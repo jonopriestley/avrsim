@@ -1,0 +1,774 @@
+
+<!DOCTYPE html>
+<html lang="en-US">
+ 
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>AVR Sim</title>
+    
+    <link rel="stylesheet" href="style.css">
+
+    <link href="https://fonts.cdnfonts.com/css/source-code-pro" rel="stylesheet">
+    
+    <script src="simulator.js"></script>
+
+</head>
+ 
+<body>
+
+    <h1 class="h1 page-header">AVR Simulator</h1>
+
+    <div class="body">
+
+        <div class="error" id="error"></div>
+        <div class="no-error" id="output"></div>
+        <div class="status" id="status">No code submitted.</div>
+
+        <div class="content">
+
+            <div class="panel panel-default panel-code">
+                <div class="panel-heading">
+                    <h4 class="panel-title">Code
+                        <small style="background-color: transparent; font-size: 15px;">
+                            (
+                            <a style="background-color: transparent;" href="http://ww1.microchip.com/downloads/en/devicedoc/atmel-0856-avr-instruction-set-manual.pdf">
+                                Instruction Set
+                            </a>
+                            )
+                        </small>
+                    </h4>
+                </div>
+                <div class="panel-body">
+                    <div class="text-box">
+                        <form>
+                            <textarea class="text-code" id="code_box" name="code_box" rows="25" cols="60"></textarea>
+                            <br>
+                            <button class="button button-assemble" type="button" onclick="app.assemble()">Assemble Code</button>
+                            <button class="button button-run" type="button" onclick="app.assemble()">Run Code</button>
+                            <button class="button button-reset" type="button" onclick="app.assemble()">Reset</button>
+                            <button class="button button-step" type="button" onclick="app.assemble()">Step</button>
+                            <select class="select select-step" name="step_size" id="step_size">
+                                <option value="1">1</option>
+                                <option value="5">5</option>
+                                <option value="25">25</option>
+                                <option value="100">100</option>
+                            </select>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel panel-default panel-cpu-and-memory">
+                <div class="panel-heading">
+                    <h4 class="panel-title">CPU & Memory</h4>
+                </div>
+                <div class="panel-body">
+                    <p class="text-muted">Registers</p>
+                    <table class="table table-reg">
+                        <tr>
+                            <th class="table-reg-heading" id="reg-linenum-0">R0 - R7</th>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-0">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-1">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-2">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-3">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-4">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-5">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-6">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-7">00</small>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th class="table-reg-heading" id="reg-linenum-1">R8 - R15</th>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-8">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-9">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-10">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-11">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-12">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-13">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-14">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-15">00</small>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th class="table-reg-heading" id="reg-linenum-2">R16 - R23</th>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-16">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-17">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-18">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-19">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-20">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-21">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-22">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-23">00</small>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th class="table-reg-heading" id="reg-linenum-3">R24 - R31</th>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-24">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-25">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-26">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-27">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-28">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-29">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-30">00</small>
+                                </div>
+                            </td>
+                            <td class="table-reg-body">
+                                <div>
+                                    <small id="reg-31">00</small>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                    <br>
+                    <p class="text-muted">Status Register</p>
+                    <table class="table table-sreg">
+                        <tr>
+                            <th style="text-align: center;">I</th>
+                            <th style="text-align: center;">T</th>
+                            <th style="text-align: center;">H</th>
+                            <th style="text-align: center;">S</th>
+                            <th style="text-align: center;">V</th>
+                            <th style="text-align: center;">N</th>
+                            <th style="text-align: center;">Z</th>
+                            <th style="text-align: center;">C</th>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div style="text-align: center; margin: auto;">
+                                    <small>FALSE</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="text-align: center; margin: auto;">
+                                    <small>FALSE</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="text-align: center; margin: auto;">
+                                    <small>FALSE</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="text-align: center; margin: auto;">
+                                    <small>FALSE</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="text-align: center; margin: auto;">
+                                    <small>FALSE</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="text-align: center; margin: auto;">
+                                    <small>FALSE</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="text-align: center; margin: auto;">
+                                    <small>FALSE</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="text-align: center; margin: auto;">
+                                    <small>FALSE</small>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                    <br>
+                    <p class="text-muted">Pointers</p>
+                    <table class="table table-other-values">
+                        <tr>
+                            <th style="text-align: center;">PC</th>
+                            <th style="text-align: center;">SP</th>
+                            <th style="text-align: center;">X</th>
+                            <th style="text-align: center;">Y</th>
+                            <th style="text-align: center;">Z</th>
+                        </tr>
+                        <tr>
+                            <td>
+                                <div style="text-align: center; margin: auto;">
+                                    <small>0000</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="text-align: center; margin: auto;">
+                                    <small>08ff</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="text-align: center; margin: auto;">
+                                    <small>0000</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="text-align: center; margin: auto;">
+                                    <small>0000</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div style="text-align: center; margin: auto;">
+                                    <small>0000</small>
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
+                    <br>
+                    <p class="text-muted">PMEM / DMEM</p>
+                    <div class="pmem">
+                        <table class="table table-pmem">
+                            <tr>
+                                <th class="table-pmem-heading" id="pmem-linenum-0">0</th>
+                                <td class="table-pmem-body">
+                                    <div>
+                                        <small id="pmem-line-0">None</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="table-pmem-heading" id="pmem-linenum-1">1</th>
+                                <td class="table-pmem-body">
+                                    <div>
+                                        <small id="pmem-line-1">None</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="table-pmem-heading" id="pmem-linenum-2">2</th>
+                                <td class="table-pmem-body">
+                                    <div>
+                                        <small id="pmem-line-2">None</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="table-pmem-heading" id="pmem-linenum-3">3</th>
+                                <td class="table-pmem-body">
+                                    <div>
+                                        <small id="pmem-line-3">None</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="table-pmem-heading" id="pmem-linenum-4">4</th>
+                                <td class="table-pmem-body">
+                                    <div>
+                                        <small id="pmem-line-4">None</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="table-pmem-heading" id="pmem-linenum-5">5</th>
+                                <td class="table-pmem-body">
+                                    <div>
+                                        <small id="pmem-line-5">None</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="table-pmem-heading" id="pmem-linenum-6">6</th>
+                                <td class="table-pmem-body">
+                                    <div>
+                                        <small id="pmem-line-6">None</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="table-pmem-heading" id="pmem-linenum-7">7</th>
+                                <td class="table-pmem-body">
+                                    <div>
+                                        <small id="pmem-line-7">None</small>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                        <button class="button button-pmem-up" type="button" onclick="app.displayPMEMUp()">ʌ</button>
+                        <button class="button button-pmem-down" type="button" onclick="app.displayPMEMDown()">v</button>
+                    </div>
+                    <div class="dmem">
+                        <table class="table table-dmem">
+                            <tr>
+                                <th class="table-dmem-heading" id="dmem-linenum-0">0100</th>
+                                <td class="table-dmem-body">
+                                    <div>
+                                        <small id="dmem-line-00">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-01">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-02">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-03">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-04">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-05">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-06">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-07">00</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="table-dmem-heading" id="dmem-linenum-1">0108</th>
+                                <td class="table-dmem-body">
+                                    <div>
+                                        <small id="dmem-line-10">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-11">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-12">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-13">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-14">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-15">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-16">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-17">00</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="table-dmem-heading" id="dmem-linenum-2">0110</th>
+                                <td class="table-dmem-body">
+                                    <div>
+                                        <small id="dmem-line-20">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-21">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-22">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-23">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-24">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-25">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-26">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-27">00</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="table-dmem-heading" id="dmem-linenum-3">0118</th>
+                                <td class="table-dmem-body">
+                                    <div>
+                                        <small id="dmem-line-30">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-31">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-32">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-33">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-34">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-35">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-36">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-37">00</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="table-dmem-heading" id="dmem-linenum-4">0120</th>
+                                <td class="table-dmem-body">
+                                    <div>
+                                        <small id="dmem-line-40">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-41">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-42">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-43">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-44">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-45">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-46">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-47">00</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="table-dmem-heading" id="dmem-linenum-5">0128</th>
+                                <td class="table-dmem-body">
+                                    <div>
+                                        <small id="dmem-line-50">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-51">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-52">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-53">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-54">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-55">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-56">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-57">00</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="table-dmem-heading" id="dmem-linenum-6">0130</th>
+                                <td class="table-dmem-body">
+                                    <div>
+                                        <small id="dmem-line-60">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-61">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-62">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-63">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-64">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-65">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-66">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-67">00</small>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="table-dmem-heading" id="dmem-linenum-7">0138</th>
+                                <td class="table-dmem-body">
+                                    <div>
+                                        <small id="dmem-line-70">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-71">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-72">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-73">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-74">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-75">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-76">00</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="table-dmem-body">
+                                        <small id="dmem-line-77">00</small>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                        <button class="button button-dmem-top" type="button" onclick="app.displayDMEMTop()">Top</button>
+                        <button class="button button-dmem-bottom" type="button" onclick="app.displayDMEMBottom()">Bottom</button>
+                        <button class="button button-dmem-up" type="button" onclick="app.displayDMEMUp()">ʌ</button>
+                        <button class="button button-dmem-down" type="button" onclick="app.displayDMEMDown()">v</button>
+                    </div>
+                    <br>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+ 
+</html>
+
+
+
+
+
+
