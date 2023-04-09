@@ -1103,21 +1103,23 @@ class Parser {
 // Also called simulator
 class Interpreter {
 
-    constructor(dmem, pmem) {
-
+    constructor() {
+        this.pmem = [];
+        this.dmem = [];
+    }
+    
+    newData(pmem, dmem) {
         // DATA & PROGRAM MEMORY
-        this.dmem = dmem;
         this.pmem = pmem;
-
+        this.dmem = dmem;
         
-
         // DEFINING PC, SP AND SREG
         this.pcl = this.dmem[0x5B]; // PC lo8
         this.pch = this.dmem[0x5C]; // PC hi8
         this.spl = this.dmem[0x5D]; // SP lo8
         this.sph = this.dmem[0x5E]; // SP hi8
         this.sreg = this.dmem[0x5F]; // SREG
-
+    
         // SETTING PC = 0 & SREG = RAMEND
         this.setPC(0);
         this.setSP(this.ramend);
@@ -1195,6 +1197,14 @@ class Interpreter {
         }
 
         return `${inst} ${arg1}, ${arg2}`;
+    }
+
+    getPMEM() {
+        return this.pmem;
+    }
+
+    getDMEM() {
+        return this.dmem;
     }
 }
 
@@ -1532,6 +1542,7 @@ class App {
         this.dmem_top = 0x100;
         this.lexer = new Lexer();
         this.parser = new Parser();
+        this.interpreter = new Interpreter();
     }
 
     assemble() {
@@ -1543,21 +1554,17 @@ class App {
 
             // Tokenizing
             this.lexer.newData(txt);
-
             console.log(this.lexer.getTokenLines());
 
             // Parsing
             this.parser.newData(this.lexer.getTokenLines(), this.lexer.getLineNumbers());
 
-            console.log(this.parser.getPMEM());
-
+            // Interpreter Initialisation
+            this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM());
+            
             // Populating Display with Data
             this.populateAll();
             
-
-            // Interpreter
-            
-
             // Success!
             this.successfulConstruction();
 
@@ -1578,7 +1585,7 @@ class App {
     populateRegisters() {
         const num_lines = 4; // number of lines in the table
         const regs_per_line = 8;
-        const registers = this.parser.dmem.slice(0,32);
+        const registers = this.interpreter.dmem.slice(0,32);
     
         // Go through the lines
         for (let line = 0; line < num_lines; line++) {
@@ -1605,7 +1612,7 @@ class App {
         for (let line = 0; line < num_lines; line++) {
             document.getElementById(`pmem-linenum-${line}`).innerHTML = `${start_cell + line}`;
             
-            let line_value =  this.parser.pmem[ start_cell + line ];  // get the line to print
+            let line_value =  this.interpreter.pmem[ start_cell + line ];  // get the line to print
     
             if (line_value === null) {                    // replace null lines with (two line inst.)
                 line_value = '(two line inst.)';
@@ -1632,7 +1639,7 @@ class App {
     
             // Put the cell values in the html
             for (let row = 0; row < num_rows; row++) {
-                let cell_value = this.parser.dmem[ start_cell + row + (num_rows * line) ].toString(16);
+                let cell_value = this.interpreter.dmem[ start_cell + row + (num_rows * line) ].toString(16);
 
                 // 0x8bf
     
