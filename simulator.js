@@ -1600,12 +1600,12 @@ class App {
         }
     }
     
-    populatePMEM(start_line) {
+    populatePMEM(start_cell) {
         const num_lines = 8; // number of lines in the table
         for (let line = 0; line < num_lines; line++) {
-            document.getElementById(`pmem-linenum-${line}`).innerHTML = `${line + start_line}`;
+            document.getElementById(`pmem-linenum-${line}`).innerHTML = `${start_cell + line}`;
             
-            let line_value =  this.parser.pmem[ line + start_line ];  // get the line to print
+            let line_value =  this.parser.pmem[ start_cell + line ];  // get the line to print
     
             if (line_value === null) {                    // replace null lines with (two line inst.)
                 line_value = '(two line inst.)';
@@ -1615,12 +1615,12 @@ class App {
         }
     }
     
-    populateDMEM(start_line) {
+    populateDMEM(start_cell) {
         const num_lines = 8; // number of lines in the table
         const num_rows = 8; // number of lines in the table
         for (let line = 0; line < num_lines; line++) {
     
-            let line_value = (start_line + (num_rows * line)).toString(16);     // Calculate line start cell number as base 16 string
+            let line_value = (start_cell + (num_rows * line)).toString(16);     // Calculate line start cell number as base 16 string
     
             // Add 0's to the front until it's 4 digits long
             for (let i = line_value.length; i < 4; i++) {
@@ -1632,7 +1632,9 @@ class App {
     
             // Put the cell values in the html
             for (let row = 0; row < num_rows; row++) {
-                let cell_value = this.parser.dmem[ start_line + row + (num_rows * line) ].toString(16);
+                let cell_value = this.parser.dmem[ start_cell + row + (num_rows * line) ].toString(16);
+
+                // 0x8bf
     
                 // Add 0's to the front until it's 4 digits long
                 for (let i = cell_value.length; i < 2; i++) {
@@ -1691,7 +1693,7 @@ class App {
     }
 
     displayDMEMBottom() {
-        this.dmem_top = (this.parser.ramend - 0x40);
+        this.dmem_top = (this.parser.ramend - 0x3f);
         this.populateDMEM(this.dmem_top);
     }
 
