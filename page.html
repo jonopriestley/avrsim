@@ -46,15 +46,15 @@
                             <textarea class="text-code" id="code_box" name="code_box" rows="25" cols="60"></textarea>
                             <br>
                             <button class="button button-assemble" type="button" onclick="app.assemble()">Assemble Code</button>
-                            <button class="button button-run" type="button" onclick="app.assemble()">Run Code</button>
-                            <button class="button button-reset" type="button" onclick="app.assemble()">Reset</button>
-                            <button class="button button-step" type="button" onclick="app.assemble()">Step</button>
+                            <button class="button button-run" type="button" onclick="app.run()">Run All</button>
+                            <button class="button button-step" type="button" onclick="app.step()">Step</button>
                             <select class="select select-step" name="step_size" id="step_size">
                                 <option value="1">1</option>
                                 <option value="5">5</option>
                                 <option value="25">25</option>
                                 <option value="100">100</option>
                             </select>
+                            <button class="button button-base" type="button" id="button_base" onclick="app.changeBase()">Base: 16</button>
                         </form>
                     </div>
                 </div>
@@ -244,54 +244,54 @@
                     <p class="text-muted">Status Register</p>
                     <table class="table table-sreg">
                         <tr>
-                            <th style="text-align: center;">I</th>
-                            <th style="text-align: center;">T</th>
-                            <th style="text-align: center;">H</th>
-                            <th style="text-align: center;">S</th>
-                            <th style="text-align: center;">V</th>
-                            <th style="text-align: center;">N</th>
-                            <th style="text-align: center;">Z</th>
-                            <th style="text-align: center;">C</th>
+                            <th class="table-sreg-heading">I</th>
+                            <th class="table-sreg-heading">T</th>
+                            <th class="table-sreg-heading">H</th>
+                            <th class="table-sreg-heading">S</th>
+                            <th class="table-sreg-heading">V</th>
+                            <th class="table-sreg-heading">N</th>
+                            <th class="table-sreg-heading">Z</th>
+                            <th class="table-sreg-heading">C</th>
                         </tr>
                         <tr>
-                            <td>
-                                <div style="text-align: center; margin: auto;">
-                                    <small>FALSE</small>
+                            <td class="table-sreg-body">
+                                <div>
+                                    <small id="sreg-I">FALSE</small>
                                 </div>
                             </td>
-                            <td>
-                                <div style="text-align: center; margin: auto;">
-                                    <small>FALSE</small>
+                            <td class="table-sreg-body">
+                                <div>
+                                    <small id="sreg-T">FALSE</small>
                                 </div>
                             </td>
-                            <td>
-                                <div style="text-align: center; margin: auto;">
-                                    <small>FALSE</small>
+                            <td class="table-sreg-body">
+                                <div>
+                                    <small id="sreg-H">FALSE</small>
                                 </div>
                             </td>
-                            <td>
-                                <div style="text-align: center; margin: auto;">
-                                    <small>FALSE</small>
+                            <td class="table-sreg-body">
+                                <div>
+                                    <small id="sreg-S">FALSE</small>
                                 </div>
                             </td>
-                            <td>
-                                <div style="text-align: center; margin: auto;">
-                                    <small>FALSE</small>
+                            <td class="table-sreg-body">
+                                <div>
+                                    <small id="sreg-V">FALSE</small>
                                 </div>
                             </td>
-                            <td>
-                                <div style="text-align: center; margin: auto;">
-                                    <small>FALSE</small>
+                            <td class="table-sreg-body">
+                                <div>
+                                    <small id="sreg-N">FALSE</small>
                                 </div>
                             </td>
-                            <td>
-                                <div style="text-align: center; margin: auto;">
-                                    <small>FALSE</small>
+                            <td class="table-sreg-body">
+                                <div>
+                                    <small id="sreg-Z">FALSE</small>
                                 </div>
                             </td>
-                            <td>
-                                <div style="text-align: center; margin: auto;">
-                                    <small>FALSE</small>
+                            <td class="table-sreg-body">
+                                <div>
+                                    <small id="sreg-C">FALSE</small>
                                 </div>
                             </td>
                         </tr>
@@ -300,36 +300,36 @@
                     <p class="text-muted">Pointers</p>
                     <table class="table table-other-values">
                         <tr>
-                            <th style="text-align: center;">PC</th>
-                            <th style="text-align: center;">SP</th>
-                            <th style="text-align: center;">X</th>
-                            <th style="text-align: center;">Y</th>
-                            <th style="text-align: center;">Z</th>
+                            <th class="table-other-values-heading">PC</th>
+                            <th class="table-other-values-heading">SP</th>
+                            <th class="table-other-values-heading">X</th>
+                            <th class="table-other-values-heading">Y</th>
+                            <th class="table-other-values-heading">Z</th>
                         </tr>
                         <tr>
-                            <td>
-                                <div style="text-align: center; margin: auto;">
-                                    <small>0000</small>
+                            <td class="table-other-values-body">
+                                <div>
+                                    <small id="reg-PC">0000</small>
                                 </div>
                             </td>
-                            <td>
-                                <div style="text-align: center; margin: auto;">
-                                    <small>08ff</small>
+                            <td class="table-other-values-body">
+                                <div>
+                                    <small id="reg-SP">0000</small>
                                 </div>
                             </td>
-                            <td>
-                                <div style="text-align: center; margin: auto;">
-                                    <small>0000</small>
+                            <td class="table-other-values-body">
+                                <div>
+                                    <small id="reg-X">0000</small>
                                 </div>
                             </td>
-                            <td>
-                                <div style="text-align: center; margin: auto;">
-                                    <small>0000</small>
+                            <td class="table-other-values-body">
+                                <div>
+                                    <small id="reg-Y">0000</small>
                                 </div>
                             </td>
-                            <td>
-                                <div style="text-align: center; margin: auto;">
-                                    <small>0000</small>
+                            <td class="table-other-values-body">
+                                <div>
+                                    <small id="reg-Z">0000</small>
                                 </div>
                             </td>
                         </tr>

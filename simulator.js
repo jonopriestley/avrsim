@@ -306,13 +306,17 @@ class Instruction {
         
         return `${inst} ${arg1}, ${arg2}`;
     }
-
-    getCode() {
-        return this.toString();
-    }
     
     getOpcode() {
         return this.opcode;
+    }
+
+    getInst() {
+        return this.inst;
+    }
+
+    getArgs() {
+        return this.args
     }
 
 }      
@@ -1106,6 +1110,13 @@ class Interpreter {
     constructor() {
         this.pmem = [];
         this.dmem = [];
+        this.sreg = new Token('REG', 0);
+        this.pcl = new Token('REG', 0); // PC lo8
+        this.pch = new Token('REG', 0); // PC hi8
+        this.spl = new Token('REG', 0); // SP lo8
+        this.sph = new Token('REG', 0); // SP hi8
+
+        this.finished = false;
     }
     
     newData(pmem, dmem) {
@@ -1121,13 +1132,236 @@ class Interpreter {
         this.sreg = this.dmem[0x5F]; // SREG
     
         // SETTING PC = 0 & SREG = RAMEND
+        this.flashend = this.pmem.length;
+        this.ramend = this.dmem.length;
         this.setPC(0);
         this.setSP(this.ramend);
 
     }
 
     step() {
-        // pass
+
+        //////// DELETE THIS LINE ////////
+        this.finished = true;
+        ///////////////////////
+
+        if (this.finished) {
+            return;
+        }
+
+        if (this.getPC() >= this.flashend) {
+            this.finished = true;
+            this.setPC(this.flashend);
+            return;
+        }
+
+        const line = this.pmem[ this.getPC() ]; 
+
+        const inst = line.getInst().getValue();
+
+        // Big switch statement
+
+        switch (inst) {
+            case 'ADC':
+                break;
+            case 'ADD':
+                break;
+            case 'ADIW':
+                break;
+            case 'AND':
+                break;
+            case 'ANDI':
+                break;
+            case 'ASR':
+                break;
+            case 'BCLR':
+                break;
+            case 'BRBC':
+                break;
+            case 'BRBS':
+                break;
+            case 'BRCC':
+                break;
+            case 'BRCS':
+                break;
+            case 'BREQ':
+                break;
+            case 'BRGE':
+                break;
+            case 'BRHC':
+                break;
+            case 'BRHS':
+                break;
+            case 'BRID':
+                break;
+            case 'BRIE':
+                break;
+            case 'BRLO':
+                break;
+            case 'BRLT':
+                break;
+            case 'BRMI':
+                break;
+            case 'BRNE':
+                break;
+            case 'BRPL':
+                break;
+            case 'BRSH':
+                break;
+            case 'BRTC':
+                break;
+            case 'BRTS':
+                break;
+            case 'BRVC':
+                break;
+            case 'BRVS':
+                break;
+            case 'BSET':
+                break;
+            case 'CALL':
+                break;
+            case 'CBI':
+                break;
+            case 'CBR':
+                break;
+            case 'CLC':
+                break;
+            case 'CLH':
+                break;
+            case 'CLI':
+                break;
+            case 'CLN':
+                break;
+            case 'CLR':
+                break;
+            case 'CLS':
+                break;
+            case 'CLT':
+                break;
+            case 'CLV':
+                break;
+            case 'CLZ':
+                break;
+            case 'COM':
+                break;
+            case 'CP':
+                break;
+            case 'CPC':
+                break;
+            case 'CPI':
+                break;
+            case 'DEC':
+                break;
+            case 'EOR':
+                break;
+            case 'IN':
+                break;
+            case 'INC':
+                break;
+            case 'JMP':
+                break;
+            case 'LD':
+                break;
+            case 'LDD':
+                break;
+            case 'LDI':
+                break;
+            case 'LDS':
+                break;
+            case 'LSL':
+                break;
+            case 'LSR':
+                break;
+            case 'MOV':
+                break;
+            case 'MOVW':
+                break;
+            case 'MUL':
+                break;
+            case 'MULS':
+                break;
+            case 'MULSU':
+                break;
+            case 'NEG':
+                break;
+            case 'NOP':
+                this.setPC(this.getPC() + 1)
+                break;
+            case 'OR':
+                break;
+            case 'ORI':
+                break;
+            case 'OUT':
+                break;
+            case 'POP':
+                break;
+            case 'PUSH':
+                break;
+            case 'RJMP':
+                break;
+            case 'RET':
+                break;
+            case 'ROL':
+                break;
+            case 'ROR':
+                break;
+            case 'SBC':
+                break;
+            case 'SBI':
+                break;
+            case 'SBIW':
+                break;
+            case 'SBR':
+                break;
+            case 'SBRC':
+                break;
+            case 'SBRS':
+                break;
+            case 'SEC':
+                break;
+            case 'SEH':
+                break;
+            case 'SEI':
+                break;
+            case 'SEN':
+                break;
+            case 'SER':
+                break;
+            case 'SES':
+                break;
+            case 'SET':
+                break;
+            case 'SEV':
+                break;
+            case 'SEZ':
+                break;
+            case 'ST':
+                break;
+            case 'STD':
+                break;
+            case 'STS':
+                break;
+            case 'SUB':
+                break;
+            case 'SUBI':
+                break;
+            case 'SWAP':
+                break;
+            case 'TST':
+                break;
+            case 'XCH':
+                break;
+            default:
+                break;
+        }
+
+        
+    }
+
+    run() {
+        while (this.finished === false && this.getPC < this.flashend) {
+            this.step();
+        }
     }
 
     getPC() {
@@ -1156,11 +1390,11 @@ class Interpreter {
         this.spl.setValue(lo8);
     }
 
-    incSP(self) {
+    incSP() {
         this.setSP( this.getSP() + 1 );
     }
 
-    decSP(self) {
+    decSP() {
         this.setSP( this.getSP() - 1 );
     }
 
@@ -1206,6 +1440,24 @@ class Interpreter {
     getDMEM() {
         return this.dmem;
     }
+
+    getSREG() {
+        return this.sreg;
+    }
+
+    getX() {
+        return (0x100 * this.getDMEM()[27].getValue()) + this.getDMEM()[26].getValue()
+    }
+
+    getY() {
+        return (0x100 * this.getDMEM()[29].getValue()) + this.getDMEM()[28].getValue()
+    }
+
+    getZ() {
+        return (0x100 * this.getDMEM()[31].getValue()) + this.getDMEM()[30].getValue()
+    }
+
+
 }
 
 
@@ -1540,9 +1792,14 @@ class App {
     constructor() {
         this.pmem_top = 0;
         this.dmem_top = 0x100;
+
         this.lexer = new Lexer();
         this.parser = new Parser();
         this.interpreter = new Interpreter();
+
+        this.base = 16; // value base for display
+
+        this.assembled = false;
     }
 
     assemble() {
@@ -1562,104 +1819,163 @@ class App {
             // Interpreter Initialisation
             this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM());
             
+            // Success!
+            this.successfulConstruction();
+
             // Populating Display with Data
             this.populateAll();
             
-            // Success!
-            this.successfulConstruction();
 
         }
 
         else {
-            this.newError('No code to parse. Please input code in the code box.')
+            this.newError('No code to parse. Please input code in the code box.');
         }
 
     }
 
+    step() {
+        const stepsize = this.getStepSize();
+        for (let i = 0; i < stepsize; i++) {
+            this.interpreter.step();
+        }
+        this.populateAll();
+    }
+
+    run() {
+        this.interpreter.run();
+        this.populateAll();
+    }
+
     populateAll() {
         this.populateRegisters();
+        this.populateSREG();
+        this.populatePointers();
         this.populatePMEM(this.pmem_top);
         this.populateDMEM(this.dmem_top);
     }
 
     populateRegisters() {
-        const num_lines = 4; // number of lines in the table
-        const regs_per_line = 8;
-        const registers = this.interpreter.dmem.slice(0,32);
+        if (this.assembled) {
+
+            const num_lines = 4; // number of lines in the table
+            const regs_per_line = 8;
+            const registers = this.interpreter.dmem.slice(0,32);
+        
+            // Go through the lines
+            for (let line = 0; line < num_lines; line++) {
+        
+                // Don't need to populate the table headings since they never change
+        
+                // Go through each reg in the line
+                for (let reg = 0; reg < regs_per_line; reg++) {
+                    const reg_num = reg + (line * regs_per_line);
+                    const reg_value = this.convertValueToBase(registers[reg_num].getValue(), 2);
+                    document.getElementById(`reg-${reg_num}`).innerHTML = reg_value;
+                }
+            }
+
+        }
+    }
+
+    populateSREG() {
+        if (this.assembled) {
+
+            const sreg_flags = ['I', 'T', 'H', 'S', 'V', 'N', 'Z', 'C'];
+            for (let i = 0; i < 8; i++) {
+                const flag = sreg_flags[i];
     
-        // Go through the lines
-        for (let line = 0; line < num_lines; line++) {
+                let flag_value = this.interpreter.getSREG().getValue(); // get the sreg value
+                flag_value = (2 ** (7 - i)) && flag_value; // get the correct bit of that value
     
-            // Don't need to populate the table headings since they never change
-    
-            // Go through each reg in the line
-            for (let reg = 0; reg < regs_per_line; reg++) {
-                const reg_num = reg + (line * regs_per_line);
-                let reg_value = registers[reg_num].getValue().toString(16);
-    
-                // Add 0's to the front until it's 2 digits long
-                for (let i = reg_value.length; i < 2; i++) {
-                    reg_value = '0' + reg_value;
+                if (flag_value) {
+                    flag_value = 'TRUE';
+                } else {
+                    flag_value = 'FALSE';
                 }
     
-                document.getElementById(`reg-${reg_num}`).innerHTML = reg_value;
+                document.getElementById(`sreg-${flag}`).innerHTML = flag_value;
+    
             }
         }
     }
+
+    populatePointers() {
+        // can't all be done in a loop since theyre all different
+
+        if (this.assembled) {
+
+            const pc = this.convertValueToBase(this.interpreter.getPC(), 4);
+            const sp = this.convertValueToBase(this.interpreter.getSP(), 4);
+            const x = this.convertValueToBase(this.interpreter.getX(), 4);
+            const y = this.convertValueToBase(this.interpreter.getY(), 4);
+            const z = this.convertValueToBase(this.interpreter.getZ(), 4);
+
+            document.getElementById('reg-PC').innerHTML = pc;
+            document.getElementById('reg-SP').innerHTML = sp;
+            document.getElementById('reg-X').innerHTML = x;
+            document.getElementById('reg-Y').innerHTML = y;
+            document.getElementById('reg-Z').innerHTML = z;
+
+        }
+
+    }
     
     populatePMEM(start_cell) {
-        const num_lines = 8; // number of lines in the table
-        for (let line = 0; line < num_lines; line++) {
-            document.getElementById(`pmem-linenum-${line}`).innerHTML = `${start_cell + line}`;
-            
-            let line_value =  this.interpreter.pmem[ start_cell + line ];  // get the line to print
-    
-            if (line_value === null) {                    // replace null lines with (two line inst.)
-                line_value = '(two line inst.)';
+        if (this.assembled) {
+
+            const num_lines = 8; // number of lines in the table
+            for (let line = 0; line < num_lines; line++) {
+                document.getElementById(`pmem-linenum-${line}`).innerHTML = `${start_cell + line}`;
+                
+                let line_value =  this.interpreter.pmem[ start_cell + line ];  // get the line to print
+        
+                if (line_value === null) {                    // replace null lines with (two line inst.)
+                    line_value = '(two line inst.)';
+                }
+        
+                document.getElementById(`pmem-line-${line}`).innerHTML = line_value;
             }
-    
-            document.getElementById(`pmem-line-${line}`).innerHTML = line_value;
         }
     }
     
     populateDMEM(start_cell) {
-        const num_lines = 8; // number of lines in the table
-        const num_rows = 8; // number of lines in the table
-        for (let line = 0; line < num_lines; line++) {
-    
-            let line_value = (start_cell + (num_rows * line)).toString(16);     // Calculate line start cell number as base 16 string
-    
-            // Add 0's to the front until it's 4 digits long
-            for (let i = line_value.length; i < 4; i++) {
-                line_value = '0' + line_value;
-            }
-    
-            // Put the line value in the html
-            document.getElementById(`dmem-linenum-${line}`).innerHTML = line_value;
-    
-            // Put the cell values in the html
-            for (let row = 0; row < num_rows; row++) {
-                let cell_value = this.interpreter.dmem[ start_cell + row + (num_rows * line) ].toString(16);
+        if (this.assembled) {
 
-                // 0x8bf
-    
+            const num_lines = 8; // number of lines in the table
+            const num_rows = 8; // number of lines in the table
+            for (let line = 0; line < num_lines; line++) {
+        
+                let line_value = (start_cell + (num_rows * line)).toString(16);     // Calculate line start cell number as base 16 string
+        
                 // Add 0's to the front until it's 4 digits long
-                for (let i = cell_value.length; i < 2; i++) {
-                    cell_value = '0' + cell_value;
+                for (let i = line_value.length; i < 4; i++) {
+                    line_value = '0' + line_value;
                 }
-                
-                document.getElementById(`dmem-line-${line}${row}`).innerHTML = cell_value;
+        
+                // Put the line value in the html
+                document.getElementById(`dmem-linenum-${line}`).innerHTML = line_value;
+        
+                // Put the cell values in the html
+                for (let row = 0; row < num_rows; row++) {
+                    let cell_value = this.interpreter.dmem[ start_cell + row + (num_rows * line) ];
+                    cell_value = this.convertValueToBase(cell_value, 2);
+                    
+                    document.getElementById(`dmem-line-${line}${row}`).innerHTML = cell_value;
+                }
             }
         }
     }
 
     successfulConstruction() {
+        this.assembled = true;
         document.getElementById('output').innerHTML = 'Success! Your code can be run.';
         document.getElementById('error').innerHTML = null;
         document.getElementById('status').innerHTML = null;
     }
 
     newError(text) {
+        this.assembled = false;
         document.getElementById('error').innerHTML = text;
         document.getElementById('output').innerHTML = null;
         document.getElementById('status').innerHTML = null;
@@ -1704,7 +2020,37 @@ class App {
         this.populateDMEM(this.dmem_top);
     }
 
+    getStepSize() {
+        return parseInt(document.getElementById('step_size').value);
+    }
 
+    convertValueToBase(value, num_digits) {
+        // Returns the value in the this.base base with a given number of digits
+        let n = value.toString(this.base);
+
+        if (this.base === 16) {
+
+            for (let i = n.length; i < num_digits; i++) {
+                n = '0' + n;
+            }
+        }
+
+        return n;
+    }
+
+    changeBase() {
+        if (this.base === 16) {
+            this.base = 10;
+            document.getElementById('button_base').innerHTML = 'Base: 10';
+        }
+
+        else {
+            this.base = 16;
+            document.getElementById('button_base').innerHTML = 'Base: 16';
+        }
+
+        this.populateAll();
+    }
 
 }
 

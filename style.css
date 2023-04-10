@@ -163,9 +163,10 @@ textarea {
     padding: 15px 15px;
 }
 
-.button-reset {
+.button-base {
     padding: 15px 15px;
 }
+
 
 .button-pmem-up {
     padding: 15px 15px;
@@ -247,13 +248,33 @@ td {
 .table-sreg {
     width: 100%;
     margin-top: 10px;
+    table-layout: fixed;
+}
+
+
+.table-sreg-heading {
+    text-align: center;
+}
+
+.table-sreg-body {
+    text-align: center;
+    margin: auto;
 }
 
 .table-other-values {
     width: 100%;
     margin-top: 10px;
+    table-layout: fixed;
 }
 
+.table-other-values-heading {
+    text-align: center;
+}
+
+.table-other-values-body {
+    text-align: center;
+    margin: auto;
+}
 
 .pmem {
     float:left;
@@ -270,7 +291,7 @@ td {
 
 .table-pmem-heading {
     text-align: center;
-    width: 10%;
+    width: 20%;
 }
 
 .table-pmem-body {
