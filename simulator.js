@@ -270,7 +270,8 @@ class Instruction {
         }
     }
 
-    toString() {
+    toString(base) {
+        // Always display numbers in base 10
         const inst = this.inst.getValue();
         const argsLen = this.args.length;
 
@@ -285,7 +286,7 @@ class Instruction {
         }
 
         else if (this.args[0].getType() === 'INT') {
-            arg1 = arg1.toString(16);
+            arg1 = arg1.toString(base);
         }
 
         if (argsLen === 1) {
@@ -301,7 +302,7 @@ class Instruction {
         }
 
         else if (this.args[1].getType() === 'INT') {
-            arg2 = arg2.toString(16);
+            arg2 = arg2.toString(base);
         }
         
         return `${inst} ${arg1}, ${arg2}`;
@@ -461,6 +462,7 @@ class Parser {
     constructor() {
         this.token_lines = [];
         this.line_numbers = [];
+        this.pmem_line_numbers = [];
         this.pmem = [];
         this.dmem = [];
 
@@ -940,13 +942,15 @@ class Parser {
                     this.newError(`Illegal token \'${line[0]}\' on line ${line_in_file}.`);
                 }
                 
-                this.pmem.push(line);                   // set the line to the line without the label
+                this.pmem.push(line); // set the line to the line without the label
+                this.pmem_line_numbers.push(line_in_file);
                 pmem_file_lines.push(line_in_file);
                 const inst = line[0].getValue();
                 
                 // Add None as next line if it's a 32 bit opcode
                 if ( opcode_32_bit.includes(inst) ) {
                     this.pmem.push(null);
+                    this.pmem_line_numbers.push(null);
                     pmem_file_lines.push(line_in_file);
                 }
             }
@@ -1094,6 +1098,10 @@ class Parser {
         return this.dmem;
     }
 
+    getPMEMLineNumbers() {
+        return this.pmem_line_numbers;
+    }
+
     newError(text) {
         document.getElementById('error').innerHTML = text;
         document.getElementById('output').innerHTML = null;
@@ -1110,6 +1118,7 @@ class Interpreter {
     constructor() {
         this.pmem = [];
         this.dmem = [];
+        this.line_numbers = [];
         this.sreg = new Token('REG', 0);
         this.pcl = new Token('REG', 0); // PC lo8
         this.pch = new Token('REG', 0); // PC hi8
@@ -1119,10 +1128,12 @@ class Interpreter {
         this.finished = false;
     }
     
-    newData(pmem, dmem) {
+    newData(pmem, dmem, pmem_line_numbers) {
         // DATA & PROGRAM MEMORY
         this.pmem = pmem;
         this.dmem = dmem;
+        this.line_numbers = pmem_line_numbers;
+        this.finished = false;
         
         // DEFINING PC, SP AND SREG
         this.pcl = this.dmem[0x5B]; // PC lo8
@@ -1132,18 +1143,14 @@ class Interpreter {
         this.sreg = this.dmem[0x5F]; // SREG
     
         // SETTING PC = 0 & SREG = RAMEND
-        this.flashend = this.pmem.length;
-        this.ramend = this.dmem.length;
+        this.flashend = this.pmem.length - 1;
+        this.ramend = this.dmem.length - 1;
         this.setPC(0);
         this.setSP(this.ramend);
 
     }
 
     step() {
-
-        //////// DELETE THIS LINE ////////
-        this.finished = true;
-        ///////////////////////
 
         if (this.finished) {
             return;
@@ -1156,25 +1163,86 @@ class Interpreter {
         }
 
         const line = this.pmem[ this.getPC() ]; 
-
         const inst = line.getInst().getValue();
+        const line_in_file = this.line_numbers[this.getPC()];
 
+        let Rd, Rr, R, K, k, b, s, A, q, I, T, H, S, V, N, Z, C;    // declaring all the variable names
+        
         // Big switch statement
 
         switch (inst) {
             case 'ADC':
+                Rd = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+                C = this.getSREG() & 1;
+                R = Rd + Rr + C;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd + Rr + C
+
+                H = ( this.getBit(Rd, 3) & this.getBit(Rr, 3) ) | ( this.getBit(Rr, 3) & (1 - this.getBit(R, 3)) ) | ( this.getBit(Rd, 3) & (1 - this.getBit(R, 3)) ); 
+                V = ( this.getBit(Rd, 7) & this.getBit(Rr, 7) & (1 - this.getBit(R, 7)) ) | ( (1 - this.getBit(Rd, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(R, 7) );
+                N = this.getBit(R, 7);
+                C = ( this.getBit(Rd, 7) & this.getBit(Rr, 7) ) | ( this.getBit(Rr, 7) & (1 - this.getBit(R, 7)) ) | ( this.getBit(Rd, 7) & (1 - this.getBit(R, 7)) ); 
+                this.updateSREGBit(H, 5);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit(C, 0);
                 break;
             case 'ADD':
+                Rd = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+                R = Rd + Rr;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd + Rr
+
+                H = ( this.getBit(Rd, 3) & this.getBit(Rr, 3) ) | ( this.getBit(Rr, 3) & (1 - this.getBit(R, 3)) ) | ( this.getBit(Rd, 3) & (1 - this.getBit(R, 3)) ); 
+                V = ( this.getBit(Rd, 7) & this.getBit(Rr, 7) & (1 - this.getBit(R, 7)) ) | ( (1 - this.getBit(Rd, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(R, 7) );
+                N = this.getBit(R, 7);
+                C = ( this.getBit(Rd, 7) & this.getBit(Rr, 7) ) | ( this.getBit(Rr, 7) & (1 - this.getBit(R, 7)) ) | ( this.getBit(Rd, 7) & (1 - this.getBit(R, 7)) ); 
+                this.updateSREGBit(H, 5);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit(C, 0);
                 break;
             case 'ADIW':
                 break;
             case 'AND':
+                Rd = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+                R = Rd & Rr;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd & Rr
+
+                V = 0;
+                N = this.getBit(R, 7);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
                 break;
             case 'ANDI':
+                Rd = this.getArgumentValue(line, 0);
+                K = this.getArgumentValue(line, 1);
+                R = Rd & K;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd & K
+
+                V = 0;
+                N = this.getBit(R, 7);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
                 break;
             case 'ASR':
                 break;
             case 'BCLR':
+                s = this.getArgumentValue(line, 0);
+                this.updateSREGBit(0, s);   // Clear bit s
                 break;
             case 'BRBC':
                 break;
@@ -1217,6 +1285,8 @@ class Interpreter {
             case 'BRVS':
                 break;
             case 'BSET':
+                s = this.getArgumentValue(line, 0);
+                this.updateSREGBit(1, s);   // Set bit s
                 break;
             case 'CALL':
                 break;
@@ -1265,10 +1335,30 @@ class Interpreter {
             case 'LDD':
                 break;
             case 'LDI':
+                K = this.getArgumentValue(line, 1);
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(K);   // Rd <-- K
                 break;
             case 'LDS':
+                k = this.getArgumentValue(line, 1);
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
+                this.incPC(); // increment once now cause total needs to be + 2
                 break;
             case 'LSL':
+                Rd = this.getArgumentValue(line, 0);
+                R = Rd + Rd;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd + Rd
+
+                H = this.getBit(Rd, 3);
+                N = this.getBit(R, 7);
+                C = this.getBit(Rd, 7);
+                V = N ^ C;
+                this.updateSREGBit(H, 5);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit(C, 0);
                 break;
             case 'LSR':
                 break;
@@ -1285,21 +1375,75 @@ class Interpreter {
             case 'NEG':
                 break;
             case 'NOP':
-                this.setPC(this.getPC() + 1)
                 break;
             case 'OR':
+                Rd = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+                R = Rd | Rr;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd | Rr
+
+                V = 0;
+                N = this.getBit(R, 7);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
                 break;
             case 'ORI':
+                Rd = this.getArgumentValue(line, 0);
+                K = this.getArgumentValue(line, 1);
+                R = Rd | K;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd | K
+
+                V = 0;
+                N = this.getBit(R, 7);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
                 break;
             case 'OUT':
                 break;
             case 'POP':
+                if (this.getSP() >= this.ramend) {
+                    this.newError(`Bad stack pointer for PUSH on line ${line_in_file}`)
+                    return;
+                }
+                Rd = line.getArgs()[0].getValue();                                  // register number
+                this.getDMEM()[ Rd ].setValue( this.getDMEM()[this.getSP()] );      // set register value
+                this.incSP();                                                       // increment the SP by 1
                 break;
             case 'PUSH':
+                if (this.getSP() <= 0x100) {
+                    this.newError(`Bad stack pointer for PUSH on line ${line_in_file}`)
+                    return;
+                }
+                Rr = this.getArgumentValue(line, 0);            // register held value
+                this.getDMEM()[this.getSP()] = Rr;              // set the value in DMEM
+                this.decSP();                                   // decrement the SP by 1
                 break;
             case 'RJMP':
                 break;
             case 'RET':
+                if (this.getSP() == this.ramend) {
+                    this.finished = true;
+                    this.incPC();
+                    return;
+                }
+
+                if ( (this.getSP() < 0x100) || (this.getSP() > (this.ramend - 2)) ) {
+                    this.newError(`Bad stack pointer for RET on line ${line_in_file}`);
+                    return;
+                }
+                
+                // Get the return line and move the SP
+                this.incSP();;
+                let ret_line = ( 0x100 * this.getDMEM()[this.getSP()] ); // get the ret high value
+                this.incSP();
+                ret_line += this.getDMEM()[this.getSP()]; // add the ret low value to the ret high value
+                this.setPC(ret_line - 1); // -1 to counteract the increment at the end of the switch statement
                 break;
             case 'ROL':
                 break;
@@ -1355,11 +1499,13 @@ class Interpreter {
                 break;
         }
 
+        this.incPC(); // almost every instruction does this, so its easier to counterract it if you don't want to do exactly that
+
         
     }
 
     run() {
-        while (this.finished === false && this.getPC < this.flashend) {
+        while (this.finished === false) {
             this.step();
         }
     }
@@ -1370,7 +1516,7 @@ class Interpreter {
 
     setPC(new_value) {
 
-        const hi8 = ( new_value - ( new_value % 0x100 ) ); // 0x100
+        const hi8 = ( new_value - ( new_value % 0x100 ) ) / 0x100;
         const lo8 = ( new_value % 0x100 );
 
         this.pch.setValue(hi8);
@@ -1383,7 +1529,7 @@ class Interpreter {
 
     setSP(new_value) {
 
-        const hi8 = ( new_value - ( new_value % 0x100 ) ); // 0x100
+        const hi8 = ( new_value - ( new_value % 0x100 ) ) / 0x100;
         const lo8 = ( new_value % 0x100 );
 
         this.sph.setValue(hi8);
@@ -1396,6 +1542,14 @@ class Interpreter {
 
     decSP() {
         this.setSP( this.getSP() - 1 );
+    }
+
+    incPC() {
+        this.setPC(this.getPC() + 1);
+    }
+
+    decPC() {
+        this.setPC(this.getPC() - 1);
     }
 
     convertPmemToksToCode(toks) {
@@ -1442,7 +1596,23 @@ class Interpreter {
     }
 
     getSREG() {
-        return this.sreg;
+        return this.sreg.getValue();
+    }
+
+    updateSREGBit(value, bit) {
+        if (value) {
+            this.sreg.setValue( this.sreg.getValue() | (2 ** bit) );
+        } else {
+            this.sreg.setValue( this.sreg.getValue() & (0x100 - (2 ** bit)) );
+        }
+    }
+
+    getBit(value, bit) {
+        // returns the value of a bit in a number
+        if ((value & (2 ** bit)) !== 0) {
+            return 1;
+        }
+        return 0;
     }
 
     getX() {
@@ -1457,9 +1627,26 @@ class Interpreter {
         return (0x100 * this.getDMEM()[31].getValue()) + this.getDMEM()[30].getValue()
     }
 
+    getArgumentValue(line, arg_num) {
+        // For getting the value of a register of integer
+        const arg = line.getArgs()[arg_num];
+        if (arg.getType() === 'INT') {
+            return arg.getValue();
+        }
+        else if (arg.getType() === 'REG') {
+            return this.getDMEM()[arg.getValue()].getValue();
+        }
+    }
+
+    newError(text) {
+        this.finished = true;
+        document.getElementById('error').innerHTML = text;
+        document.getElementById('output').innerHTML = null;
+        document.getElementById('status').innerHTML = null;
+        throw new SyntaxError(text);
+    }
 
 }
-
 
 
 
@@ -1787,7 +1974,6 @@ DIRECTIVES = [
 
 
 
-
 class App {
     constructor() {
         this.pmem_top = 0;
@@ -1800,6 +1986,7 @@ class App {
         this.base = 16; // value base for display
 
         this.assembled = false;
+
     }
 
     assemble() {
@@ -1817,11 +2004,11 @@ class App {
             this.parser.newData(this.lexer.getTokenLines(), this.lexer.getLineNumbers());
 
             // Interpreter Initialisation
-            this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM());
+            this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), this.parser.getPMEMLineNumbers());
             
             // Success!
-            this.successfulConstruction();
-
+            this.success('Success! Your code can be run.');
+            
             // Populating Display with Data
             this.populateAll();
             
@@ -1835,15 +2022,26 @@ class App {
     }
 
     step() {
+        
         const stepsize = this.getStepSize();
         for (let i = 0; i < stepsize; i++) {
             this.interpreter.step();
         }
+
+        if (this.interpreter.finished) {
+            this.success('The code has run and exited successfully!');
+        }
+
         this.populateAll();
     }
 
     run() {
         this.interpreter.run();
+
+        if (this.interpreter.finished) {
+            this.success('The code has run and exited successfully!');
+        }
+
         this.populateAll();
     }
 
@@ -1885,7 +2083,7 @@ class App {
             for (let i = 0; i < 8; i++) {
                 const flag = sreg_flags[i];
     
-                let flag_value = this.interpreter.getSREG().getValue(); // get the sreg value
+                let flag_value = this.interpreter.getSREG(); // get the sreg value
                 flag_value = (2 ** (7 - i)) && flag_value; // get the correct bit of that value
     
                 if (flag_value) {
@@ -1928,10 +2126,12 @@ class App {
             for (let line = 0; line < num_lines; line++) {
                 document.getElementById(`pmem-linenum-${line}`).innerHTML = `${start_cell + line}`;
                 
-                let line_value =  this.interpreter.pmem[ start_cell + line ];  // get the line to print
+                let line_value = this.interpreter.getPMEM()[ start_cell + line ];  // get the line to print
         
-                if (line_value === null) {                    // replace null lines with (two line inst.)
-                    line_value = '(two line inst.)';
+                if (line_value !== null) {                    // replace null lines with (two line inst.)
+                    line_value = line_value.toString(this.base);
+                } else {
+                    line_value = '(two line inst.)';  
                 }
         
                 document.getElementById(`pmem-line-${line}`).innerHTML = line_value;
@@ -1946,7 +2146,7 @@ class App {
             const num_rows = 8; // number of lines in the table
             for (let line = 0; line < num_lines; line++) {
         
-                let line_value = (start_cell + (num_rows * line)).toString(16);     // Calculate line start cell number as base 16 string
+                let line_value = (start_cell + (num_rows * line)).toString(this.base);     // Calculate line start cell number as base 16 string
         
                 // Add 0's to the front until it's 4 digits long
                 for (let i = line_value.length; i < 4; i++) {
@@ -1967,9 +2167,9 @@ class App {
         }
     }
 
-    successfulConstruction() {
+    success(text) {
         this.assembled = true;
-        document.getElementById('output').innerHTML = 'Success! Your code can be run.';
+        document.getElementById('output').innerHTML = text;
         document.getElementById('error').innerHTML = null;
         document.getElementById('status').innerHTML = null;
     }
