@@ -205,7 +205,6 @@ textarea {
     padding: 15px 15px;
 }
 
-
 tbody {
     border: 1px solid transparent;
 }
@@ -245,6 +244,12 @@ td {
     margin: auto;
 }
 
+.table-reg-small {
+    padding-left: 3%;
+    padding-right: 3%;
+    border-radius: 5px;
+}
+
 .table-sreg {
     width: 100%;
     margin-top: 10px;
@@ -269,6 +274,33 @@ td {
 
 .table-other-values-heading {
     text-align: center;
+    padding: 1%;
+}
+
+.table-other-values-heading-small {
+    color: #fff;
+    padding: 3%;
+    border-radius: 5px;
+}
+
+.heading-PC {
+    background-color:#4a5cff;
+}
+
+.heading-SP {
+    background-color:#da920d;
+}
+
+.heading-X {
+    background-color:#32bd32;
+}
+
+.heading-Y {
+    background-color:#20a3a3;
+}
+
+.heading-Z {
+    background-color:#bd0c47;
 }
 
 .table-other-values-body {
@@ -291,14 +323,18 @@ td {
 
 .table-pmem-heading {
     text-align: center;
-    width: 20%;
+    width: 25%;
+}
+
+.table-pmem-heading-small {
+    padding: 5%;
+    border-radius: 5px;
 }
 
 .table-pmem-body {
     text-align: left;
     margin: auto;
 }
-
 
 .dmem {
     float:right;
@@ -321,6 +357,12 @@ td {
 .table-dmem-body {
     text-align: center;
     margin: auto;
+}
+
+.table-dmem-body-small {
+    padding-left: 3%;
+    padding-right: 3%;
+    border-radius: 5px;
 }
 
 .memory-configs {

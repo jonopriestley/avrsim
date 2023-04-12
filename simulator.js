@@ -47,13 +47,25 @@ class Register {
         this.changed = 0;
     }
 
-    setValue(new_value) {
-        this.value = new_value % 256;
+    setChange() {
         this.changed = 1;
+    }
+
+    setValue(new_value) {
+        this.value = ((new_value % 256) + 256) % 256;
+        this.setChange();
     }
 
     getValue() {
         return this.value;
+    }
+
+    getBit(bit) {
+        // returns the value of a bit in a number
+        if ((this.getValue() & (2 ** bit)) !== 0) {
+            return 1;
+        }
+        return 0;
     }
 
 }
@@ -1175,7 +1187,7 @@ class Interpreter {
                 Rd = this.getArgumentValue(line, 0);
                 Rr = this.getArgumentValue(line, 1);
                 C = this.getSREG() & 1;
-                R = Rd + Rr + C;
+                R = (((Rd + Rr + C) % 0x100) + 0x100) % 0x100;
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd + Rr + C
 
@@ -1193,7 +1205,7 @@ class Interpreter {
             case 'ADD':
                 Rd = this.getArgumentValue(line, 0);
                 Rr = this.getArgumentValue(line, 1);
-                R = Rd + Rr;
+                R = (((Rd + Rr) % 0x100) + 0x100) % 0x100;
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd + Rr
 
@@ -1321,14 +1333,38 @@ class Interpreter {
             case 'CPI':
                 break;
             case 'DEC':
+                Rd = this.getArgumentValue(line, 0);
+                R = (((Rd - 1) % 0x100) + 0x100) % 0x100;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd - 1
+
+                V = (R === 127);
+                N = this.getBit(R, 7);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
                 break;
             case 'EOR':
                 break;
             case 'IN':
                 break;
             case 'INC':
+                Rd = this.getArgumentValue(line, 0);
+                R = (((Rd + 1) % 0x100) + 0x100) % 0x100;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd + 1
+
+                V = (R === 128);
+                N = this.getBit(R, 7);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
                 break;
             case 'JMP':
+                k = this.getArgumentValue(line, 0);
+                this.interpreter.setPC(k - 1);
                 break;
             case 'LD':
                 break;
@@ -1345,7 +1381,7 @@ class Interpreter {
                 break;
             case 'LSL':
                 Rd = this.getArgumentValue(line, 0);
-                R = Rd + Rd;
+                R = (((Rd + Rd) % 0x100) + 0x100) % 0x100;
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd + Rd
 
@@ -1363,6 +1399,8 @@ class Interpreter {
             case 'LSR':
                 break;
             case 'MOV':
+                Rr = this.getArgumentValue(line, 1);
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Rr);   // Rd <-- Rr
                 break;
             case 'MOVW':
                 break;
@@ -1429,7 +1467,6 @@ class Interpreter {
             case 'RET':
                 if (this.getSP() == this.ramend) {
                     this.finished = true;
-                    this.incPC();
                     return;
                 }
 
@@ -2022,6 +2059,9 @@ class App {
     }
 
     step() {
+        for (let i = 0; i < 32; i++) {
+            this.interpreter.getDMEM()[i].clearChange();    // set changed = 0 for all registers
+        }
         
         const stepsize = this.getStepSize();
         for (let i = 0; i < stepsize; i++) {
@@ -2036,6 +2076,10 @@ class App {
     }
 
     run() {
+        for (let i = 0; i < 32; i++) {
+            this.interpreter.getDMEM()[i].clearChange();    // set changed = 0 for all registers
+        }
+        
         this.interpreter.run();
 
         if (this.interpreter.finished) {
@@ -2058,7 +2102,12 @@ class App {
 
             const num_lines = 4; // number of lines in the table
             const regs_per_line = 8;
-            const registers = this.interpreter.dmem.slice(0,32);
+            const registers = this.interpreter.getDMEM().slice(0,32);
+
+            const no_change_background_colour = '#ddd';
+            const no_change_text_colour = '#444';
+            const change_background_colour = '#fd0002';
+            const change_text_colour = '#fff';
         
             // Go through the lines
             for (let line = 0; line < num_lines; line++) {
@@ -2070,6 +2119,15 @@ class App {
                     const reg_num = reg + (line * regs_per_line);
                     const reg_value = this.convertValueToBase(registers[reg_num].getValue(), 2);
                     document.getElementById(`reg-${reg_num}`).innerHTML = reg_value;
+
+                    // If it's changed, make the display different
+                    if (registers[reg_num].changed) {
+                        document.getElementById(`reg-${reg_num}`).style.backgroundColor = change_background_colour;
+                        document.getElementById(`reg-${reg_num}`).style.color = change_text_colour;
+                    } else {
+                        document.getElementById(`reg-${reg_num}`).style.backgroundColor = no_change_background_colour;
+                        document.getElementById(`reg-${reg_num}`).style.color = no_change_text_colour;
+                    }
                 }
             }
 
@@ -2079,12 +2137,11 @@ class App {
     populateSREG() {
         if (this.assembled) {
 
-            const sreg_flags = ['I', 'T', 'H', 'S', 'V', 'N', 'Z', 'C'];
+            const sreg_flags = ['C', 'Z', 'N', 'V', 'S', 'H', 'T', 'I'];
             for (let i = 0; i < 8; i++) {
                 const flag = sreg_flags[i];
     
-                let flag_value = this.interpreter.getSREG(); // get the sreg value
-                flag_value = (2 ** (7 - i)) && flag_value; // get the correct bit of that value
+                let flag_value = this.interpreter.sreg.getBit(i); // get the sreg bit value
     
                 if (flag_value) {
                     flag_value = 'TRUE';
@@ -2123,6 +2180,13 @@ class App {
         if (this.assembled) {
 
             const num_lines = 8; // number of lines in the table
+
+            const pc = this.interpreter.getPC();
+            const normal_background_colour = '#bbb';
+            const normal_text_colour = '#333';
+            const pc_background_colour = '#4a5cff';
+            const pc_text_colour = '#fff';
+
             for (let line = 0; line < num_lines; line++) {
                 document.getElementById(`pmem-linenum-${line}`).innerHTML = `${start_cell + line}`;
                 
@@ -2135,6 +2199,17 @@ class App {
                 }
         
                 document.getElementById(`pmem-line-${line}`).innerHTML = line_value;
+
+                // If it's the pc line
+                // If it's changed, make the display different
+                if ( ( start_cell + line ) === pc ) {
+                    document.getElementById(`pmem-linenum-${line}`).style.backgroundColor = pc_background_colour;
+                    document.getElementById(`pmem-linenum-${line}`).style.color = pc_text_colour;
+                } else {
+                    document.getElementById(`pmem-linenum-${line}`).style.backgroundColor = normal_background_colour;
+                    document.getElementById(`pmem-linenum-${line}`).style.color = normal_text_colour;
+                }
+
             }
         }
     }
@@ -2144,6 +2219,21 @@ class App {
 
             const num_lines = 8; // number of lines in the table
             const num_rows = 8; // number of lines in the table
+
+            const sp = this.interpreter.getSP();
+            const x = this.interpreter.getX();
+            const y = this.interpreter.getY();
+            const z = this.interpreter.getZ();
+
+            const normal_background_colour = '#ddd';
+            const normal_text_colour = '#444';
+
+            const sp_background_colour = '#da920d';
+            const x_background_colour = '#32bd32';
+            const y_background_colour = '#20a3a3';
+            const z_background_colour = '#bd0c47';
+            const pointer_text_colour = '#fff';
+
             for (let line = 0; line < num_lines; line++) {
         
                 let line_value = (start_cell + (num_rows * line)).toString(this.base);     // Calculate line start cell number as base 16 string
@@ -2158,10 +2248,26 @@ class App {
         
                 // Put the cell values in the html
                 for (let row = 0; row < num_rows; row++) {
-                    let cell_value = this.interpreter.dmem[ start_cell + row + (num_rows * line) ];
+                    const cell_number = start_cell + row + (num_rows * line);
+                    let cell_value = this.interpreter.getDMEM()[ cell_number ];
                     cell_value = this.convertValueToBase(cell_value, 2);
                     
                     document.getElementById(`dmem-line-${line}${row}`).innerHTML = cell_value;
+                    document.getElementById(`dmem-line-${line}${row}`).style.color = pointer_text_colour;
+
+                    // Check if it's SP, X, Y, Z
+                    if ( cell_number === sp ) {
+                        document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = sp_background_colour;
+                    } else if ( cell_number === z ) {
+                        document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = z_background_colour;
+                    } else if ( cell_number === y ) {
+                        document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = y_background_colour;
+                    } else if ( cell_number === x ) {
+                        document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = x_background_colour;
+                    } else {
+                        document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = normal_background_colour;
+                        document.getElementById(`dmem-line-${line}${row}`).style.color = normal_text_colour;
+                    }
                 }
             }
         }
