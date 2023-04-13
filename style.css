@@ -150,7 +150,6 @@ textarea {
     border-radius: 10px;
 }
 
-
 .button-assemble {
     padding: 15px 15px;
 }
@@ -167,12 +166,15 @@ textarea {
     padding: 15px 15px;
 }
 
-
 .button-pmem-up {
     padding: 15px 15px;
 }
 
 .button-pmem-down {
+    padding: 15px 15px;
+}
+
+.button-toggle-opcode {
     padding: 15px 15px;
 }
 

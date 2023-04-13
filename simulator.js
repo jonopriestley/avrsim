@@ -229,8 +229,11 @@ class Instruction {
     
     makeOpcode() {
 
-        const opcode_requirements = INST_OPCODES[ this.inst.getValue() ];
+        const inst = this.inst.getValue();
 
+        const opcode_requirements = INST_OPCODES[ inst ];
+
+        // If it's a simple opcode
         if ( opcode_requirements !== null ) {
 
             const arg_len = this.args.length;
@@ -277,8 +280,102 @@ class Instruction {
             return opcode;  
         }
         
+        // If it's a more tricky opcode
         else {
-            return 'xxxxxxxxxxxxxxxx'; // Replace later
+
+            let d, r, K, w, q;
+
+            if (inst === 'ADIW') {
+                d = this.binLenDigits(((this.args[0].getValue() / 2) - 12), 2);
+                K = this.binLenDigits(this.args[1].getValue(), 6);
+                return `10010110${K.slice(0,2)}${d}${K.slice(2)}`;
+            } else if (inst === 'CBR') {
+                d = this.binLenDigits(this.args[0].getValue(), 4);
+                K = this.binLenDigits((0xff - this.args[1].getValue()), 8);
+                return `0111${K.slice(0,4)}${d}${K.slice(4)}`;
+            } else if (inst === 'CLR') {
+                d = this.binLenDigits(this.args[0].getValue(), 5);
+                return `001001${d.slice(0,1)}${d}${d.slice(1)}`
+            } else if (inst === 'LD') {
+                d = this.binLenDigits(this.args[0].getValue(), 5);
+                w = this.args[1].getValue();
+                if (w == 'X') {
+                    return `1001000${d}1100`;
+                } else if (w === 'X+') {
+                    return `1001000${d}1101`;
+                } else if (w === '-X') {
+                    return `1001000${d}1110`;
+                } else if (w === 'Y') {
+                    return `1000000${d}1000`;
+                } else if (w === 'Y+') {
+                    return `1001000${d}1001`;
+                } else if (w === '-Y') {
+                    return `1001000${d}1010`;
+                } else if (w === 'Z') {
+                    return `1000000${d}0000`;
+                } else if (w === 'Z+') {
+                    return `1001000${d}0001`;
+                } else if (w === '-Z') {
+                    return `1001000${d}0010`;
+                }
+            } else if (inst === 'LDD') {
+                d = this.binLenDigits(this.args[0].getValue(), 5);
+                w = this.args[1].getValue().slice(0,1);
+                q = this.binLenDigits(parseInt(this.args[1].getValue().slice(2)), 6);
+                if (w === 'Y') {
+                    return `10${q.slice(0,1)}0${q.slice(1,3)}0${d}1${q.slice(3)}`;
+                } else if (w === 'Z') {
+                    return `10${q.slice(0,1)}0${q.slice(1,3)}0${d}0${q.slice(3)}`;
+                }
+            } else if (inst === 'LSL') {
+                d = this.binLenDigits(this.args[0].getValue(), 5);
+                return `000011${d.slice(0,1)}${d}${d.slice(1)}` 
+            } else if (inst === 'MOVW') {
+                d = this.binLenDigits((this.args[0].getValue() / 2), 4);
+                r = this.binLenDigits((this.args[1].getValue() / 2), 4);
+                return `00000001${d}${r}`;
+            } else if (inst === 'ROL') {
+                d = this.binLenDigits(this.args[0].getValue(), 5);
+                return `000111${d.slice(0,1)}${d}${d.slice(1)}` 
+            } else if (inst === 'SBIW') {
+                d = this.binLenDigits(((this.args[0].getValue() / 2) - 12), 2);
+                K = this.binLenDigits(this.args[1].getValue(), 6);
+                return `10010111${K.slice(0,2)}${d}${K.slice(2)}`;
+            } else if (inst === 'ST') {
+                r = this.binLenDigits(this.args[0].getValue(), 5);
+                w = this.args[1].getValue();
+                if (w == 'X') {
+                    return `1001001${r}1100`;
+                } else if (w === 'X+') {
+                    return `1001001${r}1101`;
+                } else if (w === '-X') {
+                    return `1001001${r}1110`;
+                } else if (w === 'Y') {
+                    return `1000001${r}1000`;
+                } else if (w === 'Y+') {
+                    return `1001001${r}1001`;
+                } else if (w === '-Y') {
+                    return `1001001${r}1010`;
+                } else if (w === 'Z') {
+                    return `1000001${r}0000`;
+                } else if (w === 'Z+') {
+                    return `1001001${r}0001`;
+                } else if (w === '-Z') {
+                    return `1001001${r}0010`;
+                }
+            } else if (inst === 'STD') {
+                r = this.binLenDigits(this.args[0].getValue(), 5);
+                w = this.args[1].getValue().slice(0,1);
+                q = this.binLenDigits(parseInt(this.args[1].getValue().slice(2)), 6);
+                if (w === 'Y') {
+                    return `10${q.slice(0,1)}0${q.slice(1,3)}1${r}1${q.slice(3)}`;
+                } else if (w === 'Z') {
+                    return `10${q.slice(0,1)}0${q.slice(1,3)}1${r}0${q.slice(3)}`;
+                }
+            } else if (inst === 'TST') {
+                d = this.binLenDigits(this.args[0].getValue(), 5);
+                return `001000${d.slice(0,1)}${d}${d.slice(1)}` 
+            }
         }
     }
 
@@ -1164,10 +1261,12 @@ class Interpreter {
 
     step() {
 
+        // Do nothing if it's finished running
         if (this.finished) {
             return;
         }
 
+        // If it should be finished, set it to finished then return
         if (this.getPC() >= this.flashend) {
             this.finished = true;
             this.setPC(this.flashend);
@@ -1257,80 +1356,237 @@ class Interpreter {
                 this.updateSREGBit(0, s);   // Clear bit s
                 break;
             case 'BRBC':
+                s = this.getArgumentValue(line, 0);
+                if (1 - ((this.getSREG() >> s) & 1)) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRBS':
+                s = this.getArgumentValue(line, 0);
+                if ((this.getSREG() >> s) & 1) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRCC':
+                if (1 - (this.getSREG() & 1)) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRCS':
+                if (this.getSREG() & 1) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BREQ':
+                if ((this.getSREG() >> 1) & 1) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRGE':
+                if (1 - ((this.getSREG() >> 4) & 1)) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRHC':
+                if (1 - ((this.getSREG() >> 5) & 1)) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRHS':
+                if ((this.getSREG() >> 5) & 1) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRID':
+                if (1 - ((this.getSREG() >> 7) & 1)) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRIE':
+                if ((this.getSREG() >> 7) & 1) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRLO':
+                if (this.getSREG() & 1) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRLT':
+                if ((this.getSREG() >> 4) & 1) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRMI':
+                if ((this.getSREG() >> 2) & 1) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRNE':
+                if (1 - ((this.getSREG() >> 1) & 1)) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRPL':
+                if (1 - ((this.getSREG() >> 2) & 1)) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRSH':
+                if (1 - (this.getSREG() & 1)) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRTC':
+                if (1 - ((this.getSREG() >> 6) & 1)) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRTS':
+                if ((this.getSREG() >> 6) & 1) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRVC':
+                if (1 - ((this.getSREG() >> 3) & 1)) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BRVS':
+                if ((this.getSREG() >> 3) & 1) {
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k);
+                }
                 break;
             case 'BSET':
                 s = this.getArgumentValue(line, 0);
                 this.updateSREGBit(1, s);   // Set bit s
                 break;
             case 'CALL':
+                this.incPC();
+                this.incPC();
+
+                this.getDMEM()[this.getSP()] = this.pcl.getValue();              // set the pcl in STACK
+                this.decSP(); 
+                this.getDMEM()[this.getSP()] = this.pch.getValue();              // set the pch in STACK
+                this.decSP(); 
+
+                k = this.getArgumentValue(line, 0);
+                this.setPC(k - 1);
                 break;
             case 'CBI':
                 break;
             case 'CBR':
+                Rd = this.getArgumentValue(line, 0);
+                K = this.getArgumentValue(line, 1);
+                R = Rd & (0xff - K);
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd & (0xff - K)
+
+                V = 0;
+                N = this.getBit(R, 7);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
                 break;
             case 'CLC':
+                this.updateSREGBit(0, 0);
                 break;
             case 'CLH':
+                this.updateSREGBit(0, 5);
                 break;
             case 'CLI':
+                this.updateSREGBit(0, 7);
                 break;
             case 'CLN':
+                this.updateSREGBit(0, 2);
                 break;
             case 'CLR':
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(0);   // Rd <-- 0
+                this.updateSREGBit(0, 4);
+                this.updateSREGBit(0, 3);
+                this.updateSREGBit(0, 2);
+                this.updateSREGBit(1, 1);
                 break;
             case 'CLS':
+                this.updateSREGBit(0, 4);
                 break;
             case 'CLT':
+                this.updateSREGBit(0, 6);
                 break;
             case 'CLV':
+                this.updateSREGBit(0, 3);
                 break;
             case 'CLZ':
+                this.updateSREGBit(0, 1);
                 break;
             case 'COM':
+                Rd = this.getArgumentValue(line, 0);
+                R = 0xff - Rd;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- 0xff - Rd
+
+                V = 0;
+                N = this.getBit(R, 7);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit(1, 0);
                 break;
             case 'CP':
+                Rd = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+                R = (((Rd - Rr) % 0x100) + 0x100) % 0x100;
+
+                H = ( this.getBit(R, 3) & this.getBit(Rr, 3) ) | ( this.getBit(Rr, 3) & (1 - this.getBit(Rd, 3)) ) | ( this.getBit(R, 3) & (1 - this.getBit(Rd, 3)) ); 
+                V = ( this.getBit(R, 7) & this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7)) ) | ( (1 - this.getBit(R, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(Rd, 7) );
+                N = this.getBit(R, 7);
+                C = ( this.getBit(R, 7) & this.getBit(Rr, 7) ) | ( this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7)) ) | ( this.getBit(R, 7) & (1 - this.getBit(Rd, 7)) ); 
+                this.updateSREGBit(H, 5);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit(C, 0);
                 break;
             case 'CPC':
                 break;
             case 'CPI':
+                Rd = this.getArgumentValue(line, 0);
+                K = this.getArgumentValue(line, 1);
+                R = (((Rd - K) % 0x100) + 0x100) % 0x100;
+
+                H = ( this.getBit(R, 3) & this.getBit(K, 3) ) | ( this.getBit(K, 3) & (1 - this.getBit(Rd, 3)) ) | ( this.getBit(R, 3) & (1 - this.getBit(Rd, 3)) ); 
+                V = ( this.getBit(R, 7) & this.getBit(K, 7) & (1 - this.getBit(Rd, 7)) ) | ( (1 - this.getBit(R, 7)) & (1 - this.getBit(K, 7)) & this.getBit(Rd, 7) );
+                N = this.getBit(R, 7);
+                C = ( this.getBit(R, 7) & this.getBit(K, 7) ) | ( this.getBit(K, 7) & (1 - this.getBit(Rd, 7)) ) | ( this.getBit(R, 7) & (1 - this.getBit(Rd, 7)) ); 
+                this.updateSREGBit(H, 5);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit(C, 0);
                 break;
             case 'DEC':
                 Rd = this.getArgumentValue(line, 0);
@@ -1346,6 +1602,18 @@ class Interpreter {
                 this.updateSREGBit((R === 0), 1);
                 break;
             case 'EOR':
+                Rd = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+                R = Rd ^ Rr;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd ^ Rr
+
+                V = 0;
+                N = this.getBit(R, 7);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
                 break;
             case 'IN':
                 break;
@@ -1364,7 +1632,7 @@ class Interpreter {
                 break;
             case 'JMP':
                 k = this.getArgumentValue(line, 0);
-                this.interpreter.setPC(k - 1);
+                this.setPC(k - 1);
                 break;
             case 'LD':
                 break;
@@ -1411,6 +1679,20 @@ class Interpreter {
             case 'MULSU':
                 break;
             case 'NEG':
+                Rd = this.getArgumentValue(line, 0);
+                R = (((0 - Rd) % 0x100) + 0x100) % 0x100;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- 0 - Rd
+
+                H = this.getBit(R, 3) | (1 - this.getBit(Rd, 3));
+                V = (R === 128);
+                N = this.getBit(R, 7);
+                this.updateSREGBit(H, 5);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit((R !== 0), 1);
                 break;
             case 'NOP':
                 break;
@@ -1463,6 +1745,8 @@ class Interpreter {
                 this.decSP();                                   // decrement the SP by 1
                 break;
             case 'RJMP':
+                k = this.getArgumentValue(line, 0);
+                this.setPC(this.getPC() + k);
                 break;
             case 'RET':
                 if (this.getSP() == this.ramend) {
@@ -1493,28 +1777,69 @@ class Interpreter {
             case 'SBIW':
                 break;
             case 'SBR':
+                Rd = this.getArgumentValue(line, 0);
+                K = this.getArgumentValue(line, 1);
+                R = Rd | K;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd | K
+
+                V = 0;
+                N = this.getBit(R, 7);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
                 break;
             case 'SBRC':
+                Rd = this.getArgumentValue(line, 0);
+                b = this.getArgumentValue(line, 1);
+                if (1 - ((this.getSREG() >> b) & 1)) {
+                    k = this.getArgumentValue(line, 0);
+                    this.incPC();
+                }
+                // Skip another line if the next instruction has a 32 bit opcode
+                if (['CALL', 'JMP', 'LDS', 'STS'].includes(this.pmem[ this.getPC() ].getInst().getValue())) {
+                    this.incPC();
+                }
                 break;
             case 'SBRS':
+                Rd = this.getArgumentValue(line, 0);
+                b = this.getArgumentValue(line, 1);
+                if ((this.getSREG() >> b) & 1) {
+                    k = this.getArgumentValue(line, 0);
+                    this.incPC();
+                }
+                // Skip another line if the next instruction has a 32 bit opcode
+                if (['CALL', 'JMP', 'LDS', 'STS'].includes(this.pmem[ this.getPC() ].getInst().getValue())) {
+                    this.incPC();
+                }
                 break;
             case 'SEC':
+                this.updateSREGBit(1, 0);
                 break;
             case 'SEH':
+                this.updateSREGBit(1, 5);
                 break;
             case 'SEI':
+                this.updateSREGBit(1, 7);
                 break;
             case 'SEN':
+                this.updateSREGBit(1, 2);
                 break;
             case 'SER':
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(0xff);   // Rd <-- 0xff
                 break;
             case 'SES':
+                this.updateSREGBit(1, 4);
                 break;
             case 'SET':
+                this.updateSREGBit(1, 6);
                 break;
             case 'SEV':
+                this.updateSREGBit(1, 3);
                 break;
             case 'SEZ':
+                this.updateSREGBit(1, 1);
                 break;
             case 'ST':
                 break;
@@ -1523,12 +1848,57 @@ class Interpreter {
             case 'STS':
                 break;
             case 'SUB':
+                Rd = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+                R = (((Rd - Rr) % 0x100) + 0x100) % 0x100;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd - Rr
+
+                H = ( this.getBit(R, 3) & this.getBit(Rr, 3) ) | ( this.getBit(Rr, 3) & (1 - this.getBit(Rd, 3)) ) | ( this.getBit(R, 3) & (1 - this.getBit(Rd, 3)) ); 
+                V = ( this.getBit(R, 7) & this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7)) ) | ( (1 - this.getBit(R, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(Rd, 7) );
+                N = this.getBit(R, 7);
+                C = ( this.getBit(R, 7) & this.getBit(Rr, 7) ) | ( this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7)) ) | ( this.getBit(R, 7) & (1 - this.getBit(Rd, 7)) ); 
+                this.updateSREGBit(H, 5);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit(C, 0);
                 break;
             case 'SUBI':
+                Rd = this.getArgumentValue(line, 0);
+                K = this.getArgumentValue(line, 1);
+                R = (((Rd - K) % 0x100) + 0x100) % 0x100;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd - Rr
+
+                H = ( this.getBit(R, 3) & this.getBit(K, 3) ) | ( this.getBit(K, 3) & (1 - this.getBit(Rd, 3)) ) | ( this.getBit(R, 3) & (1 - this.getBit(Rd, 3)) ); 
+                V = ( this.getBit(R, 7) & this.getBit(K, 7) & (1 - this.getBit(Rd, 7)) ) | ( (1 - this.getBit(R, 7)) & (1 - this.getBit(K, 7)) & this.getBit(Rd, 7) );
+                N = this.getBit(R, 7);
+                C = ( this.getBit(R, 7) & this.getBit(K, 7) ) | ( this.getBit(K, 7) & (1 - this.getBit(Rd, 7)) ) | ( this.getBit(R, 7) & (1 - this.getBit(Rd, 7)) ); 
+                this.updateSREGBit(H, 5);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit(C, 0);
                 break;
             case 'SWAP':
+                Rd = this.getArgumentValue(line, 0);
+                R = ( (Rd & 0x0F) << 4 | (Rd & 0xF0) >> 4 );
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
                 break;
             case 'TST':
+                Rd = this.getArgumentValue(line, 0);
+                R = Rd;
+
+                V = 0;
+                N = this.getBit(R, 7);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
                 break;
             case 'XCH':
                 break;
@@ -1646,7 +2016,7 @@ class Interpreter {
 
     getBit(value, bit) {
         // returns the value of a bit in a number
-        if ((value & (2 ** bit)) !== 0) {
+        if (((value >> bit) & 1) !== 0) {
             return 1;
         }
         return 0;
@@ -1951,12 +2321,12 @@ INST_OPCODES = {
     'LDI': ['d', 'K', '1110KKKKddddKKKK'],
     'LDS': ['d', 'k', '1001000ddddd0000kkkkkkkkkkkkkkkk'],
     'LSL': null,
-    'LSR': null,
+    'LSR': ['d', '1001010ddddd0110'],
     'MOV': ['d', 'r', '001011rdddddrrrr'],
     'MOVW': null,
     'MUL': ['d', 'r', '100111rdddddrrrr'],
     'MULS': ['d', 'r', '00000010ddddrrrr'],
-    'MULSU': null,
+    'MULSU': ['d', 'r', '000000110ddd0rrr'],
     'NEG': ['d', '1001010ddddd0001'],
     'NOP': ['0000000000000000'],
     'OR': ['d', 'r', '001010rdddddrrrr'],
@@ -1967,7 +2337,7 @@ INST_OPCODES = {
     'RET': ['1001010100001000'],
     'RJMP': ['k', '1100kkkkkkkkkkkk'], // this one needs 2's comp too
     'ROL': null,
-    'ROR': null,
+    'ROR': ['d', '1001010ddddd0111'],
     'SBC': ['d', 'r', '000010rdddddrrrr'],
     'SBI': ['A', 'b', '10011010AAAAAbbb'],
     'SBIW': null,
@@ -2021,6 +2391,7 @@ class App {
         this.interpreter = new Interpreter();
 
         this.base = 16; // value base for display
+        this.display_opcode = false;
 
         this.assembled = false;
 
@@ -2191,11 +2562,25 @@ class App {
                 document.getElementById(`pmem-linenum-${line}`).innerHTML = `${start_cell + line}`;
                 
                 let line_value = this.interpreter.getPMEM()[ start_cell + line ];  // get the line to print
-        
-                if (line_value !== null) {                    // replace null lines with (two line inst.)
-                    line_value = line_value.toString(this.base);
-                } else {
-                    line_value = '(two line inst.)';  
+
+                // If the opcode display = true 
+                if (this.display_opcode) {
+                    if (line_value !== null) {                    // replace null lines with (two line inst.)
+                        line_value = line_value.getOpcode().slice(0,16);
+                    } else {
+                        line_value = this.interpreter.getPMEM()[ start_cell + line - 1];
+                        line_value = line_value.getOpcode().slice(16);
+                    }
+                }
+                
+                // If the instruction is to be display, not the opcode
+                else {
+            
+                    if (line_value !== null) {                    // replace null lines with (two line inst.)
+                        line_value = line_value.toString(this.base);
+                    } else {
+                        line_value = '(two line inst.)';  
+                    }
                 }
         
                 document.getElementById(`pmem-line-${line}`).innerHTML = line_value;
@@ -2347,15 +2732,25 @@ class App {
     changeBase() {
         if (this.base === 16) {
             this.base = 10;
-            document.getElementById('button_base').innerHTML = 'Base: 10';
+            document.getElementById('button_base').innerHTML = 'Base 16';
         }
 
         else {
             this.base = 16;
-            document.getElementById('button_base').innerHTML = 'Base: 16';
+            document.getElementById('button_base').innerHTML = 'Base 10';
         }
 
         this.populateAll();
+    }
+
+    toggleOpcodeDisplay() {
+        this.display_opcode = !(this.display_opcode);
+        if (this.display_opcode) {
+            document.getElementById('button-opcode').innerHTML = 'Opcode Off';
+        } else {
+            document.getElementById('button-opcode').innerHTML = 'Opcode On'; 
+        }
+        this.populatePMEM(this.pmem_top);
     }
 
 }

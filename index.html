@@ -54,7 +54,7 @@
                                 <option value="25">25</option>
                                 <option value="100">100</option>
                             </select>
-                            <button class="button button-base" type="button" id="button_base" onclick="app.changeBase()">Base: 16</button>
+                            <button class="button button-base" type="button" id="button_base" onclick="app.changeBase()">Base 10</button>
                         </form>
                     </div>
                 </div>
@@ -458,6 +458,7 @@
                         </table>
                         <button class="button button-pmem-up" type="button" onclick="app.displayPMEMUp()">ʌ</button>
                         <button class="button button-pmem-down" type="button" onclick="app.displayPMEMDown()">v</button>
+                        <button class="button button-toggle-opcode" type="button" id="button-opcode" onclick="app.toggleOpcodeDisplay()">Opcode On</button>
                     </div>
                     <div class="dmem">
                         <table class="table table-dmem">
