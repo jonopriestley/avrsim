@@ -1,9 +1,9 @@
 
 
-class Token{
+class Token {
     constructor(type_, value = null) {
         this.type = type_;
-        this.value = value; 
+        this.value = value;
     }
 
     getType() {
@@ -24,13 +24,13 @@ class Token{
 
     toString() {
         return `${this.type}:${this.value}`;
-      }
+    }
 }
 
 
 
 class Register {
-    constructor(name, value=0, changed=0) {
+    constructor(name, value = 0, changed = 0) {
         this.name = name;
         this.value = value;
         this.changed = changed;
@@ -68,6 +68,15 @@ class Register {
         return 0;
     }
 
+    inc() {
+        this.setValue(this.getValue() + 1);
+    }
+
+    dec() {
+        this.setValue(this.getValue() - 1);
+    }
+
+
 }
 
 
@@ -90,7 +99,7 @@ class Argument {
         const legal_token_types = this.getTokenType(); // the legal token types for this argument
 
         // CHECK IF IT'S A LEGAL ARGUMENT
-        if ( !legal_token_types.includes(tok.getType()) ) {
+        if (!legal_token_types.includes(tok.getType())) {
             this.newError(`Illegal token '${tok.getValue()}' on line ${line_num}.`);
         }
 
@@ -111,7 +120,7 @@ class Argument {
             }
         }
 
-        // CHECK ITS LEGAL TOKEN TYPE AND in THE LEGAL LIST
+        // CHECK ITS LEGAL TOKEN TYPE AND IN THE LEGAL LIST
         else if (this.hasOptionsList() && !this.getOptionsList().includes(tok.getValue())) {
             this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
         }
@@ -120,6 +129,7 @@ class Argument {
         else if (this.hasExactValue() && tok.getValue() !== this.getExactValue()) {
             this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
         }
+
     }
 
     getTokenType() {
@@ -171,7 +181,7 @@ class Instruction {
         this.args = tokens.slice(1);
         this.opcode = this.makeOpcode();
     }
-    
+
     twosComp(number, digits) {
 
         if (number >= 0) {
@@ -190,13 +200,13 @@ class Instruction {
         // Add digits to the front if it's too short
         const zeros = digits - b.length;
         for (let i = 0; i < zeros; i++) {
-            b = '1' +  b;
+            b = '1' + b;
         }
 
 
         return b;
     }
-    
+
     binLenDigits(number, digits) {
 
         let b = number.toString(2);
@@ -210,7 +220,7 @@ class Instruction {
         // Add digits to the front if it's too short
         const zeros = digits - b.length;
         for (let i = 0; i < zeros; i++) {
-            b = '0' +  b;
+            b = '0' + b;
         }
 
         return b;
@@ -226,43 +236,43 @@ class Instruction {
         }
         return count;
     }
-    
+
     makeOpcode() {
 
         const inst = this.inst.getValue();
 
-        const opcode_requirements = INST_OPCODES[ inst ];
+        const opcode_requirements = INST_OPCODES[inst];
 
         // If it's a simple opcode
-        if ( opcode_requirements !== null ) {
+        if (opcode_requirements !== null) {
 
             const arg_len = this.args.length;
-            
+
             // Return the opcode if it's always the same opcode
-            if ( opcode_requirements.length === 1 ) {
+            if (opcode_requirements.length === 1) {
                 return opcode_requirements[0];
             }
 
             // Get the opcode for use later
-            let opcode = opcode_requirements[ opcode_requirements.length - 1 ];
+            let opcode = opcode_requirements[opcode_requirements.length - 1];
 
             // GO THROUGH EACH ARGUMENT AND SYMBOL ASSOCIATED WITH IT AND REPLACE THEM IN THE GIVEN OPCODE
             for (let arg_num = 0; arg_num < arg_len; arg_num++) {
 
-                const symbol = opcode_requirements[ arg_num ]; //  the symbol for replacing in the opcode e.g. 'd'
+                const symbol = opcode_requirements[arg_num]; //  the symbol for replacing in the opcode e.g. 'd'
 
                 const digit_count = this.countElements(opcode, symbol); // number of digits the argument takes up in the opcode
 
-                if (digit_count === 0 ) { // skip if it's an argument that doesnt matter (like Z in XCH)
+                if (digit_count === 0) { // skip if it's an argument that doesnt matter (like Z in XCH)
                     continue
                 }
 
-                const arg = this.args[ arg_num ].getValue(); // the argument value
+                const arg = this.args[arg_num].getValue(); // the argument value
 
                 let var_value;
 
                 // If it's a 2's comp value then make it 2's comp
-                if ( ['RJMP'].concat(INST_LIST.slice(7, 27)).includes(this.inst.getValue()) ) {
+                if (['RJMP'].concat(INST_LIST.slice(7, 27)).includes(this.inst.getValue())) {
                     var_value = this.twosComp(arg, digit_count);
                 }
 
@@ -277,9 +287,9 @@ class Instruction {
 
             }
 
-            return opcode;  
+            return opcode;
         }
-        
+
         // If it's a more tricky opcode
         else {
 
@@ -288,14 +298,14 @@ class Instruction {
             if (inst === 'ADIW') {
                 d = this.binLenDigits(((this.args[0].getValue() / 2) - 12), 2);
                 K = this.binLenDigits(this.args[1].getValue(), 6);
-                return `10010110${K.slice(0,2)}${d}${K.slice(2)}`;
+                return `10010110${K.slice(0, 2)}${d}${K.slice(2)}`;
             } else if (inst === 'CBR') {
                 d = this.binLenDigits(this.args[0].getValue(), 4);
                 K = this.binLenDigits((0xff - this.args[1].getValue()), 8);
-                return `0111${K.slice(0,4)}${d}${K.slice(4)}`;
+                return `0111${K.slice(0, 4)}${d}${K.slice(4)}`;
             } else if (inst === 'CLR') {
                 d = this.binLenDigits(this.args[0].getValue(), 5);
-                return `001001${d.slice(0,1)}${d}${d.slice(1)}`
+                return `001001${d.slice(0, 1)}${d}${d.slice(1)}`
             } else if (inst === 'LD') {
                 d = this.binLenDigits(this.args[0].getValue(), 5);
                 w = this.args[1].getValue();
@@ -320,27 +330,27 @@ class Instruction {
                 }
             } else if (inst === 'LDD') {
                 d = this.binLenDigits(this.args[0].getValue(), 5);
-                w = this.args[1].getValue().slice(0,1);
+                w = this.args[1].getValue().slice(0, 1);
                 q = this.binLenDigits(parseInt(this.args[1].getValue().slice(2)), 6);
                 if (w === 'Y') {
-                    return `10${q.slice(0,1)}0${q.slice(1,3)}0${d}1${q.slice(3)}`;
+                    return `10${q.slice(0, 1)}0${q.slice(1, 3)}0${d}1${q.slice(3)}`;
                 } else if (w === 'Z') {
-                    return `10${q.slice(0,1)}0${q.slice(1,3)}0${d}0${q.slice(3)}`;
+                    return `10${q.slice(0, 1)}0${q.slice(1, 3)}0${d}0${q.slice(3)}`;
                 }
             } else if (inst === 'LSL') {
                 d = this.binLenDigits(this.args[0].getValue(), 5);
-                return `000011${d.slice(0,1)}${d}${d.slice(1)}` 
+                return `000011${d.slice(0, 1)}${d}${d.slice(1)}`
             } else if (inst === 'MOVW') {
                 d = this.binLenDigits((this.args[0].getValue() / 2), 4);
                 r = this.binLenDigits((this.args[1].getValue() / 2), 4);
                 return `00000001${d}${r}`;
             } else if (inst === 'ROL') {
                 d = this.binLenDigits(this.args[0].getValue(), 5);
-                return `000111${d.slice(0,1)}${d}${d.slice(1)}` 
+                return `000111${d.slice(0, 1)}${d}${d.slice(1)}`
             } else if (inst === 'SBIW') {
                 d = this.binLenDigits(((this.args[0].getValue() / 2) - 12), 2);
                 K = this.binLenDigits(this.args[1].getValue(), 6);
-                return `10010111${K.slice(0,2)}${d}${K.slice(2)}`;
+                return `10010111${K.slice(0, 2)}${d}${K.slice(2)}`;
             } else if (inst === 'ST') {
                 r = this.binLenDigits(this.args[0].getValue(), 5);
                 w = this.args[1].getValue();
@@ -364,17 +374,17 @@ class Instruction {
                     return `1001001${r}0010`;
                 }
             } else if (inst === 'STD') {
-                r = this.binLenDigits(this.args[0].getValue(), 5);
-                w = this.args[1].getValue().slice(0,1);
-                q = this.binLenDigits(parseInt(this.args[1].getValue().slice(2)), 6);
+                r = this.binLenDigits(this.args[1].getValue(), 5);
+                w = this.args[0].getValue().slice(0, 1);
+                q = this.binLenDigits(parseInt(this.args[0].getValue().slice(2)), 6);
                 if (w === 'Y') {
-                    return `10${q.slice(0,1)}0${q.slice(1,3)}1${r}1${q.slice(3)}`;
+                    return `10${q.slice(0, 1)}0${q.slice(1, 3)}1${r}1${q.slice(3)}`;
                 } else if (w === 'Z') {
-                    return `10${q.slice(0,1)}0${q.slice(1,3)}1${r}0${q.slice(3)}`;
+                    return `10${q.slice(0, 1)}0${q.slice(1, 3)}1${r}0${q.slice(3)}`;
                 }
             } else if (inst === 'TST') {
                 d = this.binLenDigits(this.args[0].getValue(), 5);
-                return `001000${d.slice(0,1)}${d}${d.slice(1)}` 
+                return `001000${d.slice(0, 1)}${d}${d.slice(1)}`
             }
         }
     }
@@ -389,7 +399,7 @@ class Instruction {
         }
 
         let arg1 = this.args[0].getValue();
-        
+
         if (this.args[0].getType() === 'REG') {
             arg1 = `R${arg1}`;
         }
@@ -399,11 +409,11 @@ class Instruction {
         }
 
         if (argsLen === 1) {
-            
+
             return `${inst} ${arg1}`;
         }
-            
-            
+
+
         let arg2 = this.args[1].getValue();
 
         if (this.args[1].getType() === 'REG') {
@@ -413,10 +423,10 @@ class Instruction {
         else if (this.args[1].getType() === 'INT') {
             arg2 = arg2.toString(base);
         }
-        
+
         return `${inst} ${arg1}, ${arg2}`;
     }
-    
+
     getOpcode() {
         return this.opcode;
     }
@@ -429,24 +439,24 @@ class Instruction {
         return this.args
     }
 
-}      
+}
 
 
 
 class Lexer {
     constructor() {
     }
-    
+
     newData(text) {
         this.text = text;
-    
+
         const toks_info = this.tokenize(this.text);
-    
+
         this.token_lines = toks_info[0];
         this.line_numbers = toks_info[1]; // text file line number for each token line
 
     }
-  
+
     tokenize(code) {
         /**
          * Takes the code as raw text and returns the tokens as a list of
@@ -545,7 +555,7 @@ class Lexer {
                 line_nums.push(line_number + 1);    // Add the line numbers of each line for later
             }
 
-            }
+        }
 
         return [tokens, line_nums];
 
@@ -578,33 +588,33 @@ class Parser {
         // DEFINING THE SIZE OF DMEM AND PMEM
         this.ramend = 0x8FF;
         this.flashend = 0x3FFF;
-        
+
     }
-    
+
     newData(token_lines, line_numbers) {
         this.token_lines = token_lines;
         this.line_numbers = line_numbers;
-    
+
         this.labels = Object.create(null);
-    
+
         this.dmem = [];
         // Add registers to dmem
         for (let i = 0; i < 256; i++) {
             let reg = new Register(`R${i}`);
             this.dmem.push(reg);
         }
-    
+
         this.pmem = [];
-        
+
         this.parse();
-        
+
         // FILLING IN DMEM AND PMEM WITH 0/NOP
         for (let i = this.dmem.length; i < (this.ramend + 1); i++) {
             this.dmem.push(0);
         }
-        
+
         for (let i = this.pmem.length; i < (this.flashend + 1); i++) {
-            this.pmem.push(new Instruction( [ new Token('INST', 'NOP') ] ));
+            this.pmem.push(new Instruction([new Token('INST', 'NOP')]));
         }
 
     }
@@ -622,7 +632,7 @@ class Parser {
         //////////////////////////////////////////////
 
         const first_line = this.token_lines[0];
-        
+
         // Check if first line is a .section directive
         if (first_line[0].getType() !== "DIR" || first_line[0].getValue() !== ".section") {
             this.newError("First line must be a '.section' directive");
@@ -631,11 +641,11 @@ class Parser {
         // Check if the first line is correct length and directives
         if (first_line.length !== 2 || first_line[1].getType() !== "DIR" ||
             ![".data", ".text"].includes(first_line[1].getValue())) {
-            
+
             this.newError("First line must be '.section .data' or '.section .text'");
         }
 
-        
+
         // Check if last line is .end
         const final_line = this.token_lines[this.token_lines.length - 1];
         if (final_line.length > 1 || final_line[0].getType() !== "DIR" || final_line[0].getValue() !== ".end") {
@@ -651,9 +661,9 @@ class Parser {
             // If you find a .section directive check it
             if (line[0].getValue() === ".section" && line[0].getType() === "DIR") {
                 if (
-                line.length !== 2 ||
-                line[1].getType() !== "DIR" ||
-                ![".data", ".text"].includes(line[1].getValue())) {
+                    line.length !== 2 ||
+                    line[1].getType() !== "DIR" ||
+                    ![".data", ".text"].includes(line[1].getValue())) {
                     this.newError("Invalid '.section' directive");
                 }
 
@@ -688,23 +698,23 @@ class Parser {
             const line = this.token_lines[line_num];             // tokens in the current line
             const line_length = line.length;                     // number of tokens in the line
             const line_in_file = this.line_numbers[line_num];    // the current line if there's an error
-            
+
             // Go through each token and make them the correct format
             for (let tok_num = 0; tok_num < line_length; tok_num++) {
-                
+
                 const current_tok = line[tok_num];
 
                 // Check INST and make upper case
-                if ( current_tok.getType() === 'INST' ) {
-                    current_tok.setValue( current_tok.getValue().toUpperCase() ); // make all instructions upper case
-                    
-                    if ( !INST_LIST.includes( current_tok.getValue() ) ) { // check if the token is a valid instruction
+                if (current_tok.getType() === 'INST') {
+                    current_tok.setValue(current_tok.getValue().toUpperCase()); // make all instructions upper case
+
+                    if (!INST_LIST.includes(current_tok.getValue())) { // check if the token is a valid instruction
                         this.newError(`Invalid instruction \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
                 }
 
                 // Check REG are valid numbers
-                else if ( current_tok.getType() === 'REG' ) {
+                else if (current_tok.getType() === 'REG') {
                     const reg_number = current_tok.getValue();
 
                     if (reg_number > 31) {
@@ -713,25 +723,25 @@ class Parser {
                 }
 
                 // Check DIR are valid directives
-                else if ( current_tok.getType() === 'DIR' && !DIRECTIVES.includes( current_tok.getValue() ) ) {
+                else if (current_tok.getType() === 'DIR' && !DIRECTIVES.includes(current_tok.getValue())) {
                     this.newError(`Invalid directive \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                 }
 
                 // Convert integers to base 10
-                else if ( current_tok.getType() === 'INT' ) {
+                else if (current_tok.getType() === 'INT') {
 
                     let int_value = 0;
-                    
+
                     // this line is technically irrelevant since parseInt deals with 0x already
-                    if ( current_tok.getValue().includes('x') ) {
+                    if (current_tok.getValue().includes('x')) {
                         int_value = parseInt(current_tok.getValue().slice(2), 16);
                     }
 
-                    else if ( current_tok.getValue().includes('$') ) {
+                    else if (current_tok.getValue().includes('$')) {
                         int_value = parseInt(current_tok.getValue().slice(1), 16);
                     }
 
-                    else if ( current_tok.getValue().includes('b') ) {
+                    else if (current_tok.getValue().includes('b')) {
                         int_value = parseInt(current_tok.getValue().slice(2), 2);
                     }
 
@@ -739,7 +749,7 @@ class Parser {
                         int_value = parseInt(current_tok.getValue());
                     }
 
-                    current_tok.setValue( int_value );
+                    current_tok.setValue(int_value);
 
                 }
 
@@ -756,12 +766,12 @@ class Parser {
         //////////////////////////////////////////////
 
         // Check data section exists
-        const data_section_exists = ( text_section_start !== 0 );
+        const data_section_exists = (text_section_start !== 0);
 
         let line_num = 0;
 
         // GO THROUGH LINES IN DATA SECTION
-        while ( data_section_exists && ( line_num < text_section_start ) ) {
+        while (data_section_exists && (line_num < text_section_start)) {
 
             if (line_num === 0) {                               // skip if it's the .section .data line
                 line_num += 1;
@@ -775,7 +785,7 @@ class Parser {
             let tok_num = 0;
 
             // DEAL WITH LABELS AT THE START OF THE LINE
-            if ( line[tok_num].getType() === 'LABEL' ) {
+            if (line[tok_num].getType() === 'LABEL') {
                 let label = line[0].getValue();                 // get label with the colon at the end
                 label = label.slice(0, (label.length - 1));
                 this.labels[label] = this.dmem.length;          // add location of the data label
@@ -783,86 +793,86 @@ class Parser {
             }
 
             // CHECK THE DIRECTIVE
-            if ( line[tok_num].getType() !== 'DIR' ) {
+            if (line[tok_num].getType() !== 'DIR') {
                 this.newError(`Illegal syntax \'${line[tok_num].getValue()}\' on line ${line_in_file}.`);
             }
-            
+
             const line_directive = line[tok_num].getValue();    // get the directive for this line to use below
 
             tok_num += 1;                                       // Move to the next token in the line
 
             // EXECUTE THE DIRECTIVE
-            while ( tok_num < line_length ) {
+            while (tok_num < line_length) {
 
                 const current_tok = line[tok_num];
-                
+
                 const parity_of_tokens_left = (line_length - 1 - tok_num) % 2; // used for calculating comma placement
 
                 ///// EXECUTE THE DIRECTIVES /////
 
                 // Byte directive
-                if ( parity_of_tokens_left === 0 && line_directive === '.byte' ) {
+                if (parity_of_tokens_left === 0 && line_directive === '.byte') {
 
-                    if ( current_tok.getType() !== 'INT' ) { // expecting integer
+                    if (current_tok.getType() !== 'INT') { // expecting integer
                         this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
 
-                    this.dmem.push( current_tok.getValue() ); // add to data
+                    this.dmem.push(current_tok.getValue()); // add to data
                 }
-                
+
                 // String, Ascii, Asciz directives
-                else if ( parity_of_tokens_left === 0 && ['.string', '.ascii', '.asciz'].includes(line_directive) ) {
-                    
-                    if ( current_tok.getType() !== 'STR' ) {
+                else if (parity_of_tokens_left === 0 && ['.string', '.ascii', '.asciz'].includes(line_directive)) {
+
+                    if (current_tok.getType() !== 'STR') {
                         this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
 
                     let string_text = current_tok.getValue();
                     string_text = string_text.slice(1, (string_text.length - 1));   // remove quotation marks from either side
-                    
+
                     // Go through each character and add it's ascii code to the data
                     for (let i = 0; i < string_text.length; i++) {
                         const char = string_text[i];
 
                         const char_ascii_value = char.charCodeAt(0); // get ascii code
-                        
+
                         if (char_ascii_value > 127) { // check it's a valid character
                             this.newError(`Bad character \'${char}\' on line ${line_in_file}.`);
                         }
 
-                        this.dmem.push( char_ascii_value );                 // add to data
+                        this.dmem.push(char_ascii_value);                 // add to data
                     }
 
-                    if ( ['.string', '.asciz'].includes(line_directive) ) {  // add NULL if directive requires it
-                        this.dmem.push( 0 );                                // add NULL to data
+                    if (['.string', '.asciz'].includes(line_directive)) {  // add NULL if directive requires it
+                        this.dmem.push(0);                                // add NULL to data
                     }
-                
+
                 }
 
                 // Space directive
-                else if ( parity_of_tokens_left === 0 && line_directive === '.space' ) {
-                    
-                    if ( current_tok.getType() !== 'INT' ) { // expecting integer
+                else if (parity_of_tokens_left === 0 && line_directive === '.space') {
+
+                    if (current_tok.getType() !== 'INT') { // expecting integer
                         this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
 
                     // Check if it's the number of spaces or the content of the spaces
-                        // Check if the previous token is the directive
-                        // If so, it's the number of spaces
+                    // Check if the previous token is the directive
+                    // If so, it's the number of spaces
 
-                    if ( line[tok_num - 1].getType() === 'DIR' ) {              // if this integer is the number of values
-                        
+                    if (line[tok_num - 1].getType() === 'DIR') {              // if this integer is the number of values
+
                         const number_of_spaces = current_tok.getValue();        // the number of spaces we're making
 
-                        if ( ( tok_num + 1 ) === line_length ) {                // if there is no space value given, make them 0
+                        if ((tok_num + 1) === line_length) {                // if there is no space value given, make them 0
                             for (let i = 0; i < number_of_spaces; i++) {
-                                this.dmem.push( 0 );                            // add 0's for as many spaces as needed
+                                this.dmem.push(0);                            // add 0's for as many spaces as needed
                             }
                         }
                     }
-                    
+
                     // Otherwise check it's the final token
-                    else if ( ( tok_num + 1 ) !== line_length ) { // if it's the second argument given it must be the last
+                    else if ((tok_num + 1) !== line_length) { // if it's the second argument given it must be the last
                         this.newError(`Too many arguments given for .string on line ${line_in_file}.`);
                     }
 
@@ -871,7 +881,7 @@ class Parser {
                         const space_value = current_tok.getValue();             // value of the spaces
                         const number_of_spaces = line[tok_num - 2].getValue();  // the number of spaces we're making
                         for (let i = 0; i < number_of_spaces; i++) {
-                            this.dmem.push( space_value );                      // add the value for as many spaces as needed
+                            this.dmem.push(space_value);                      // add the value for as many spaces as needed
                         }
                     }
 
@@ -879,41 +889,41 @@ class Parser {
                 }
 
                 // Def directive
-                else if ( line_directive === '.def' ) {
-                    
+                else if (line_directive === '.def') {
+
                     // Check the number of arguments
-                    if ( (line_length - tok_num) > 3) { // if there's too many arguments
+                    if ((line_length - tok_num) > 3) { // if there's too many arguments
                         this.newError(`Too many arguments given for .def on line ${line_in_file}.`);
                     }
 
                     // if it's the 3rd last argument (expecting REF)
-                    if ( ( tok_num + 3 ) == line_length ) {
-                        if ( current_tok.getType() !== 'REF' ) {
+                    if ((tok_num + 3) == line_length) {
+                        if (current_tok.getType() !== 'REF') {
                             this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`)
-                        } 
+                        }
                     }
 
                     // Raise error if 2nd last token is not '='
-                    else if ( ( tok_num + 2 ) === line_length && current_tok.getType() !== 'SYMBOL' && current_tok.getValue() !== '=' ) {
+                    else if ((tok_num + 2) === line_length && current_tok.getType() !== 'SYMBOL' && current_tok.getValue() !== '=') {
                         this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
 
                     // If it's the last token (expecting REG)
-                    else if ( ( tok_num + 1 ) == line_length ) {
-                        
-                        if ( current_tok.getType() !== 'REG' ) {
+                    else if ((tok_num + 1) == line_length) {
+
+                        if (current_tok.getType() !== 'REG') {
                             this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                         }
 
                         const def_word = line[tok_num - 2].getValue();
-                        
+
                         this.labels[def_word] = current_tok.getValue(); // add the def word to the labels list
                     }
 
                 }
 
                 // Should be comma if there are even number of tokens left. Raise error.
-                else if ( parity_of_tokens_left === 1 && current_tok.getType() !== 'COMMA' ) {
+                else if (parity_of_tokens_left === 1 && current_tok.getType() !== 'COMMA') {
                     this.newError(`Missing comma on line ${line_in_file}.`);
                 }
 
@@ -928,7 +938,7 @@ class Parser {
 
 
         // Should be at .section .text line now
-        
+
         //////////////////////////////////////////////
         //////////////// TEXT SECTION ////////////////
         //////////////////////////////////////////////
@@ -937,7 +947,7 @@ class Parser {
         line_num += 1;                                          // move to the .global line
         let line = this.token_lines[line_num];                  // current line
 
-        if ( line.length !== 2 || line[0].getValue() !== '.global' ) {
+        if (line.length !== 2 || line[0].getValue() !== '.global') {
             this.newError(`Must begin text section with a valid \'.global\' directive: line ${this.line_numbers[line_num]}.`);
         }
 
@@ -949,7 +959,7 @@ class Parser {
         const opcode_32_bit = ['CALL', 'JMP', 'LDS', 'STS'];    // instructions with 32 bit opcode
 
         //////// CREATE PMEM AND GET THE LABEL LOCATIONS
-        while ( line_num < (this.token_lines.length - 1) ) {
+        while (line_num < (this.token_lines.length - 1)) {
 
             let line = this.token_lines[line_num]; // current line
             const line_length = line.length; // calculate number of tokens in the line
@@ -959,25 +969,25 @@ class Parser {
             let has_label = false; // bool for if the line has a label
 
             // While loop does:
-                // Check for labels and remove them
-                // Change HI8 LO8 to integers
-                // Change REF type (data labels) to integers 
-            while ( tok_num < line_length ) {
+            // Check for labels and remove them
+            // Change HI8 LO8 to integers
+            // Change REF type (data labels) to integers 
+            while (tok_num < line_length) {
 
                 const current_tok = line[tok_num]; // current token
 
                 // Check for labels and remove them
-                if ( current_tok.getType() === 'LABEL' ) {
+                if (current_tok.getType() === 'LABEL') {
 
                     // Label can only be at the start
-                    if ( tok_num !== 0 ) {
+                    if (tok_num !== 0) {
                         this.newError(`Illegal label location on line ${line_in_file}.`);
                     }
 
                     const label = current_tok.getValue().slice(0, (current_tok.getValue().length - 1)); // remove the colon from the end
                     this.labels[label] = this.pmem.length; //  add it to the labels dictionary
 
-                    if ( this.pmem.length === 0 && label !== global_funct_name ) {
+                    if (this.pmem.length === 0 && label !== global_funct_name) {
                         this.newError(`Incorrect global function name on line ${line_in_file}.`);
                     }
 
@@ -985,10 +995,10 @@ class Parser {
                 }
 
                 // Change HI8 LO8 to integers
-                else if ( ['HI8', 'LO8'].includes(current_tok.getType()) ) {
-                    
+                else if (['HI8', 'LO8'].includes(current_tok.getType())) {
+
                     // Must have 3 left, a bracket, a value, and a bracket
-                    if ( ( line_length - 1 - tok_num ) !== 3 ) {
+                    if ((line_length - 1 - tok_num) !== 3) {
                         this.newError(`Illegal ${current_tok.getValue()} on line ${line_in_file}.`);
                     }
 
@@ -997,27 +1007,27 @@ class Parser {
                     const right_bracket = line[tok_num + 3];
 
                     // Check the token we expect to be the left bracket
-                    if ( left_bracket.getType() !== 'SYMBOL' || left_bracket.getValue() !== '(' ) {
+                    if (left_bracket.getType() !== 'SYMBOL' || left_bracket.getValue() !== '(') {
                         this.newError(`Illegal ${current_tok.getValue()} left bracket on line ${line_in_file}.`);
                     }
 
                     // Check the token we expect to be the right bracket
-                    if ( right_bracket.getType() !== 'SYMBOL' || right_bracket.getValue() !== ')' ) {
+                    if (right_bracket.getType() !== 'SYMBOL' || right_bracket.getValue() !== ')') {
                         this.newError(`Illegal ${current_tok.getValue()} right bracket on line ${line_in_file}.`);
                     }
 
                     // Check the variable is defined
-                    if ( this.labels[variable.getValue()] === undefined || variable.getType() !== 'REF' ) {
+                    if (this.labels[variable.getValue()] === undefined || variable.getType() !== 'REF') {
                         this.newError(`Illegal ${current_tok.getValue()} variable on line ${line_in_file}.`);
                     }
 
                     let int_value = 0;
 
                     // Convert the value to the hi8/lo8 value
-                    if ( current_tok.getType() === 'HI8' ) {
+                    if (current_tok.getType() === 'HI8') {
                         int_value = this.hi8(this.labels[variable.getValue()]);
                     }
-                    
+
                     else {
                         int_value = this.lo8(this.labels[variable.getValue()]);
                     }
@@ -1025,39 +1035,39 @@ class Parser {
                     line[tok_num] = new Token('INT', int_value);
 
                     line = line.slice(0, (line.length - 3)); // remove the rest of the line
-                    
+
                     tok_num += 3;
                 }
 
                 // Change REF type (data labels) to integers
-                else if ( current_tok.getType() === 'REF' && data_labels.includes(current_tok.getValue()) ) {
+                else if (current_tok.getType() === 'REF' && data_labels.includes(current_tok.getValue())) {
                     current_tok.setType('INT');
-                    current_tok.setValue( this.labels[current_tok.getValue()] );
+                    current_tok.setValue(this.labels[current_tok.getValue()]);
                 }
 
                 tok_num += 1;
             }
 
             // If the line has a label AND instruction remove the label
-            if ( has_label && ( line_length > 1 ) ) {
+            if (has_label && (line_length > 1)) {
                 line = line.slice(1);
             }
-            
+
             // Add the line to the program memory
-            if ( (!has_label) || ( has_label && ( line_length > 1 ) ) ) {
-                
+            if ((!has_label) || (has_label && (line_length > 1))) {
+
                 // If theyre not instructions, it's illegal
-                if ( line[0].getType() !== 'INST' ) {
+                if (line[0].getType() !== 'INST') {
                     this.newError(`Illegal token \'${line[0]}\' on line ${line_in_file}.`);
                 }
-                
+
                 this.pmem.push(line); // set the line to the line without the label
                 this.pmem_line_numbers.push(line_in_file);
                 pmem_file_lines.push(line_in_file);
                 const inst = line[0].getValue();
-                
+
                 // Add None as next line if it's a 32 bit opcode
-                if ( opcode_32_bit.includes(inst) ) {
+                if (opcode_32_bit.includes(inst)) {
                     this.pmem.push(null);
                     this.pmem_line_numbers.push(null);
                     pmem_file_lines.push(line_in_file);
@@ -1068,14 +1078,14 @@ class Parser {
 
         }
 
-        const control_flow_instructions = ['CALL', 'JMP', 'RJMP'].concat( INST_LIST.slice(7,27) ); // all the branching instructions
+        const control_flow_instructions = ['CALL', 'JMP', 'RJMP'].concat(INST_LIST.slice(7, 27)); // all the branching instructions
 
         ////////// TURN ALL REFS INTO INT FOR BRANCHING INSTRUCTIONS
         for (let line_num = 0; line_num < this.pmem.length; line_num++) {
 
             const line = this.pmem[line_num]; // current line
 
-            if ( line === null ) {
+            if (line === null) {
                 continue
             }
 
@@ -1090,27 +1100,27 @@ class Parser {
                 const current_tok = line[tok_num];
 
                 // Replace REF with integer for branching
-                if ( current_tok.getType() === 'REF' ) {
-                    
+                if (current_tok.getType() === 'REF') {
+
                     // Check the label reference is a real label
-                    if ( this.labels[current_tok.getValue()] === undefined ) { 
+                    if (this.labels[current_tok.getValue()] === undefined) {
                         this.newError(`Illegal token \'${current_tok}\' on line ${line_in_file}.`);
                     }
-                    
+
                     // If it's a non relative control flow instruction 
-                    if ( control_flow_instructions.slice(0,2).includes(first_tok.getValue()) ) {
-                        
-                        let k = this.labels[ current_tok.getValue() ];      // Get k for label
-                        
+                    if (control_flow_instructions.slice(0, 2).includes(first_tok.getValue())) {
+
+                        let k = this.labels[current_tok.getValue()];      // Get k for label
+
                         // Replace it in the line
                         current_tok.setType('INT');
                         current_tok.setValue(k);
                     }
 
                     // If it's a relative control flow instruction
-                    else if ( control_flow_instructions.slice(2).includes(first_tok.getValue()) ) {
+                    else if (control_flow_instructions.slice(2).includes(first_tok.getValue())) {
 
-                        let k = this.labels[ current_tok.getValue() ];      // Get k for label
+                        let k = this.labels[current_tok.getValue()];      // Get k for label
                         let relative_k = k - 1 - line_num;                  // the k for relative jumping instructions
 
                         // Replace it in the line
@@ -1122,17 +1132,17 @@ class Parser {
         }
 
         ////////// CHECK INSTRUCTION SYNTAX
-            // Skip None lines
-            // Go through and check commas in right place (then remove them)
-            // Check for real instruction
-            // Check number of args given is correct
-            // Check if the types for each token are correct and their values are acceptable
+        // Skip None lines
+        // Go through and check commas in right place (then remove them)
+        // Check for real instruction
+        // Check number of args given is correct
+        // Check if the types for each token are correct and their values are acceptable
 
         for (let line_num = 0; line_num < this.pmem.length; line_num++) {
-            
+
             let line = this.pmem[line_num];                     // the line up to
 
-            if ( line == null ) {                               // skip over none lines
+            if (line == null) {                               // skip over none lines
                 continue
             }
 
@@ -1140,21 +1150,21 @@ class Parser {
             const line_in_file = pmem_file_lines[line_num];     // the current line if there's an error
 
             // CHECK FOR COMMA AND REMOVE THEM IF THEYRE CORRECTLY PLACED
-            if ( line_length > 2 ) {
-                
+            if (line_length > 2) {
+
                 // If the 2rd token is not a comma then its bad syntax
-                if ( line[2].getType() !== 'COMMA' ) {
+                if (line[2].getType() !== 'COMMA') {
                     this.newError(`Illegal token ${line[2]} on line ${line_in_file}: expecting comma.`);
                 }
 
-                line.splice(2,1);                       // remove the comma
+                line.splice(2, 1);                       // remove the comma
                 line_length -= 1;                       // line is shorter by 1
             }
 
             const inst = line[0].getValue();            // instruction for that line
 
             // CHECK IT'S A REAL INSTRUCTION
-            if ( INST_OPERANDS[inst] === undefined ) {
+            if (INST_OPERANDS[inst] === undefined) {
                 this.newError(`Illegal instruction \'${inst}\' on line ${line_in_file}.`);
             }
 
@@ -1163,7 +1173,7 @@ class Parser {
             const given_args = line.slice(1);           // the arguments we have
 
             // CHECK IF IT'S GOT THE WRONG NUMBER OF ARGUMENTS
-            if ( ( expected_args === null && given_args.length > 0 ) || ( expected_args !== null  && ( given_args.length !== expected_args.length  ) ) ) {
+            if ((expected_args === null && given_args.length > 0) || (expected_args !== null && (given_args.length !== expected_args.length))) {
                 this.newError(`Wrong number of arguments given on line ${line_in_file}.`);
             }
 
@@ -1171,7 +1181,7 @@ class Parser {
             for (let tok_num = 1; tok_num < line_length; tok_num++) {
 
                 const given_arg = line[tok_num];                // given arg
-                const exp_arg = expected_args[ tok_num - 1 ];   // expected arg
+                const exp_arg = expected_args[tok_num - 1];   // expected arg
 
                 // CHECK THE TOKEN IS LEGAL
                 exp_arg.isLegalToken(given_arg, line_in_file);
@@ -1192,11 +1202,11 @@ class Parser {
     }
 
     hi8(val) {
-        return parseInt ( ( val - ( val % 0x100) ) / 0x100 );
+        return parseInt((val - (val % 0x100)) / 0x100);
     }
 
     lo8(val) {
-        return ( val % 0x100 );
+        return (val % 0x100);
     }
 
     getPMEM() {
@@ -1217,7 +1227,7 @@ class Parser {
         document.getElementById('status').innerHTML = null;
         throw new SyntaxError(text);
     }
-    
+
 }
 
 
@@ -1236,21 +1246,21 @@ class Interpreter {
 
         this.finished = false;
     }
-    
+
     newData(pmem, dmem, pmem_line_numbers) {
         // DATA & PROGRAM MEMORY
         this.pmem = pmem;
         this.dmem = dmem;
         this.line_numbers = pmem_line_numbers;
         this.finished = false;
-        
+
         // DEFINING PC, SP AND SREG
         this.pcl = this.dmem[0x5B]; // PC lo8
         this.pch = this.dmem[0x5C]; // PC hi8
         this.spl = this.dmem[0x5D]; // SP lo8
         this.sph = this.dmem[0x5E]; // SP hi8
         this.sreg = this.dmem[0x5F]; // SREG
-    
+
         // SETTING PC = 0 & SREG = RAMEND
         this.flashend = this.pmem.length - 1;
         this.ramend = this.dmem.length - 1;
@@ -1273,12 +1283,12 @@ class Interpreter {
             return;
         }
 
-        const line = this.pmem[ this.getPC() ]; 
+        const line = this.pmem[this.getPC()];
         const inst = line.getInst().getValue();
         const line_in_file = this.line_numbers[this.getPC()];
 
-        let Rd, Rr, R, K, k, b, s, A, q, I, T, H, S, V, N, Z, C;    // declaring all the variable names
-        
+        let Rd, Rr, R, K, k, b, s, A, q, w, H, V, N, Z, C;    // declaring all the variable names
+
         // Big switch statement
 
         switch (inst) {
@@ -1290,10 +1300,10 @@ class Interpreter {
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd + Rr + C
 
-                H = ( this.getBit(Rd, 3) & this.getBit(Rr, 3) ) | ( this.getBit(Rr, 3) & (1 - this.getBit(R, 3)) ) | ( this.getBit(Rd, 3) & (1 - this.getBit(R, 3)) ); 
-                V = ( this.getBit(Rd, 7) & this.getBit(Rr, 7) & (1 - this.getBit(R, 7)) ) | ( (1 - this.getBit(Rd, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(R, 7) );
+                H = (this.getBit(Rd, 3) & this.getBit(Rr, 3)) | (this.getBit(Rr, 3) & (1 - this.getBit(R, 3))) | (this.getBit(Rd, 3) & (1 - this.getBit(R, 3)));
+                V = (this.getBit(Rd, 7) & this.getBit(Rr, 7) & (1 - this.getBit(R, 7))) | ((1 - this.getBit(Rd, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(R, 7));
                 N = this.getBit(R, 7);
-                C = ( this.getBit(Rd, 7) & this.getBit(Rr, 7) ) | ( this.getBit(Rr, 7) & (1 - this.getBit(R, 7)) ) | ( this.getBit(Rd, 7) & (1 - this.getBit(R, 7)) ); 
+                C = (this.getBit(Rd, 7) & this.getBit(Rr, 7)) | (this.getBit(Rr, 7) & (1 - this.getBit(R, 7))) | (this.getBit(Rd, 7) & (1 - this.getBit(R, 7)));
                 this.updateSREGBit(H, 5);
                 this.updateSREGBit(N ^ V, 4);
                 this.updateSREGBit(V, 3);
@@ -1308,10 +1318,10 @@ class Interpreter {
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd + Rr
 
-                H = ( this.getBit(Rd, 3) & this.getBit(Rr, 3) ) | ( this.getBit(Rr, 3) & (1 - this.getBit(R, 3)) ) | ( this.getBit(Rd, 3) & (1 - this.getBit(R, 3)) ); 
-                V = ( this.getBit(Rd, 7) & this.getBit(Rr, 7) & (1 - this.getBit(R, 7)) ) | ( (1 - this.getBit(Rd, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(R, 7) );
+                H = (this.getBit(Rd, 3) & this.getBit(Rr, 3)) | (this.getBit(Rr, 3) & (1 - this.getBit(R, 3))) | (this.getBit(Rd, 3) & (1 - this.getBit(R, 3)));
+                V = (this.getBit(Rd, 7) & this.getBit(Rr, 7) & (1 - this.getBit(R, 7))) | ((1 - this.getBit(Rd, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(R, 7));
                 N = this.getBit(R, 7);
-                C = ( this.getBit(Rd, 7) & this.getBit(Rr, 7) ) | ( this.getBit(Rr, 7) & (1 - this.getBit(R, 7)) ) | ( this.getBit(Rd, 7) & (1 - this.getBit(R, 7)) ); 
+                C = (this.getBit(Rd, 7) & this.getBit(Rr, 7)) | (this.getBit(Rr, 7) & (1 - this.getBit(R, 7))) | (this.getBit(Rd, 7) & (1 - this.getBit(R, 7)));
                 this.updateSREGBit(H, 5);
                 this.updateSREGBit(N ^ V, 4);
                 this.updateSREGBit(V, 3);
@@ -1320,6 +1330,15 @@ class Interpreter {
                 this.updateSREGBit(C, 0);
                 break;
             case 'ADIW':
+                Rd = this.getArgumentValue(line, 0);
+                K = this.getArgumentValue(line, 1);
+                if ((Rd + K) > 0xff) {
+                    R = (Rd + K) % 0x100;
+                    this.getDMEM()[line.getArgs()[0].getValue() + 1].inc();
+                } else {
+                    R = Rd + K;
+                }
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
                 break;
             case 'AND':
                 Rd = this.getArgumentValue(line, 0);
@@ -1350,6 +1369,22 @@ class Interpreter {
                 this.updateSREGBit((R === 0), 1);
                 break;
             case 'ASR':
+                Rd = this.getArgumentValue(line, 0);
+                R = Rd;
+                R = (R >> 1) & 0xff;
+                if ((R & 64) !== 0) {
+                    R += 128
+                }
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
+
+                N = this.getBit(R, 7);
+                C = Rd & 1;
+                V = N ^ C;
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit(C, 0);
                 break;
             case 'BCLR':
                 s = this.getArgumentValue(line, 0);
@@ -1486,14 +1521,18 @@ class Interpreter {
                 this.incPC();
 
                 this.getDMEM()[this.getSP()] = this.pcl.getValue();              // set the pcl in STACK
-                this.decSP(); 
+                this.decSP();
                 this.getDMEM()[this.getSP()] = this.pch.getValue();              // set the pch in STACK
-                this.decSP(); 
+                this.decSP();
 
                 k = this.getArgumentValue(line, 0);
                 this.setPC(k - 1);
                 break;
             case 'CBI':
+                A = this.getArgumentValue(line, 0);
+                b = this.getArgumentValue(line, 1);
+                R = this.getDMEM()[A + 0x20].getValue() & (0xff - (1 << b));
+                this.getDMEM()[A + 0x20].setValue(R);
                 break;
             case 'CBR':
                 Rd = this.getArgumentValue(line, 0);
@@ -1559,10 +1598,10 @@ class Interpreter {
                 Rr = this.getArgumentValue(line, 1);
                 R = (((Rd - Rr) % 0x100) + 0x100) % 0x100;
 
-                H = ( this.getBit(R, 3) & this.getBit(Rr, 3) ) | ( this.getBit(Rr, 3) & (1 - this.getBit(Rd, 3)) ) | ( this.getBit(R, 3) & (1 - this.getBit(Rd, 3)) ); 
-                V = ( this.getBit(R, 7) & this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7)) ) | ( (1 - this.getBit(R, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(Rd, 7) );
+                H = (this.getBit(R, 3) & this.getBit(Rr, 3)) | (this.getBit(Rr, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(R, 3) & (1 - this.getBit(Rd, 3)));
+                V = (this.getBit(R, 7) & this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | ((1 - this.getBit(R, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(Rd, 7));
                 N = this.getBit(R, 7);
-                C = ( this.getBit(R, 7) & this.getBit(Rr, 7) ) | ( this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7)) ) | ( this.getBit(R, 7) & (1 - this.getBit(Rd, 7)) ); 
+                C = (this.getBit(R, 7) & this.getBit(Rr, 7)) | (this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | (this.getBit(R, 7) & (1 - this.getBit(Rd, 7)));
                 this.updateSREGBit(H, 5);
                 this.updateSREGBit(N ^ V, 4);
                 this.updateSREGBit(V, 3);
@@ -1571,16 +1610,32 @@ class Interpreter {
                 this.updateSREGBit(C, 0);
                 break;
             case 'CPC':
+                Rd = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+                C = this.getSREG() & 1;
+                R = (((Rd - Rr - C) % 0x100) + 0x100) % 0x100;
+
+                H = (this.getBit(R, 3) & this.getBit(Rr, 3)) | (this.getBit(Rr, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(R, 3) & (1 - this.getBit(Rd, 3)));
+                V = (this.getBit(R, 7) & this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | ((1 - this.getBit(R, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(Rd, 7));
+                Z = (R === 0) & ((this.getSREG() >> 1) & 1);
+                N = this.getBit(R, 7);
+                C = (this.getBit(R, 7) & this.getBit(Rr, 7)) | (this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | (this.getBit(R, 7) & (1 - this.getBit(Rd, 7)));
+                this.updateSREGBit(H, 5);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit(Z, 1);
+                this.updateSREGBit(C, 0);
                 break;
             case 'CPI':
                 Rd = this.getArgumentValue(line, 0);
                 K = this.getArgumentValue(line, 1);
                 R = (((Rd - K) % 0x100) + 0x100) % 0x100;
 
-                H = ( this.getBit(R, 3) & this.getBit(K, 3) ) | ( this.getBit(K, 3) & (1 - this.getBit(Rd, 3)) ) | ( this.getBit(R, 3) & (1 - this.getBit(Rd, 3)) ); 
-                V = ( this.getBit(R, 7) & this.getBit(K, 7) & (1 - this.getBit(Rd, 7)) ) | ( (1 - this.getBit(R, 7)) & (1 - this.getBit(K, 7)) & this.getBit(Rd, 7) );
+                H = (this.getBit(R, 3) & this.getBit(K, 3)) | (this.getBit(K, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(R, 3) & (1 - this.getBit(Rd, 3)));
+                V = (this.getBit(R, 7) & this.getBit(K, 7) & (1 - this.getBit(Rd, 7))) | ((1 - this.getBit(R, 7)) & (1 - this.getBit(K, 7)) & this.getBit(Rd, 7));
                 N = this.getBit(R, 7);
-                C = ( this.getBit(R, 7) & this.getBit(K, 7) ) | ( this.getBit(K, 7) & (1 - this.getBit(Rd, 7)) ) | ( this.getBit(R, 7) & (1 - this.getBit(Rd, 7)) ); 
+                C = (this.getBit(R, 7) & this.getBit(K, 7)) | (this.getBit(K, 7) & (1 - this.getBit(Rd, 7))) | (this.getBit(R, 7) & (1 - this.getBit(Rd, 7)));
                 this.updateSREGBit(H, 5);
                 this.updateSREGBit(N ^ V, 4);
                 this.updateSREGBit(V, 3);
@@ -1616,6 +1671,11 @@ class Interpreter {
                 this.updateSREGBit((R === 0), 1);
                 break;
             case 'IN':
+                Rd = this.getArgumentValue(line, 0);
+                A = this.getArgumentValue(line, 1);
+                R = this.getDMEM()[A + 0x20].getValue();
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- I/O(A)
                 break;
             case 'INC':
                 Rd = this.getArgumentValue(line, 0);
@@ -1635,8 +1695,48 @@ class Interpreter {
                 this.setPC(k - 1);
                 break;
             case 'LD':
+                w = line.getArgs()[1].getValue();
+                // Decrement X/Y/Z
+                if (w[0] === '-') {
+                    if (w === '-X') {
+                        this.decX();
+                        w = 'X';
+                    } else if (w === '-Y') {
+                        this.decY();
+                        w = 'Y';
+                    } else if (w === '-Z') {
+                        this.decZ();
+                        w = 'Z';
+                    }
+                }
+
+                if (w[0] === 'X') {
+                    k = this.getX();
+                } else if (w[0] === 'Y') {
+                    k = this.getY();
+                } else if (w[0] === 'Z') {
+                    k = this.getZ();
+                }
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
+                if (w.includes('+')) {
+                    if (w === 'X+') {
+                        this.incX();
+                    } else if (w === 'Y+') {
+                        this.incY();
+                    } else if (w === 'Z+') {
+                        this.incZ();
+                    }
+                }
                 break;
             case 'LDD':
+                w = line.getArgs()[1].getValue()[0];
+                q = parseInt(line.getArgs()[1].getValue().slice(2));
+                if (w === 'Y') {
+                    k = this.getY() + q;
+                } else if (w === 'Z') {
+                    k = this.getZ() + q;
+                }
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 break;
             case 'LDI':
                 K = this.getArgumentValue(line, 1);
@@ -1665,18 +1765,61 @@ class Interpreter {
                 this.updateSREGBit(C, 0);
                 break;
             case 'LSR':
+                Rd = this.getArgumentValue(line, 0);
+                R = (Rd >> 1) & 0xff;
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
+
+                N = 0;
+                C = Rd & 1;
+                V = N ^ C;
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit(C, 0);
                 break;
             case 'MOV':
                 Rr = this.getArgumentValue(line, 1);
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(Rr);   // Rd <-- Rr
                 break;
             case 'MOVW':
+                Rr = this.getArgumentValue(line, 1);
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Rr);   // Rd <-- Rr
+                Rr = this.getDMEM()[line.getArgs()[1].getValue() + 1].getValue();
+                this.getDMEM()[line.getArgs()[0].getValue() + 1].setValue(Rr);   // Rd <-- Rr
                 break;
             case 'MUL':
+                Rd = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+                R = Rd * Rr;
+
+                this.getDMEM()[0].setValue(R % 256);
+                this.getDMEM()[1].setValue((R - (R % 256)) / 256);
+
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit((R >> 15) & 1, 0);
                 break;
             case 'MULS':
+                Rd = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+                R = Rd * Rr;
+                
+                this.getDMEM()[0].setValue(R % 256);
+                this.getDMEM()[1].setValue((R - (R % 256)) / 256);
+
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit((R >> 15) & 1, 0);
                 break;
             case 'MULSU':
+                Rd = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+                R = Rd * Rr;
+                
+                this.getDMEM()[0].setValue(R % 256);
+                this.getDMEM()[1].setValue((R - (R % 256)) / 256);
+
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit((R >> 15) & 1, 0);
                 break;
             case 'NEG':
                 Rd = this.getArgumentValue(line, 0);
@@ -1725,6 +1868,10 @@ class Interpreter {
                 this.updateSREGBit((R === 0), 1);
                 break;
             case 'OUT':
+                A = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+
+                this.getDMEM()[A + 0x20].setValue(Rr);   // I/O(A) <-- Rr
                 break;
             case 'POP':
                 if (this.getSP() >= this.ramend) {
@@ -1732,7 +1879,7 @@ class Interpreter {
                     return;
                 }
                 Rd = line.getArgs()[0].getValue();                                  // register number
-                this.getDMEM()[ Rd ].setValue( this.getDMEM()[this.getSP()] );      // set register value
+                this.getDMEM()[Rd].setValue(this.getDMEM()[this.getSP()]);      // set register value
                 this.incSP();                                                       // increment the SP by 1
                 break;
             case 'PUSH':
@@ -1754,27 +1901,105 @@ class Interpreter {
                     return;
                 }
 
-                if ( (this.getSP() < 0x100) || (this.getSP() > (this.ramend - 2)) ) {
+                if ((this.getSP() < 0x100) || (this.getSP() > (this.ramend - 2))) {
                     this.newError(`Bad stack pointer for RET on line ${line_in_file}`);
                     return;
                 }
-                
+
                 // Get the return line and move the SP
                 this.incSP();;
-                let ret_line = ( 0x100 * this.getDMEM()[this.getSP()] ); // get the ret high value
+                let ret_line = (0x100 * this.getDMEM()[this.getSP()]); // get the ret high value
                 this.incSP();
                 ret_line += this.getDMEM()[this.getSP()]; // add the ret low value to the ret high value
                 this.setPC(ret_line - 1); // -1 to counteract the increment at the end of the switch statement
                 break;
             case 'ROL':
+                Rd = this.getArgumentValue(line, 0);
+                C = (Rd >> 7) & 1;
+                R = ((Rd << 1) & 0xff) + C;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
+
+                H = this.getBit(Rd, 3);
+                N = this.getBit(R, 7);
+                V = N ^ C;
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit(C, 0);
                 break;
             case 'ROR':
+                Rd = this.getArgumentValue(line, 0);
+                C = Rd & 1;
+                R = ((Rd >> 1) & 0xff) + (128 * C);
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
+
+                N = this.getBit(R, 7);
+                V = N ^ C;
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit((R === 0), 1);
+                this.updateSREGBit(C, 0);
                 break;
             case 'SBC':
+                Rd = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+                C = this.getSREG() & 1;
+                R = (((Rd - Rr - C) % 0x100) + 0x100) % 0x100;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd - Rr - C
+
+                H = (this.getBit(R, 3) & this.getBit(Rr, 3)) | (this.getBit(Rr, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(R, 3) & (1 - this.getBit(Rd, 3)));
+                V = (this.getBit(R, 7) & this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | ((1 - this.getBit(R, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(Rd, 7));
+                N = this.getBit(R, 7);
+                Z = (R === 0) & ((this.getSREG() >> 1) & 1);
+                C = (this.getBit(R, 7) & this.getBit(Rr, 7)) | (this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | (this.getBit(R, 7) & (1 - this.getBit(Rd, 7)));
+                this.updateSREGBit(H, 5);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit(Z, 1);
+                this.updateSREGBit(C, 0);
+                break;
+            case 'SBCI':
+                Rd = this.getArgumentValue(line, 0);
+                K = this.getArgumentValue(line, 1);
+                C = this.getSREG() & 1;
+                R = (((Rd - K - C) % 0x100) + 0x100) % 0x100;
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd - K - C
+
+                H = (this.getBit(R, 3) & this.getBit(K, 3)) | (this.getBit(K, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(R, 3) & (1 - this.getBit(Rd, 3)));
+                V = (this.getBit(R, 7) & this.getBit(K, 7) & (1 - this.getBit(Rd, 7))) | ((1 - this.getBit(R, 7)) & (1 - this.getBit(K, 7)) & this.getBit(Rd, 7));
+                N = this.getBit(R, 7);
+                Z = (R === 0) & ((this.getSREG() >> 1) & 1);
+                C = (this.getBit(R, 7) & this.getBit(K, 7)) | (this.getBit(K, 7) & (1 - this.getBit(Rd, 7))) | (this.getBit(R, 7) & (1 - this.getBit(Rd, 7)));
+                this.updateSREGBit(H, 5);
+                this.updateSREGBit(N ^ V, 4);
+                this.updateSREGBit(V, 3);
+                this.updateSREGBit(N, 2);
+                this.updateSREGBit(Z, 1);
+                this.updateSREGBit(C, 0);
                 break;
             case 'SBI':
+                A = this.getArgumentValue(line, 0);
+                b = this.getArgumentValue(line, 1);
+                R = this.getDMEM()[A + 0x20].getValue() | (1 << b);
+                this.getDMEM()[A + 0x20].setValue(R);
                 break;
             case 'SBIW':
+                Rd = this.getArgumentValue(line, 0);
+                K = this.getArgumentValue(line, 1);
+                if ((Rd - K) < 0) {
+                    R = 0x100 + Rd - K;
+                    this.getDMEM()[line.getArgs()[0].getValue() + 1].dec();
+                } else {
+                    R = Rd - K;
+                }
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
                 break;
             case 'SBR':
                 Rd = this.getArgumentValue(line, 0);
@@ -1798,7 +2023,7 @@ class Interpreter {
                     this.incPC();
                 }
                 // Skip another line if the next instruction has a 32 bit opcode
-                if (['CALL', 'JMP', 'LDS', 'STS'].includes(this.pmem[ this.getPC() ].getInst().getValue())) {
+                if (['CALL', 'JMP', 'LDS', 'STS'].includes(this.pmem[this.getPC()].getInst().getValue())) {
                     this.incPC();
                 }
                 break;
@@ -1810,7 +2035,7 @@ class Interpreter {
                     this.incPC();
                 }
                 // Skip another line if the next instruction has a 32 bit opcode
-                if (['CALL', 'JMP', 'LDS', 'STS'].includes(this.pmem[ this.getPC() ].getInst().getValue())) {
+                if (['CALL', 'JMP', 'LDS', 'STS'].includes(this.pmem[this.getPC()].getInst().getValue())) {
                     this.incPC();
                 }
                 break;
@@ -1842,10 +2067,58 @@ class Interpreter {
                 this.updateSREGBit(1, 1);
                 break;
             case 'ST':
+                w = line.getArgs()[0].getValue();
+                Rr = this.getArgumentValue(line, 1);
+                // Decrement X/Y/Z
+                if (w[0] === '-') {
+                    if (w === '-X') {
+                        this.decX();
+                        w = 'X';
+                    } else if (w === '-Y') {
+                        this.decY();
+                        w = 'Y';
+                    } else if (w === '-Z') {
+                        this.decZ();
+                        w = 'Z';
+                    }
+                }
+
+                if (w[0] === 'X') {
+                    k = this.getX();
+                } else if (w[0] === 'Y') {
+                    k = this.getY();
+                } else if (w[0] === 'Z') {
+                    k = this.getZ();
+                }
+
+                this.getDMEM()[k] = Rr;   // (k) <-- Rr
+
+                if (w.includes('+')) {
+                    if (w === 'X+') {
+                        this.incX();
+                    } else if (w === 'Y+') {
+                        this.incY();
+                    } else if (w === 'Z+') {
+                        this.incZ();
+                    }
+                }
                 break;
             case 'STD':
+                w = line.getArgs()[0].getValue()[0];
+                q = parseInt(line.getArgs()[0].getValue().slice(2));
+                Rd = this.getArgumentValue(line, 1);
+                if (w === 'Y') {
+                    k = this.getY() + q;
+                } else if (w === 'Z') {
+                    k = this.getZ() + q;
+                }
+                this.getDMEM()[k] = Rd;   // (k) <-- Rd
                 break;
             case 'STS':
+                k = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(line, 1);
+                this.getDMEM()[k] = Rd;   // (k) <-- Rd
+                this.incPC(); // increment once now cause total needs to be + 2
                 break;
             case 'SUB':
                 Rd = this.getArgumentValue(line, 0);
@@ -1854,10 +2127,10 @@ class Interpreter {
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd - Rr
 
-                H = ( this.getBit(R, 3) & this.getBit(Rr, 3) ) | ( this.getBit(Rr, 3) & (1 - this.getBit(Rd, 3)) ) | ( this.getBit(R, 3) & (1 - this.getBit(Rd, 3)) ); 
-                V = ( this.getBit(R, 7) & this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7)) ) | ( (1 - this.getBit(R, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(Rd, 7) );
+                H = (this.getBit(R, 3) & this.getBit(Rr, 3)) | (this.getBit(Rr, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(R, 3) & (1 - this.getBit(Rd, 3)));
+                V = (this.getBit(R, 7) & this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | ((1 - this.getBit(R, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(Rd, 7));
                 N = this.getBit(R, 7);
-                C = ( this.getBit(R, 7) & this.getBit(Rr, 7) ) | ( this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7)) ) | ( this.getBit(R, 7) & (1 - this.getBit(Rd, 7)) ); 
+                C = (this.getBit(R, 7) & this.getBit(Rr, 7)) | (this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | (this.getBit(R, 7) & (1 - this.getBit(Rd, 7)));
                 this.updateSREGBit(H, 5);
                 this.updateSREGBit(N ^ V, 4);
                 this.updateSREGBit(V, 3);
@@ -1870,12 +2143,12 @@ class Interpreter {
                 K = this.getArgumentValue(line, 1);
                 R = (((Rd - K) % 0x100) + 0x100) % 0x100;
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd - Rr
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd - K
 
-                H = ( this.getBit(R, 3) & this.getBit(K, 3) ) | ( this.getBit(K, 3) & (1 - this.getBit(Rd, 3)) ) | ( this.getBit(R, 3) & (1 - this.getBit(Rd, 3)) ); 
-                V = ( this.getBit(R, 7) & this.getBit(K, 7) & (1 - this.getBit(Rd, 7)) ) | ( (1 - this.getBit(R, 7)) & (1 - this.getBit(K, 7)) & this.getBit(Rd, 7) );
+                H = (this.getBit(R, 3) & this.getBit(K, 3)) | (this.getBit(K, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(R, 3) & (1 - this.getBit(Rd, 3)));
+                V = (this.getBit(R, 7) & this.getBit(K, 7) & (1 - this.getBit(Rd, 7))) | ((1 - this.getBit(R, 7)) & (1 - this.getBit(K, 7)) & this.getBit(Rd, 7));
                 N = this.getBit(R, 7);
-                C = ( this.getBit(R, 7) & this.getBit(K, 7) ) | ( this.getBit(K, 7) & (1 - this.getBit(Rd, 7)) ) | ( this.getBit(R, 7) & (1 - this.getBit(Rd, 7)) ); 
+                C = (this.getBit(R, 7) & this.getBit(K, 7)) | (this.getBit(K, 7) & (1 - this.getBit(Rd, 7))) | (this.getBit(R, 7) & (1 - this.getBit(Rd, 7)));
                 this.updateSREGBit(H, 5);
                 this.updateSREGBit(N ^ V, 4);
                 this.updateSREGBit(V, 3);
@@ -1885,7 +2158,7 @@ class Interpreter {
                 break;
             case 'SWAP':
                 Rd = this.getArgumentValue(line, 0);
-                R = ( (Rd & 0x0F) << 4 | (Rd & 0xF0) >> 4 );
+                R = ((Rd & 0x0F) << 4 | (Rd & 0xF0) >> 4);
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
                 break;
@@ -1901,6 +2174,16 @@ class Interpreter {
                 this.updateSREGBit((R === 0), 1);
                 break;
             case 'XCH':
+                k = this.getZ();
+                Rd = this.getArgumentValue(line, 1);
+                if ((k < 0x100) || (k > 0x8ff)) {
+                    this.newError(`Illegal value of Z pointer, ${k}: line ${line_in_file}`);
+                }
+
+                let vals = [Rd, this.getDMEM()[k]];
+
+                this.getDMEM()[k] = vals[0];                                    // (Z) <-- Rd
+                this.getDMEM()[line.getArgs()[1].getValue()].setValue(vals[1]); // Rd <-- (Z)
                 break;
             default:
                 break;
@@ -1908,7 +2191,7 @@ class Interpreter {
 
         this.incPC(); // almost every instruction does this, so its easier to counterract it if you don't want to do exactly that
 
-        
+
     }
 
     run() {
@@ -1918,37 +2201,37 @@ class Interpreter {
     }
 
     getPC() {
-        return ( 0x100 * this.pch.getValue() ) + this.pcl.getValue();
+        return (0x100 * this.pch.getValue()) + this.pcl.getValue();
     }
 
     setPC(new_value) {
 
-        const hi8 = ( new_value - ( new_value % 0x100 ) ) / 0x100;
-        const lo8 = ( new_value % 0x100 );
+        const hi8 = (new_value - (new_value % 0x100)) / 0x100;
+        const lo8 = (new_value % 0x100);
 
         this.pch.setValue(hi8);
         this.pcl.setValue(lo8);
     }
 
     getSP() {
-        return ( 0x100 * this.sph.getValue() ) + this.spl.getValue();
+        return (0x100 * this.sph.getValue()) + this.spl.getValue();
     }
 
     setSP(new_value) {
 
-        const hi8 = ( new_value - ( new_value % 0x100 ) ) / 0x100;
-        const lo8 = ( new_value % 0x100 );
+        const hi8 = (new_value - (new_value % 0x100)) / 0x100;
+        const lo8 = (new_value % 0x100);
 
         this.sph.setValue(hi8);
         this.spl.setValue(lo8);
     }
 
     incSP() {
-        this.setSP( this.getSP() + 1 );
+        this.setSP(this.getSP() + 1);
     }
 
     decSP() {
-        this.setSP( this.getSP() - 1 );
+        this.setSP(this.getSP() - 1);
     }
 
     incPC() {
@@ -1969,7 +2252,7 @@ class Interpreter {
         const inst = toks[0].getValue();
 
         // IF THERE'S NO ARGUMENTS
-        if ( toks.length === 1 ) {
+        if (toks.length === 1) {
             return inst;
         }
 
@@ -1977,17 +2260,17 @@ class Interpreter {
 
         let arg1 = `${args[0].getValue()}`; // value of the argument
 
-        if ( args[0].getType() === 'REG' ) {
+        if (args[0].getType() === 'REG') {
             arg1 = 'R' + arg1;
         }
         // IF THERE'S 1 ARGUMENT
-        if ( toks.length === 2 ) {
+        if (toks.length === 2) {
             return `${inst} ${arg1}`;
         }
 
         // IF THERE'S 2 ARGUMENTS
         let arg2 = `${args[1].getValue()}`; // value of the argument
-        if ( args[1].getType() === 'REG' ) {
+        if (args[1].getType() === 'REG') {
             arg2 = 'R' + arg2;
         }
 
@@ -2008,9 +2291,9 @@ class Interpreter {
 
     updateSREGBit(value, bit) {
         if (value) {
-            this.sreg.setValue( this.sreg.getValue() | (2 ** bit) );
+            this.sreg.setValue(this.sreg.getValue() | (2 ** bit));
         } else {
-            this.sreg.setValue( this.sreg.getValue() & (0x100 - (2 ** bit)) );
+            this.sreg.setValue(this.sreg.getValue() & (0x100 - (2 ** bit)));
         }
     }
 
@@ -2026,12 +2309,66 @@ class Interpreter {
         return (0x100 * this.getDMEM()[27].getValue()) + this.getDMEM()[26].getValue()
     }
 
+    incX() {
+        const XL = this.getDMEM()[26].getValue();
+        const XH = this.getDMEM()[27].getValue();
+        if (XL === 255) {
+            this.getDMEM()[27].setValue(XH + 1);
+        }
+        this.getDMEM()[26].setValue(XL + 1);
+    }
+
+    decX() {
+        const XL = this.getDMEM()[26].getValue();
+        const XH = this.getDMEM()[27].getValue();
+        if (XL === 0) {
+            this.getDMEM()[27].setValue(XH - 1);
+        }
+        this.getDMEM()[26].setValue(XL - 1);
+    }
+
     getY() {
         return (0x100 * this.getDMEM()[29].getValue()) + this.getDMEM()[28].getValue()
     }
 
+    incY() {
+        const YL = this.getDMEM()[28].getValue();
+        const YH = this.getDMEM()[29].getValue();
+        if (YL === 255) {
+            this.getDMEM()[29].setValue(YH + 1);
+        }
+        this.getDMEM()[28].setValue(YL + 1);
+    }
+
+    decY() {
+        const YL = this.getDMEM()[28].getValue();
+        const YH = this.getDMEM()[29].getValue();
+        if (YL === 0) {
+            this.getDMEM()[29].setValue(YH - 1);
+        }
+        this.getDMEM()[28].setValue(YL - 1);
+    }
+
     getZ() {
         return (0x100 * this.getDMEM()[31].getValue()) + this.getDMEM()[30].getValue()
+    }
+
+    incZ() {
+        const ZL = this.getDMEM()[30].getValue();
+        const ZH = this.getDMEM()[31].getValue();
+        if (ZL === 255) {
+            this.getDMEM()[31].setValue(ZH + 1);
+        }
+        this.getDMEM()[30].setValue(ZL + 1);
+    }
+
+    decZ() {
+        const ZL = this.getDMEM()[30].getValue();
+        const ZH = this.getDMEM()[31].getValue();
+        if (ZL === 0) {
+            this.getDMEM()[31].setValue(ZH - 1);
+        }
+        this.getDMEM()[30].setValue(ZL - 1);
     }
 
     getArgumentValue(line, arg_num) {
@@ -2130,6 +2467,7 @@ INST_LIST = [
     'ROL',
     'ROR',
     'SBC',
+    'SBCI',
     'SBI',
     'SBIW',
     'SBR',
@@ -2152,19 +2490,19 @@ INST_LIST = [
     'SWAP',
     'TST',
     'XCH'
-];  
+];
 
 
 const reg_0_31 = new Argument('REG', 0, 31);
 const reg_16_31 = new Argument('REG', 16, 31);
-const reg_word_low = new Argument('REG', options_list=[0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]);
+const reg_word_low = new Argument('REG', null, null, [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]);
 const int_0_7 = new Argument('INT', 0, 7);
 const int_0_31 = new Argument('INT', 0, 31);
 const int_0_63 = new Argument('INT', 0, 63);
 const int_0_255 = new Argument('INT', 0, 255);
 const int_n64_63 = new Argument('INT', -64, 63);
 const word_plus_q_0_63 = new Argument('WORDPLUSQ', 0, 63);
-const word_wxyz = new Argument('REG', options_list=[24, 26, 28, 30]);
+const word_wxyz = new Argument('REG', null, null, [24, 26, 28, 30]);
 
 // Allows ranges for each inst
 INST_OPERANDS = {
@@ -2177,7 +2515,7 @@ INST_OPERANDS = {
     'BCLR': [int_0_7],
     'BRBC': [int_0_7, int_n64_63],
     'BRBS': [int_0_7, int_n64_63],
-    'BRCC': [int_n64_63], 
+    'BRCC': [int_n64_63],
     'BRCS': [int_n64_63],
     'BREQ': [int_n64_63],
     'BRGE': [int_n64_63],
@@ -2240,6 +2578,7 @@ INST_OPERANDS = {
     'ROL': [reg_0_31],
     'ROR': [reg_0_31],
     'SBC': [reg_0_31, reg_0_31],
+    'SBCI': [reg_16_31, int_0_255],
     'SBI': [int_0_31, int_0_7],
     'SBIW': [word_wxyz, int_0_63],
     'SBR': [reg_16_31, int_0_255],
@@ -2261,7 +2600,7 @@ INST_OPERANDS = {
     'SUBI': [reg_16_31, int_0_255],
     'SWAP': [reg_0_31],
     'TST': [reg_0_31],
-    'XCH': [new Argument('WORD', exact_value='Z'), reg_0_31]
+    'XCH': [new Argument('WORD', null, null, null, 'Z'), reg_0_31]
 }
 
 
@@ -2276,7 +2615,7 @@ INST_OPCODES = {
     'BCLR': ['s', '100101001sss1000'],
     'BRBC': ['s', 'k', '111101kkkkkkksss'],
     'BRBS': ['s', 'k', '111100kkkkkkksss'],
-    'BRCC': ['k', '111101kkkkkkk000'], 
+    'BRCC': ['k', '111101kkkkkkk000'],
     'BRCS': ['k', '111100kkkkkkk000'],
     'BREQ': ['k', '111100kkkkkkk001'],
     'BRGE': ['k', '111101kkkkkkk100'],
@@ -2339,6 +2678,7 @@ INST_OPCODES = {
     'ROL': null,
     'ROR': ['d', '1001010ddddd0111'],
     'SBC': ['d', 'r', '000010rdddddrrrr'],
+    'SBCI': ['d', 'K', '0100KKKKddddKKKK'],
     'SBI': ['A', 'b', '10011010AAAAAbbb'],
     'SBIW': null,
     'SBR': ['d', 'K', '0110KKKKddddKKKK'],
@@ -2413,13 +2753,12 @@ class App {
 
             // Interpreter Initialisation
             this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), this.parser.getPMEMLineNumbers());
-            
+
             // Success!
             this.success('Success! Your code can be run.');
-            
+
             // Populating Display with Data
             this.populateAll();
-            
 
         }
 
@@ -2433,11 +2772,13 @@ class App {
         for (let i = 0; i < 32; i++) {
             this.interpreter.getDMEM()[i].clearChange();    // set changed = 0 for all registers
         }
-        
+
         const stepsize = this.getStepSize();
         for (let i = 0; i < stepsize; i++) {
             this.interpreter.step();
         }
+
+        this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
 
         if (this.interpreter.finished) {
             this.success('The code has run and exited successfully!');
@@ -2450,12 +2791,14 @@ class App {
         for (let i = 0; i < 32; i++) {
             this.interpreter.getDMEM()[i].clearChange();    // set changed = 0 for all registers
         }
-        
+
         this.interpreter.run();
 
         if (this.interpreter.finished) {
             this.success('The code has run and exited successfully!');
         }
+
+        this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
 
         this.populateAll();
     }
@@ -2473,18 +2816,18 @@ class App {
 
             const num_lines = 4; // number of lines in the table
             const regs_per_line = 8;
-            const registers = this.interpreter.getDMEM().slice(0,32);
+            const registers = this.interpreter.getDMEM().slice(0, 32);
 
             const no_change_background_colour = '#ddd';
             const no_change_text_colour = '#444';
             const change_background_colour = '#fd0002';
             const change_text_colour = '#fff';
-        
+
             // Go through the lines
             for (let line = 0; line < num_lines; line++) {
-        
+
                 // Don't need to populate the table headings since they never change
-        
+
                 // Go through each reg in the line
                 for (let reg = 0; reg < regs_per_line; reg++) {
                     const reg_num = reg + (line * regs_per_line);
@@ -2511,17 +2854,17 @@ class App {
             const sreg_flags = ['C', 'Z', 'N', 'V', 'S', 'H', 'T', 'I'];
             for (let i = 0; i < 8; i++) {
                 const flag = sreg_flags[i];
-    
+
                 let flag_value = this.interpreter.sreg.getBit(i); // get the sreg bit value
-    
+
                 if (flag_value) {
                     flag_value = 'TRUE';
                 } else {
                     flag_value = 'FALSE';
                 }
-    
+
                 document.getElementById(`sreg-${flag}`).innerHTML = flag_value;
-    
+
             }
         }
     }
@@ -2546,7 +2889,7 @@ class App {
         }
 
     }
-    
+
     populatePMEM(start_cell) {
         if (this.assembled) {
 
@@ -2560,34 +2903,34 @@ class App {
 
             for (let line = 0; line < num_lines; line++) {
                 document.getElementById(`pmem-linenum-${line}`).innerHTML = `${start_cell + line}`;
-                
-                let line_value = this.interpreter.getPMEM()[ start_cell + line ];  // get the line to print
+
+                let line_value = this.interpreter.getPMEM()[start_cell + line];  // get the line to print
 
                 // If the opcode display = true 
                 if (this.display_opcode) {
                     if (line_value !== null) {                    // replace null lines with (two line inst.)
-                        line_value = line_value.getOpcode().slice(0,16);
+                        line_value = line_value.getOpcode().slice(0, 16);
                     } else {
-                        line_value = this.interpreter.getPMEM()[ start_cell + line - 1];
+                        line_value = this.interpreter.getPMEM()[start_cell + line - 1];
                         line_value = line_value.getOpcode().slice(16);
                     }
                 }
-                
+
                 // If the instruction is to be display, not the opcode
                 else {
-            
+
                     if (line_value !== null) {                    // replace null lines with (two line inst.)
                         line_value = line_value.toString(this.base);
                     } else {
-                        line_value = '(two line inst.)';  
+                        line_value = '(two line inst.)';
                     }
                 }
-        
+
                 document.getElementById(`pmem-line-${line}`).innerHTML = line_value;
 
                 // If it's the pc line
                 // If it's changed, make the display different
-                if ( ( start_cell + line ) === pc ) {
+                if ((start_cell + line) === pc) {
                     document.getElementById(`pmem-linenum-${line}`).style.backgroundColor = pc_background_colour;
                     document.getElementById(`pmem-linenum-${line}`).style.color = pc_text_colour;
                 } else {
@@ -2598,7 +2941,7 @@ class App {
             }
         }
     }
-    
+
     populateDMEM(start_cell) {
         if (this.assembled) {
 
@@ -2620,34 +2963,34 @@ class App {
             const pointer_text_colour = '#fff';
 
             for (let line = 0; line < num_lines; line++) {
-        
+
                 let line_value = (start_cell + (num_rows * line)).toString(this.base);     // Calculate line start cell number as base 16 string
-        
+
                 // Add 0's to the front until it's 4 digits long
                 for (let i = line_value.length; i < 4; i++) {
                     line_value = '0' + line_value;
                 }
-        
+
                 // Put the line value in the html
                 document.getElementById(`dmem-linenum-${line}`).innerHTML = line_value;
-        
+
                 // Put the cell values in the html
                 for (let row = 0; row < num_rows; row++) {
                     const cell_number = start_cell + row + (num_rows * line);
-                    let cell_value = this.interpreter.getDMEM()[ cell_number ];
+                    let cell_value = this.interpreter.getDMEM()[cell_number];
                     cell_value = this.convertValueToBase(cell_value, 2);
-                    
+
                     document.getElementById(`dmem-line-${line}${row}`).innerHTML = cell_value;
                     document.getElementById(`dmem-line-${line}${row}`).style.color = pointer_text_colour;
 
                     // Check if it's SP, X, Y, Z
-                    if ( cell_number === sp ) {
+                    if (cell_number === sp) {
                         document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = sp_background_colour;
-                    } else if ( cell_number === z ) {
+                    } else if (cell_number === z) {
                         document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = z_background_colour;
-                    } else if ( cell_number === y ) {
+                    } else if (cell_number === y) {
                         document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = y_background_colour;
-                    } else if ( cell_number === x ) {
+                    } else if (cell_number === x) {
                         document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = x_background_colour;
                     } else {
                         document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = normal_background_colour;
@@ -2674,28 +3017,28 @@ class App {
     }
 
     displayPMEMUp() {
-        if ( this.pmem_top >= 8 ) {
+        if (this.pmem_top >= 8) {
             this.pmem_top -= 8;
             this.populatePMEM(this.pmem_top);
         }
     }
 
     displayPMEMDown() {
-        if (this.pmem_top <= (this.parser.flashend - 8) ) {
+        if (this.pmem_top <= (this.parser.flashend - 8)) {
             this.pmem_top += 8;
             this.populatePMEM(this.pmem_top);
         }
     }
 
     displayDMEMUp() {
-        if ( this.dmem_top >= 0x140 ) {
+        if (this.dmem_top >= 0x140) {
             this.dmem_top -= 0x40;
             this.populateDMEM(this.dmem_top);
         }
     }
 
     displayDMEMDown() {
-        if (this.dmem_top <= (this.parser.ramend - 0x40) ) {
+        if (this.dmem_top <= (this.parser.ramend - 0x40)) {
             this.dmem_top += 0x40;
             this.populateDMEM(this.dmem_top);
         }
@@ -2748,14 +3091,14 @@ class App {
         if (this.display_opcode) {
             document.getElementById('button-opcode').innerHTML = 'Opcode Off';
         } else {
-            document.getElementById('button-opcode').innerHTML = 'Opcode On'; 
+            document.getElementById('button-opcode').innerHTML = 'Opcode On';
         }
         this.populatePMEM(this.pmem_top);
     }
 
 }
 
- 
+
 
 app = new App();
 
