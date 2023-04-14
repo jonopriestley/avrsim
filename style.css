@@ -433,7 +433,6 @@ td {
 .donate {
     font-size: 15px;
     font-family: Arial, Helvetica, sans-serif;
-    margin-left: 1%;
-    margin-bottom: 1%;
+    margin: 1%;
     float: left;
 }
