@@ -15,7 +15,6 @@ h1 {
     background-color: #fb4;
     padding: 10px;
     margin: 0;
-
 }
 
 .body {
@@ -150,6 +149,12 @@ textarea {
     border-radius: 10px;
 }
 
+.button:hover {
+    color: #000;
+    background-color: #ddd;
+    border: 1px solid #c0c0c0;
+}
+
 .button-assemble {
     padding: 15px 15px;
 }
@@ -194,11 +199,21 @@ textarea {
     padding: 15px 15px;
 }
 
+.button-donate {
+    padding: 15px 15px;
+    background-color: #ffe080;
+}
+
 .select {
     color: #000;
     background-color: #fff;
     font-family: sans-serif;
     border: 1px solid #e0e0e0; 
+}
+
+.select:hover {
+    background-color: #ddd;
+    border: 1px solid #c0c0c0; 
 }
 
 .select-step {
@@ -414,4 +429,10 @@ td {
     padding-right: 3%;
 }
 
-
+.donate {
+    font-size: 15px;
+    font-family: Arial, Helvetica, sans-serif;
+    margin-left: 1%;
+    margin-bottom: 1%;
+    float: left;
+}
