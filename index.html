@@ -43,7 +43,17 @@
                 <div class="panel-body">
                     <div class="text-box">
                         <form>
-                            <textarea class="text-code" id="code_box" name="code_box" rows="28" cols="60"></textarea>
+                            <textarea class="text-code" id="code_box" name="code_box" rows="28" cols="60">
+.section .data
+
+.section .text
+.global main
+
+main:
+ret
+
+.end
+                            </textarea>
                             <br>
                             <button class="button button-assemble" type="button" onclick="app.assemble()">Assemble Code</button>
                             <button class="button button-run" type="button" onclick="app.run()">Run All</button>
@@ -823,11 +833,11 @@
 
     <div class="donate">
         <a href="https://www.paypal.com/donate/?business=8BXF5U6436LQY&no_recurring=0&item_name=Thank+you+for+supporting+me+in+creating+the+AVR+Sim%21&currency_code=AUD">Donate</a>
-        to support me.
+        to support development.
     </div>
 
 </body>
- 
+
 </html>
 
 
