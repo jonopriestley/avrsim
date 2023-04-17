@@ -2913,7 +2913,8 @@ class App {
             const pc_text_colour = '#fff';
 
             for (let line = 0; line < num_lines; line++) {
-                document.getElementById(`pmem-linenum-${line}`).innerHTML = `${start_cell + line}`;
+                let real_line = start_cell + line;
+                document.getElementById(`pmem-linenum-${line}`).innerHTML = real_line.toString(this.base);
 
                 let line_value = this.interpreter.getPMEM()[start_cell + line];  // get the line to print
 
