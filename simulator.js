@@ -1245,6 +1245,8 @@ class Interpreter {
         this.sph = new Token('REG', 0); // SP hi8
 
         this.finished = false;
+
+        this.step_count = 0;
     }
 
     newData(pmem, dmem, pmem_line_numbers) {
@@ -2190,6 +2192,15 @@ class Interpreter {
         }
 
         this.incPC(); // almost every instruction does this, so its easier to counterract it if you don't want to do exactly that
+        
+        this.step_count += 1 // count the number of steps to prevent infinite loops
+
+        // If the number of steps is too large, terminate running the code
+        if (this.step_count > 1000000) {
+            this.finished = true;
+            this.newError('Number of steps in code too large. Execution terminated.')
+            return;
+        } 
 
 
     }

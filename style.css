@@ -436,3 +436,10 @@ td {
     margin: 1%;
     float: left;
 }
+
+.feedback {
+    font-size: 15px;
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 1%;
+    float: left;
+}
