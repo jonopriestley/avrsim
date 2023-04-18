@@ -770,6 +770,8 @@ class Parser {
 
         let line_num = 0;
 
+        const definitions = Object.create(null);;
+
         // GO THROUGH LINES IN DATA SECTION
         while (data_section_exists && (line_num < text_section_start)) {
 
@@ -897,10 +899,8 @@ class Parser {
                     }
 
                     // if it's the 3rd last argument (expecting REF)
-                    if ((tok_num + 3) == line_length) {
-                        if (current_tok.getType() !== 'REF') {
-                            this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`)
-                        }
+                    if ((tok_num + 3) == line_length && current_tok.getType() !== 'REF') {
+                        this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`)
                     }
 
                     // Raise error if 2nd last token is not '='
@@ -915,9 +915,9 @@ class Parser {
                             this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                         }
 
-                        const def_word = line[tok_num - 2].getValue();
+                        const def_word = line[tok_num - 2].getValue();  // get the definition name for the labels list
 
-                        this.labels[def_word] = current_tok.getValue(); // add the def word to the labels list
+                        definitions[def_word] = current_tok.getValue(); // add the def word to the labels list
                     }
 
                 }
@@ -955,6 +955,7 @@ class Parser {
         const global_funct_name = line[1].getValue();           // the name of the glibal function for later
         line_num += 1;                                          // move to instructions part of text section
         const data_labels = Object.keys(this.labels);           // to be used for replacing data labels in instructions
+        const definition_keys = Object.keys(definitions);
         const pmem_file_lines = [];                             // where in the text file each pmem line is 
         const opcode_32_bit = ['CALL', 'JMP', 'LDS', 'STS'];    // instructions with 32 bit opcode
 
@@ -1039,10 +1040,20 @@ class Parser {
                     tok_num += 3;
                 }
 
-                // Change REF type (data labels) to integers
-                else if (current_tok.getType() === 'REF' && data_labels.includes(current_tok.getValue())) {
-                    current_tok.setType('INT');
-                    current_tok.setValue(this.labels[current_tok.getValue()]);
+                // Change REF type to correct form from reference
+                else if (current_tok.getType() === 'REF') {
+
+                    // If it's in data labels
+                    if (data_labels.includes(current_tok.getValue())) {
+                        current_tok.setType('INT');
+                        current_tok.setValue(this.labels[current_tok.getValue()]);
+                    }
+
+                    // If it's a REG definition
+                    else if (definition_keys.includes(current_tok.getValue())) {
+                        current_tok.setType('REG');
+                        current_tok.setValue(definitions[current_tok.getValue()]);
+                    }
                 }
 
                 tok_num += 1;
@@ -1080,7 +1091,7 @@ class Parser {
 
         const control_flow_instructions = ['CALL', 'JMP', 'RJMP'].concat(INST_LIST.slice(7, 27)); // all the branching instructions
 
-        ////////// TURN ALL REFS INTO INT FOR BRANCHING INSTRUCTIONS
+        ////////// TURN ALL REFS INTO CORRECT FORM
         for (let line_num = 0; line_num < this.pmem.length; line_num++) {
 
             const line = this.pmem[line_num]; // current line
