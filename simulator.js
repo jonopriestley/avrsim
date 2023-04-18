@@ -837,11 +837,17 @@ class Parser {
 
                     let escape = false; // if the last char was an escape character 
                     const escape_chars = {
-                        '\\': '\\',
-                        'n': '\n',
-                        't': '\t',
-                        '\"': '\"',
-                        '\'': '\''
+                        '\\': 0x5c,
+                        'n': 0x0a,
+                        't': 0x09,
+                        '\"': 0x22,
+                        '\'': 0x27,
+                        'r': 0x0d,
+                        'a': 0x07,
+                        'b': 0x08,
+                        'f': 0x0c,
+                        'v': 0x0b,
+                        '0': 0x00
                     };
 
                     // Go through each character and add it's ascii code to the data
@@ -855,7 +861,7 @@ class Parser {
                                 this.newError(`Bad escape character \'\\${char}\' on line ${line_in_file}.`);
                             }
 
-                            char_ascii_value = escape_chars[char].charCodeAt(0); // get ascii code
+                            char_ascii_value = escape_chars[char]; // get ascii code
 
                             escape = false;
                         }
