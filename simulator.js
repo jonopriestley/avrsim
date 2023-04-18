@@ -832,11 +832,47 @@ class Parser {
                     let string_text = current_tok.getValue();
                     string_text = string_text.slice(1, (string_text.length - 1));   // remove quotation marks from either side
 
+                    let char_ascii_value;
+                    let char;
+
+                    let escape = false; // if the last char was an escape character 
+                    const escape_chars = {
+                        '\\': '\\',
+                        'n': '\n',
+                        't': '\t',
+                        '\"': '\"',
+                        '\'': '\''
+                    };
+
                     // Go through each character and add it's ascii code to the data
                     for (let i = 0; i < string_text.length; i++) {
-                        const char = string_text[i];
+                        char = string_text[i];
 
-                        const char_ascii_value = char.charCodeAt(0); // get ascii code
+                        // Make the escape character ascii value
+                        if (escape) {
+                            // Check if it's a valid escape character
+                            if (!Object.keys(escape_chars).includes(char)) {
+                                this.newError(`Bad escape character \'\\${char}\' on line ${line_in_file}.`);
+                            }
+
+                            char_ascii_value = escape_chars[char].charCodeAt(0); // get ascii code
+
+                            escape = false;
+                        }
+
+                        // Check for escape characters
+                        else if (char === '\\') {
+                            escape = true;
+                            if (i + 1 === string_text.length) {
+                                this.newError(`Bad escape character \'${char}\' on line ${line_in_file}.`);
+                            }
+                            continue;
+                        }
+
+                        else {
+                            char_ascii_value = char.charCodeAt(0); // get ascii code
+                        }
+
 
                         if (char_ascii_value > 127) { // check it's a valid character
                             this.newError(`Bad character \'${char}\' on line ${line_in_file}.`);
