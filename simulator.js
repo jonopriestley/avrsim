@@ -848,14 +848,26 @@ class Parser {
                         'f': 0x0c,
                         'v': 0x0b,
                         '0': 0x00
-                    };
+                    } // I have chosen not to add \o and \x for oct and hex numbers
 
                     // Go through each character and add it's ascii code to the data
                     for (let i = 0; i < string_text.length; i++) {
                         char = string_text[i];
 
+                        if (!escape) {
+                            char_ascii_value = char.charCodeAt(0); // get ascii code
+                            
+                            if (char === '\\') {
+                                escape = true;
+                                if (i + 1 === string_text.length) {
+                                    this.newError(`Bad escape character \'${char}\' on line ${line_in_file}.`);
+                                }
+                                continue;
+                            }
+                        }
+
                         // Make the escape character ascii value
-                        if (escape) {
+                        else {
                             // Check if it's a valid escape character
                             if (!Object.keys(escape_chars).includes(char)) {
                                 this.newError(`Bad escape character \'\\${char}\' on line ${line_in_file}.`);
@@ -865,20 +877,6 @@ class Parser {
 
                             escape = false;
                         }
-
-                        // Check for escape characters
-                        else if (char === '\\') {
-                            escape = true;
-                            if (i + 1 === string_text.length) {
-                                this.newError(`Bad escape character \'${char}\' on line ${line_in_file}.`);
-                            }
-                            continue;
-                        }
-
-                        else {
-                            char_ascii_value = char.charCodeAt(0); // get ascii code
-                        }
-
 
                         if (char_ascii_value > 127) { // check it's a valid character
                             this.newError(`Bad character \'${char}\' on line ${line_in_file}.`);
