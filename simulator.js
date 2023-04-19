@@ -1611,8 +1611,6 @@ class Interpreter {
                         this.newError(`Bad stack pointer for CALL on line ${line_in_file}`);
                         return;
                     }
-
-                    document.getElementById('console').innerHTML += '\n';
                     
                     // Pop address into X
                     this.incSP();                                                       // increment the SP by 1
@@ -1631,6 +1629,8 @@ class Interpreter {
                         char = String.fromCharCode(K);
                         document.getElementById('console').innerHTML += char;           // add it to the console
                     }
+
+                    document.getElementById('console').innerHTML += '\n';
 
                     // Push X value back onto stack
                     this.getDMEM()[this.getSP()] = this.getDMEM()[27].getValue();
