@@ -1638,6 +1638,9 @@ class Interpreter {
                     this.getDMEM()[this.getSP()] = this.getDMEM()[26].getValue();
                     this.decSP();                                                       // decrement the SP by 1
                     
+                    // Increment to go past the double instruction
+                    this.incPC();                                         
+
                 }
                     // Printf takes the top two values from the stack
                     // Puts them into X low byte then high byte
