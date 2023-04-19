@@ -1639,8 +1639,12 @@ class Interpreter {
                     this.decSP();                                                       // decrement the SP by 1
                     
                     // Increment to go past the double instruction
-                    this.incPC();                                         
-
+                    this.incPC();    
+                    
+                    // Move the scroll to the bottom
+                    const console_box = document.getElementById('console');
+                    console_box.scrollTop = console_box.scrollHeight;
+                    
                 }
                     // Printf takes the top two values from the stack
                     // Puts them into X low byte then high byte
