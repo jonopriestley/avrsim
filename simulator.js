@@ -100,7 +100,12 @@ class Argument {
 
         // CHECK IF IT'S A LEGAL ARGUMENT
         if (!legal_token_types.includes(tok.getType())) {
-            this.newError(`Illegal token '${tok.getValue()}' on line ${line_num}.`);
+            if (tok.getType() !== 'REG') {
+                this.newError(`Illegal token '${tok.getValue()}' on line ${line_num}.`);
+            }
+            else {
+                this.newError(`Illegal token 'R${tok.getValue()}' on line ${line_num}.`);
+            }
         }
 
         // CHECK ITS LEGAL TOKEN TYPE AND WITHIN THE LEGAL BOUNDS
@@ -112,7 +117,7 @@ class Argument {
                 val = parseInt(val.substring(2)); // get rid of the Z+ or Y+ part
             }
 
-            if (!(this.getMinVal() <= val && val <= this.getMaxVal())) {
+            if (tok.getType() !== 'REF' && !(this.getMinVal() <= val && val <= this.getMaxVal())) {
                 if (tok.getType() === 'REG') {
                     tok.setValue(`R${tok.getValue()}`); // set it to register
                 }
@@ -121,12 +126,12 @@ class Argument {
         }
 
         // CHECK ITS LEGAL TOKEN TYPE AND IN THE LEGAL LIST
-        else if (this.hasOptionsList() && !this.getOptionsList().includes(tok.getValue())) {
+        if (this.hasOptionsList() && !this.getOptionsList().includes(tok.getValue())) {
             this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
         }
 
         // CHECK ITS LEGAL TOKEN TYPE AND IN THE LEGAL LIST
-        else if (this.hasExactValue() && tok.getValue() !== this.getExactValue()) {
+        if (this.hasExactValue() && tok.getValue() !== this.getExactValue()) {
             this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
         }
 
@@ -274,6 +279,10 @@ class Instruction {
                 // If it's a 2's comp value then make it 2's comp
                 if (['RJMP'].concat(INST_LIST.slice(7, 27)).includes(this.inst.getValue())) {
                     var_value = this.twosComp(arg, digit_count);
+                }
+
+                else if (FUNCTIONS.includes(arg)) {
+                    var_value = '1111111111111111111111';
                 }
 
                 // Otherwise just make it regular binary
@@ -482,7 +491,7 @@ class Lexer {
             [/^[XYZ]/, 'WORD'],                 // word
             [/^,/, 'COMMA'],                    // comma
             [/^[^\w\s]+/, 'SYMBOL'],            // symbols
-            [/^[^\s\d]{1}[\w\d_]*/, 'REF'] // references (like labels used in an instruction) --> Called STRING in sim.py
+            [/^[^\s\d]{1}[\w\d_]*/, 'REF']      // references (like labels used in an instruction) --> Called STRING in sim.py
         ];
 
         const tokens = [];
@@ -1094,6 +1103,11 @@ class Parser {
                         current_tok.setType('REG');
                         current_tok.setValue(definitions[current_tok.getValue()]);
                     }
+
+
+                    // Check if it's a function call?
+
+                    // It may be a pmem label so don't raise an error yet
                 }
 
                 tok_num += 1;
@@ -1153,13 +1167,13 @@ class Parser {
                 // Replace REF with integer for branching
                 if (current_tok.getType() === 'REF') {
 
-                    // Check the label reference is a real label
-                    if (this.labels[current_tok.getValue()] === undefined) {
+                    // Check the label reference is a real label or function
+                    if (this.labels[current_tok.getValue()] === undefined && !FUNCTIONS.includes(current_tok.getValue())) {
                         this.newError(`Illegal token \'${current_tok}\' on line ${line_in_file}.`);
                     }
 
-                    // If it's a non relative control flow instruction 
-                    if (control_flow_instructions.slice(0, 2).includes(first_tok.getValue())) {
+                    // If it's a non relative control flow instruction and it's not a function
+                    if (control_flow_instructions.slice(0, 2).includes(first_tok.getValue()) && !FUNCTIONS.includes(current_tok.getValue())) {
 
                         let k = this.labels[current_tok.getValue()];      // Get k for label
 
@@ -1570,16 +1584,71 @@ class Interpreter {
                 this.updateSREGBit(1, s);   // Set bit s
                 break;
             case 'CALL':
-                this.incPC();
-                this.incPC();
+                if (line.getArgs()[0].getType() === 'INT') {
+                    this.incPC();
+                    this.incPC();
 
-                this.getDMEM()[this.getSP()] = this.pcl.getValue();              // set the pcl in STACK
-                this.decSP();
-                this.getDMEM()[this.getSP()] = this.pch.getValue();              // set the pch in STACK
-                this.decSP();
+                    if (this.getSP() <= 0x101) {
+                        this.newError(`Bad stack pointer for CALL on line ${line_in_file}`)
+                        return;
+                    }
 
-                k = this.getArgumentValue(line, 0);
-                this.setPC(k - 1);
+                    this.getDMEM()[this.getSP()] = this.pcl.getValue();              // push pcl in STACK
+                    this.decSP();
+                    this.getDMEM()[this.getSP()] = this.pch.getValue();              // push pch in STACK
+                    this.decSP();
+
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(k - 1);
+                    break;
+                }
+
+                // OTHERWISE IF IT'S PRINTF
+                if (line.getArgs()[0].getValue() === 'printf') {
+                    
+                    // Check you can pop twice
+                    if (this.getSP() >= (this.ramend - 1)) {
+                        this.newError(`Bad stack pointer for CALL on line ${line_in_file}`);
+                        return;
+                    }
+
+                    document.getElementById('console').innerHTML += '\n';
+                    
+                    // Pop address into X
+                    this.incSP();                                                       // increment the SP by 1
+                    this.getDMEM()[26].setValue(this.getDMEM()[this.getSP()]);
+                    this.incSP();                                                       // increment the SP by 1
+                    this.getDMEM()[27].setValue(this.getDMEM()[this.getSP()]);
+                    
+                    // Do the printing
+                    let K, char;
+                    while (true) {
+                        K = this.getDMEM()[this.getX()]
+                        this.incX();
+                        if (K === 0) {
+                            break;
+                        }
+                        char = String.fromCharCode(K);
+                        document.getElementById('console').innerHTML += char;           // add it to the console
+                    }
+
+                    // Push X value back onto stack
+                    this.getDMEM()[this.getSP()] = this.getDMEM()[27].getValue();
+                    this.decSP();                                                       // decrement the SP by 1
+                    this.getDMEM()[this.getSP()] = this.getDMEM()[26].getValue();
+                    this.decSP();                                                       // decrement the SP by 1
+                    
+                }
+                    // Printf takes the top two values from the stack
+                    // Puts them into X low byte then high byte
+                    // Assumes that it is pointing at the string you want to print
+                    // Prints characters with X+ until it hits a null character
+                    // Pushes the new location of X onto the stack
+                    // Returns
+
+                    // X is changed
+                    // The string is printed
+                    // Next instruction is after
                 break;
             case 'CBI':
                 A = this.getArgumentValue(line, 0);
@@ -1931,9 +2000,9 @@ class Interpreter {
                     this.newError(`Bad stack pointer for PUSH on line ${line_in_file}`)
                     return;
                 }
-                Rd = line.getArgs()[0].getValue();                                  // register number
-                this.getDMEM()[Rd].setValue(this.getDMEM()[this.getSP()]);      // set register value
                 this.incSP();                                                       // increment the SP by 1
+                Rd = line.getArgs()[0].getValue();                                  // register number
+                this.getDMEM()[Rd].setValue(this.getDMEM()[this.getSP()]);          // set register value
                 break;
             case 'PUSH':
                 if (this.getSP() <= 0x100) {
@@ -2455,6 +2524,11 @@ class Interpreter {
 }
 
 
+FUNCTIONS = [
+    'printf'
+];
+
+
 
 INST_LIST = [
     'ADC',
@@ -2596,7 +2670,7 @@ INST_OPERANDS = {
     'BRVC': [int_n64_63],
     'BRVS': [int_n64_63],
     'BSET': [int_0_7],
-    'CALL': [new Argument('INT', 0, 4194303)],
+    'CALL': [new Argument(['INT', 'REF'], 0, 4194303, FUNCTIONS)],
     'CBI': [int_0_31, int_0_7],
     'CBR': [reg_16_31, int_0_255],
     'CLC': null,
