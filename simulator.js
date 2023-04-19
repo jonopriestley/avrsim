@@ -1305,8 +1305,7 @@ class Interpreter {
         this.sph = new Token('REG', 0); // SP hi8
 
         this.finished = false;
-
-        this.step_count = 0;
+        
     }
 
     newData(pmem, dmem, pmem_line_numbers, txt) {
@@ -1315,8 +1314,10 @@ class Interpreter {
         this.dmem = dmem;
         this.line_numbers = pmem_line_numbers;
         this.txt = txt;
+
         this.lines = this.txt.split('\n');
         this.finished = false;
+        this.step_count = 0;
 
         // DEFINING PC, SP AND SREG
         this.pcl = this.dmem[0x5B]; // PC lo8
@@ -1330,6 +1331,8 @@ class Interpreter {
         this.ramend = this.dmem.length - 1;
         this.setPC(0);
         this.setSP(this.ramend);
+
+
 
     }
 
@@ -2915,8 +2918,15 @@ class App {
         }
 
         const stepsize = this.getStepSize();
-        for (let i = 0; i < stepsize; i++) {
-            this.interpreter.step();
+
+        if (stepsize > 0) {
+            for (let i = 0; i < stepsize; i++) {
+                this.interpreter.step();
+            }
+        }
+
+        else {
+            this.stepBack(stepsize);
         }
 
         this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
@@ -2942,6 +2952,30 @@ class App {
         this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
 
         this.populateAll();
+    }
+
+    stepBack(steps_back) {
+        /* Expecting the argument steps_back < 0
+        */
+        const steps = this.interpreter.step_count + steps_back;       // the total number of steps to get to the point you want to go for
+        
+        let txt = document.getElementById('code_box').value;
+        this.lexer.newData(txt);
+        this.parser.newData(this.lexer.getTokenLines(), this.lexer.getLineNumbers(), txt);
+        this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), this.parser.getPMEMLineNumbers(), txt);
+
+        for (let i = 0; i < (steps - 1); i++) {
+            this.interpreter.step();    // do enough steps to get to the point you expect to be at
+        }
+        
+        // Clear the change for all registers
+        for (let i = 0; i < 32; i++) {
+            this.interpreter.getDMEM()[i].clearChange();
+        }
+
+        if (steps > 0) {
+            this.interpreter.step();    // Take the step once the change has been cleared
+        }
     }
 
     populateAll() {
