@@ -1,5 +1,4 @@
 
-
 class Token {
     constructor(type_, value = null) {
         this.type = type_;
@@ -91,7 +90,7 @@ class Argument {
         this.exact_value = exact_value;
     }
 
-    isLegalToken(tok, line_num) {
+    isLegalToken(tok, line_num, line_txt) {
         /*
          * Takes a token and checks if it matches with the argument.
          */
@@ -101,10 +100,10 @@ class Argument {
         // CHECK IF IT'S A LEGAL ARGUMENT
         if (!legal_token_types.includes(tok.getType())) {
             if (tok.getType() !== 'REG') {
-                this.newError(`Illegal token '${tok.getValue()}' on line ${line_num}.`);
+                this.newError(`Illegal token '${tok.getValue()}' on line ${line_num}: ${line_txt}`);
             }
             else {
-                this.newError(`Illegal token 'R${tok.getValue()}' on line ${line_num}.`);
+                this.newError(`Illegal token 'R${tok.getValue()}' on line ${line_num}: ${line_txt}`);
             }
         }
 
@@ -121,18 +120,18 @@ class Argument {
                 if (tok.getType() === 'REG') {
                     tok.setValue(`R${tok.getValue()}`); // set it to register
                 }
-                this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
+                this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}: ${line_txt}`);
             }
         }
 
         // CHECK ITS LEGAL TOKEN TYPE AND IN THE LEGAL LIST
         if (this.hasOptionsList() && !this.getOptionsList().includes(tok.getValue())) {
-            this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
+            this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}: ${line_txt}`);
         }
 
         // CHECK ITS LEGAL TOKEN TYPE AND IN THE LEGAL LIST
         if (this.hasExactValue() && tok.getValue() !== this.getExactValue()) {
-            this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
+            this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}: ${line_txt}`);
         }
 
     }
@@ -521,9 +520,9 @@ class Lexer {
                         break;
                     }
                 }
-
+                
                 if (!match) {
-                    this.newError(`Invalid syntax on line ${line_number + 1} starting at position ${pos}.`);
+                    this.newError(`Invalid syntax on line ${line_number + 1} starting at position ${pos}: ${line}`);
                 }
 
                 pos += match[0].length;
@@ -582,6 +581,13 @@ class Lexer {
         return this.line_numbers;
     }
 
+    newError(text) {
+        document.getElementById('error').innerHTML = text;
+        document.getElementById('output').innerHTML = null;
+        document.getElementById('status').innerHTML = null;
+        throw new SyntaxError(text);
+    }
+
 }
 
 
@@ -600,9 +606,11 @@ class Parser {
 
     }
 
-    newData(token_lines, line_numbers) {
+    newData(token_lines, line_numbers, txt) {
         this.token_lines = token_lines;
         this.line_numbers = line_numbers;
+        this.txt = txt;
+        this.lines = this.txt.split('\n');
 
         this.labels = Object.create(null);
 
@@ -648,12 +656,9 @@ class Parser {
         }
 
         // Check if the first line is correct length and directives
-        if (first_line.length !== 2 || first_line[1].getType() !== "DIR" ||
-            ![".data", ".text"].includes(first_line[1].getValue())) {
-
+        if (first_line.length !== 2 || first_line[1].getType() !== "DIR" || ![".data", ".text"].includes(first_line[1].getValue())) {
             this.newError("First line must be '.section .data' or '.section .text'");
         }
-
 
         // Check if last line is .end
         const final_line = this.token_lines[this.token_lines.length - 1];
@@ -663,31 +668,21 @@ class Parser {
 
         // Find .section .text start
         let text_section_start = null;
-        let data_section_start = null;
         for (let line_num = 0; line_num < this.token_lines.length; line_num++) {
             const line = this.token_lines[line_num];
+            const line_in_file = this.line_numbers[line_num];
 
             // If you find a .section directive check it
             if (line[0].getValue() === ".section" && line[0].getType() === "DIR") {
-                if (
-                    line.length !== 2 ||
-                    line[1].getType() !== "DIR" ||
-                    ![".data", ".text"].includes(line[1].getValue())) {
-                    this.newError("Invalid '.section' directive");
+                
+                if (line.length !== 2 || line[1].getType() !== "DIR" || ![".data", ".text"].includes(line[1].getValue())) {
+                    this.newError(`Invalid '.section' directive on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                 }
 
                 // If you find the text section then stop looking
-                if (line[1].getValue() === ".data") {
-                    if (text_section_start !== null) {
-                        this.newError("Data section must come before the text section");
-                    }
-                    data_section_start = line_num;
-                }
-
-                // If you find the text section then stop looking
-                else if (line[1].getValue() === ".text") {
+                if (line[1].getValue() === ".text") {
                     text_section_start = line_num;
-                    if (data_section_start !== null) break;
+                    break;
                 }
             }
         }
@@ -718,7 +713,7 @@ class Parser {
                     current_tok.setValue(current_tok.getValue().toUpperCase()); // make all instructions upper case
 
                     if (!INST_LIST.includes(current_tok.getValue())) { // check if the token is a valid instruction
-                        this.newError(`Invalid instruction \'${current_tok.getValue()}\' on line ${line_in_file}.`);
+                        this.newError(`Invalid instruction \'${current_tok.getValue()}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
                 }
 
@@ -727,13 +722,13 @@ class Parser {
                     const reg_number = current_tok.getValue();
 
                     if (reg_number > 31) {
-                        this.newError(`Illegal register \'R${current_tok.getValue()}\' on line ${line_in_file}.`);
+                        this.newError(`Illegal register \'R${current_tok.getValue()}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
                 }
 
                 // Check DIR are valid directives
                 else if (current_tok.getType() === 'DIR' && !DIRECTIVES.includes(current_tok.getValue())) {
-                    this.newError(`Invalid directive \'${current_tok.getValue()}\' on line ${line_in_file}.`);
+                    this.newError(`Invalid directive \'${current_tok.getValue()}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                 }
 
                 // Convert integers to base 10
@@ -805,7 +800,7 @@ class Parser {
 
             // CHECK THE DIRECTIVE
             if (line[tok_num].getType() !== 'DIR') {
-                this.newError(`Illegal syntax \'${line[tok_num].getValue()}\' on line ${line_in_file}.`);
+                this.newError(`Illegal syntax \'${line[tok_num].getValue()}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
             }
 
             const line_directive = line[tok_num].getValue();    // get the directive for this line to use below
@@ -825,7 +820,7 @@ class Parser {
                 if (parity_of_tokens_left === 0 && line_directive === '.byte') {
 
                     if (current_tok.getType() !== 'INT') { // expecting integer
-                        this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
+                        this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
 
                     this.dmem.push(current_tok.getValue()); // add to data
@@ -835,7 +830,7 @@ class Parser {
                 else if (parity_of_tokens_left === 0 && ['.string', '.ascii', '.asciz'].includes(line_directive)) {
 
                     if (current_tok.getType() !== 'STR') {
-                        this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
+                        this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
 
                     let string_text = current_tok.getValue();
@@ -869,7 +864,7 @@ class Parser {
                             if (char === '\\') {
                                 escape = true;
                                 if (i + 1 === string_text.length) {
-                                    this.newError(`Bad escape character \'${char}\' on line ${line_in_file}.`);
+                                    this.newError(`Bad escape character \'${char}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                                 }
                                 continue;
                             }
@@ -879,7 +874,7 @@ class Parser {
                         else {
                             // Check if it's a valid escape character
                             if (!Object.keys(escape_chars).includes(char)) {
-                                this.newError(`Bad escape character \'\\${char}\' on line ${line_in_file}.`);
+                                this.newError(`Bad escape character \'\\${char}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                             }
 
                             char_ascii_value = escape_chars[char]; // get ascii code
@@ -888,7 +883,7 @@ class Parser {
                         }
 
                         if (char_ascii_value > 127) { // check it's a valid character
-                            this.newError(`Bad character \'${char}\' on line ${line_in_file}.`);
+                            this.newError(`Bad character \'${char}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                         }
 
                         this.dmem.push(char_ascii_value);                 // add to data
@@ -904,7 +899,7 @@ class Parser {
                 else if (parity_of_tokens_left === 0 && line_directive === '.space') {
 
                     if (current_tok.getType() !== 'INT') { // expecting integer
-                        this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
+                        this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
 
                     // Check if it's the number of spaces or the content of the spaces
@@ -924,7 +919,7 @@ class Parser {
 
                     // Otherwise check it's the final token
                     else if ((tok_num + 1) !== line_length) { // if it's the second argument given it must be the last
-                        this.newError(`Too many arguments given for .string on line ${line_in_file}.`);
+                        this.newError(`Too many arguments given for .string on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
 
                     // If it is the final token
@@ -944,24 +939,24 @@ class Parser {
 
                     // Check the number of arguments
                     if ((line_length - tok_num) > 3) { // if there's too many arguments
-                        this.newError(`Too many arguments given for .def on line ${line_in_file}.`);
+                        this.newError(`Too many arguments given for .def on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
 
                     // if it's the 3rd last argument (expecting REF)
                     if ((tok_num + 3) == line_length && current_tok.getType() !== 'REF') {
-                        this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`)
+                        this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`)
                     }
 
                     // Raise error if 2nd last token is not '='
                     else if ((tok_num + 2) === line_length && current_tok.getType() !== 'SYMBOL' && current_tok.getValue() !== '=') {
-                        this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`);
+                        this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
 
                     // If it's the last token (expecting REG)
                     else if ((tok_num + 1) == line_length) {
 
                         if (current_tok.getType() !== 'REG') {
-                            this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`);
+                            this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                         }
 
                         const def_word = line[tok_num - 2].getValue();  // get the definition name for the labels list
@@ -973,7 +968,7 @@ class Parser {
 
                 // Should be comma if there are even number of tokens left. Raise error.
                 else if (parity_of_tokens_left === 1 && current_tok.getType() !== 'COMMA') {
-                    this.newError(`Missing comma on line ${line_in_file}.`);
+                    this.newError(`Missing comma on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                 }
 
 
@@ -984,7 +979,6 @@ class Parser {
 
 
         }
-
 
         // Should be at .section .text line now
 
@@ -997,7 +991,8 @@ class Parser {
         let line = this.token_lines[line_num];                  // current line
 
         if (line.length !== 2 || line[0].getValue() !== '.global') {
-            this.newError(`Must begin text section with a valid \'.global\' directive: line ${this.line_numbers[line_num]}.`);
+            const line_in_file = this.line_numbers[line_num]; // the current line if there's an error
+            this.newError(`Must begin text section with a valid \'.global\' directive: line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
         }
 
         /// Some variables for later
@@ -1031,14 +1026,14 @@ class Parser {
 
                     // Label can only be at the start
                     if (tok_num !== 0) {
-                        this.newError(`Illegal label location on line ${line_in_file}.`);
+                        this.newError(`Illegal label location on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
 
                     const label = current_tok.getValue().slice(0, (current_tok.getValue().length - 1)); // remove the colon from the end
                     this.labels[label] = this.pmem.length; //  add it to the labels dictionary
 
                     if (this.pmem.length === 0 && label !== global_funct_name) {
-                        this.newError(`Incorrect global function name on line ${line_in_file}.`);
+                        this.newError(`Incorrect global function name starting the text section on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
 
                     has_label = true;
@@ -1049,7 +1044,7 @@ class Parser {
 
                     // Must have 3 left, a bracket, a value, and a bracket
                     if ((line_length - 1 - tok_num) !== 3) {
-                        this.newError(`Illegal ${current_tok.getValue()} on line ${line_in_file}.`);
+                        this.newError(`Illegal ${current_tok.getValue()} on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
 
                     const left_bracket = line[tok_num + 1];
@@ -1058,17 +1053,17 @@ class Parser {
 
                     // Check the token we expect to be the left bracket
                     if (left_bracket.getType() !== 'SYMBOL' || left_bracket.getValue() !== '(') {
-                        this.newError(`Illegal ${current_tok.getValue()} left bracket on line ${line_in_file}.`);
+                        this.newError(`Illegal ${current_tok.getValue()} left bracket on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
 
                     // Check the token we expect to be the right bracket
                     if (right_bracket.getType() !== 'SYMBOL' || right_bracket.getValue() !== ')') {
-                        this.newError(`Illegal ${current_tok.getValue()} right bracket on line ${line_in_file}.`);
+                        this.newError(`Illegal ${current_tok.getValue()} right bracket on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
 
                     // Check the variable is defined
                     if (this.labels[variable.getValue()] === undefined || variable.getType() !== 'REF') {
-                        this.newError(`Illegal ${current_tok.getValue()} variable on line ${line_in_file}.`);
+                        this.newError(`Illegal ${current_tok.getValue()} variable on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
 
                     let int_value = 0;
@@ -1123,7 +1118,7 @@ class Parser {
 
                 // If theyre not instructions, it's illegal
                 if (line[0].getType() !== 'INST') {
-                    this.newError(`Illegal token \'${line[0]}\' on line ${line_in_file}.`);
+                    this.newError(`Illegal token \'${line[0].getValue()}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                 }
 
                 this.pmem.push(line); // set the line to the line without the label
@@ -1169,7 +1164,7 @@ class Parser {
 
                     // Check the label reference is a real label or function
                     if (this.labels[current_tok.getValue()] === undefined && !FUNCTIONS.includes(current_tok.getValue())) {
-                        this.newError(`Illegal token \'${current_tok}\' on line ${line_in_file}.`);
+                        this.newError(`Illegal token \'${current_tok.getValue()}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     }
 
                     // If it's a non relative control flow instruction and it's not a function
@@ -1219,7 +1214,7 @@ class Parser {
 
                 // If the 2rd token is not a comma then its bad syntax
                 if (line[2].getType() !== 'COMMA') {
-                    this.newError(`Illegal token ${line[2]} on line ${line_in_file}: expecting comma.`);
+                    this.newError(`Illegal token ${line[2].getValue()} on line ${line_in_file}, expecting comma: ${this.lines[line_in_file - 1]}`);
                 }
 
                 line.splice(2, 1);                       // remove the comma
@@ -1230,7 +1225,7 @@ class Parser {
 
             // CHECK IT'S A REAL INSTRUCTION
             if (INST_OPERANDS[inst] === undefined) {
-                this.newError(`Illegal instruction \'${inst}\' on line ${line_in_file}.`);
+                this.newError(`Illegal instruction \'${inst}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
             }
 
             // GET GIVEN AND EXPECTED ARGUMENTS
@@ -1239,7 +1234,7 @@ class Parser {
 
             // CHECK IF IT'S GOT THE WRONG NUMBER OF ARGUMENTS
             if ((expected_args === null && given_args.length > 0) || (expected_args !== null && (given_args.length !== expected_args.length))) {
-                this.newError(`Wrong number of arguments given on line ${line_in_file}.`);
+                this.newError(`Wrong number of arguments given on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
             }
 
             // CHECK THE ARGUMENTS
@@ -1249,7 +1244,7 @@ class Parser {
                 const exp_arg = expected_args[tok_num - 1];   // expected arg
 
                 // CHECK THE TOKEN IS LEGAL
-                exp_arg.isLegalToken(given_arg, line_in_file);
+                exp_arg.isLegalToken(given_arg, line_in_file, this.lines[line_in_file - 1]);
             }
 
             // SET THE LINE TO AN INSTRUCTION
@@ -1314,11 +1309,13 @@ class Interpreter {
         this.step_count = 0;
     }
 
-    newData(pmem, dmem, pmem_line_numbers) {
+    newData(pmem, dmem, pmem_line_numbers, txt) {
         // DATA & PROGRAM MEMORY
         this.pmem = pmem;
         this.dmem = dmem;
         this.line_numbers = pmem_line_numbers;
+        this.txt = txt;
+        this.lines = this.txt.split('\n');
         this.finished = false;
 
         // DEFINING PC, SP AND SREG
@@ -1589,7 +1586,7 @@ class Interpreter {
                     this.incPC();
 
                     if (this.getSP() <= 0x101) {
-                        this.newError(`Bad stack pointer for CALL on line ${line_in_file}`)
+                        this.newError(`Bad stack pointer for CALL on line ${line_in_file}: ${this.lines[line_in_file - 1]}`)
                         return;
                     }
 
@@ -1608,7 +1605,7 @@ class Interpreter {
                     
                     // Check you can pop twice
                     if (this.getSP() >= (this.ramend - 1)) {
-                        this.newError(`Bad stack pointer for CALL on line ${line_in_file}`);
+                        this.newError(`Bad stack pointer for CALL on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                         return;
                     }
                     
@@ -2004,7 +2001,7 @@ class Interpreter {
                 break;
             case 'POP':
                 if (this.getSP() >= this.ramend) {
-                    this.newError(`Bad stack pointer for PUSH on line ${line_in_file}`)
+                    this.newError(`Bad stack pointer for PUSH on line ${line_in_file}: ${this.lines[line_in_file - 1]}`)
                     return;
                 }
                 this.incSP();                                                       // increment the SP by 1
@@ -2013,7 +2010,7 @@ class Interpreter {
                 break;
             case 'PUSH':
                 if (this.getSP() <= 0x100) {
-                    this.newError(`Bad stack pointer for PUSH on line ${line_in_file}`)
+                    this.newError(`Bad stack pointer for PUSH on line ${line_in_file}: ${this.lines[line_in_file - 1]}`)
                     return;
                 }
                 Rr = this.getArgumentValue(line, 0);            // register held value
@@ -2031,7 +2028,7 @@ class Interpreter {
                 }
 
                 if ((this.getSP() < 0x100) || (this.getSP() > (this.ramend - 2))) {
-                    this.newError(`Bad stack pointer for RET on line ${line_in_file}`);
+                    this.newError(`Bad stack pointer for RET on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                     return;
                 }
 
@@ -2306,7 +2303,7 @@ class Interpreter {
                 k = this.getZ();
                 Rd = this.getArgumentValue(line, 1);
                 if ((k < 0x100) || (k > 0x8ff)) {
-                    this.newError(`Illegal value of Z pointer, ${k}: line ${line_in_file}`);
+                    this.newError(`Illegal value of Z pointer \'${k}\' on line ${line_in_file}: ${this.lines[line_in_file - 1]}`);
                 }
 
                 let vals = [Rd, this.getDMEM()[k]];
@@ -2892,15 +2889,16 @@ class App {
             console.log(this.lexer.getTokenLines());
 
             // Parsing
-            this.parser.newData(this.lexer.getTokenLines(), this.lexer.getLineNumbers());
+            this.parser.newData(this.lexer.getTokenLines(), this.lexer.getLineNumbers(), txt);
 
             // Interpreter Initialisation
-            this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), this.parser.getPMEMLineNumbers());
+            this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), this.parser.getPMEMLineNumbers(), txt);
 
             // Success!
             this.success('Success! Your code can be run.');
 
             // Populating Display with Data
+            this.pmem_top = 0;
             this.populateAll();
 
         }
