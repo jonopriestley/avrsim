@@ -42,8 +42,7 @@
                 </div>
                 <div class="panel-body">
                     <div class="text-box">
-                        <form>
-                            <textarea class="text-code" id="code_box" name="code_box" rows="27" cols="60">
+                        <textarea class="text-code" id="code_box" name="code_box" rows="27" cols="60">
 .section .data
 
 .section .text
@@ -52,21 +51,19 @@
 main:
 ret
 
-.end
-</textarea>
-                            <br>
-                            <button class="button button-assemble" type="button" onclick="app.assemble()">Assemble Code</button>
-                            <button class="button button-run" type="button" onclick="app.run()">Run All</button>
-                            <button class="button button-step" type="button" onclick="app.step()">Step</button>
-                            <select class="select select-step" name="step_size" id="step_size">
-                                <option value="1">1</option>
-                                <option value="5">5</option>
-                                <option value="25">25</option>
-                                <option value="100">100</option>
-                                <option value="-1">-1</option>
-                            </select>
-                            <button class="button button-base" type="button" id="button_base" onclick="app.changeBase()">Base 10</button>
-                        </form>
+.end</textarea>
+                        <br>
+                        <button class="button button-assemble" type="button" onclick="app.assemble()">Assemble Code</button>
+                        <button class="button button-run" type="button" onclick="app.run()">Run All</button>
+                        <button class="button button-step" type="button" onclick="app.step()">Step</button>
+                        <select class="select select-step" name="step_size" id="step_size">
+                            <option value="1">1</option>
+                            <option value="5">5</option>
+                            <option value="25">25</option>
+                            <option value="100">100</option>
+                            <option value="-1">-1</option>
+                        </select>
+                        <button class="button button-base" type="button" id="button_base" onclick="app.changeBase()">Base 10</button>
                     </div>
                 </div>
             </div>
@@ -825,7 +822,7 @@ ret
                     </div>
                     <br>
                     <p class="text-muted">Console</p>
-                    <textarea class="console" id="console" name="console" rows="5" cols="60" disabled></textarea>
+                    <textarea class="console" id="console" name="console" rows="7" cols="60" readonly></textarea>
                 </div>
             </div>
         </div>
@@ -839,6 +836,8 @@ ret
         <a href="https://forms.gle/45BmsgQvjkZu9hEo7">feedback</a>
         on anything you want improved.
     </div>
+
+    <script src="support.js"></script>
 
 </body>
 

@@ -1332,8 +1332,8 @@ class Interpreter {
         this.setPC(0);
         this.setSP(this.ramend);
 
-
-
+        
+        
     }
 
     step() {
