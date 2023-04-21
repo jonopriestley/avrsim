@@ -90,7 +90,7 @@ class Argument {
         this.exact_value = exact_value;
     }
 
-    isLegalToken(tok, line_num, line_txt) {
+    isLegalToken(tok, line_num) {
         /*
          * Takes a token and checks if it matches with the argument.
          */
@@ -114,7 +114,7 @@ class Argument {
 
             if (tok.getType() === 'WORDPLUSQ') {
                 val = parseInt(val.substring(2)); // get rid of the Z+ or Y+ part
-            }
+            }   
 
             if (tok.getType() !== 'REF' && !(this.getMinVal() <= val && val <= this.getMaxVal())) {
                 if (tok.getType() === 'REG') {
@@ -126,7 +126,9 @@ class Argument {
 
         // CHECK ITS LEGAL TOKEN TYPE AND IN THE LEGAL LIST
         if (this.hasOptionsList() && !this.getOptionsList().includes(tok.getValue())) {
-            this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
+            if (tok.getType() !== 'INT') {
+                this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
+            }
         }
 
         // CHECK ITS LEGAL TOKEN TYPE AND IN THE LEGAL LIST
@@ -796,6 +798,10 @@ class Parser {
                 label = label.slice(0, (label.length - 1));
                 this.labels[label] = this.dmem.length;          // add location of the data label
                 tok_num += 1;
+                if (tok_num >= line_length) {
+                    line_num += 1;
+                    continue;
+                }
             }
 
             // CHECK THE DIRECTIVE
@@ -1244,7 +1250,7 @@ class Parser {
                 const exp_arg = expected_args[tok_num - 1];   // expected arg
 
                 // CHECK THE TOKEN IS LEGAL
-                exp_arg.isLegalToken(given_arg, line_in_file, this.lines[line_in_file - 1]);
+                exp_arg.isLegalToken(given_arg, line_in_file);
             }
 
             // SET THE LINE TO AN INSTRUCTION
