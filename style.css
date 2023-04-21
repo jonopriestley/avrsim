@@ -167,6 +167,7 @@ textarea {
     min-width: 30%;
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
+    overflow-x: hidden;
 }
 
 
@@ -238,6 +239,10 @@ textarea {
 }
 
 .button-dmem-down {
+    padding: 15px 15px;
+}
+
+.button-clear-console {
     padding: 15px 15px;
 }
 

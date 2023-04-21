@@ -3278,6 +3278,10 @@ class App {
         this.populatePMEM(this.pmem_top);
     }
 
+    clearConsole() {
+        document.getElementById('console').innerHTML = '';
+    }
+
 }
 
 
