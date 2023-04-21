@@ -175,6 +175,7 @@ textarea {
     margin-bottom: 10px;
     max-width: 95%;
     min-width: 30%;
+    margin-top: 10px;
 }
 
 .button {
