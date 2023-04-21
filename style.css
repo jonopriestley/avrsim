@@ -131,12 +131,42 @@ textarea {
     border-radius: 10px;
     padding: 10px;
     align-self: center;
+    resize: none;
 }
+
+
+.line-numbers {
+    margin-right: 0;
+    width: 10%;
+    float: left;
+}
+
+.lines-box {
+    font-size: 16px;
+    font-family: 'Source Code Pro', 'Courier New', Courier, sans-serif;
+    text-align: right;
+    padding-top: 10px;
+    padding-right: 10%;
+    padding-left: 10%;
+    width: 80%;
+    overflow: hidden;
+    border-right: 0;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.code {
+    float: right;
+    width: 90%;
+}
+
 
 .text-code {
     margin-bottom: 10px;
     max-width: 95%;
     min-width: 30%;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
 }
 
 

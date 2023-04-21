@@ -41,7 +41,19 @@
                     </h4>
                 </div>
                 <div class="panel-body">
-                    <div class="text-box">
+                    <div class="line-numbers">
+                        <textarea class="lines-box" id="lines_box" rows="27">
+1
+2
+3
+4
+5
+6
+7
+8
+9</textarea>
+                    </div>
+                    <div class="code">
                         <textarea class="text-code" id="code_box" name="code_box" rows="27" cols="60">
 .section .data
 
@@ -52,19 +64,19 @@ main:
 ret
 
 .end</textarea>
-                        <br>
-                        <button class="button button-assemble" type="button" onclick="app.assemble()">Assemble Code</button>
-                        <button class="button button-run" type="button" onclick="app.run()">Run All</button>
-                        <button class="button button-step" type="button" onclick="app.step()">Step</button>
-                        <select class="select select-step" name="step_size" id="step_size">
-                            <option value="1">1</option>
-                            <option value="5">5</option>
-                            <option value="25">25</option>
-                            <option value="100">100</option>
-                            <option value="-1">-1</option>
-                        </select>
-                        <button class="button button-base" type="button" id="button_base" onclick="app.changeBase()">Base 10</button>
                     </div>
+                    <br>
+                    <button class="button button-assemble" type="button" onclick="app.assemble()">Assemble Code</button>
+                    <button class="button button-run" type="button" onclick="app.run()">Run All</button>
+                    <button class="button button-step" type="button" onclick="app.step()">Step</button>
+                    <select class="select select-step" name="step_size" id="step_size">
+                        <option value="1">1</option>
+                        <option value="5">5</option>
+                        <option value="25">25</option>
+                        <option value="100">100</option>
+                        <option value="-1">-1</option>
+                    </select>
+                    <button class="button button-base" type="button" id="button_base" onclick="app.changeBase()">Base 10</button>
                 </div>
             </div>
 
