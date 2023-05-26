@@ -1,23 +1,22 @@
-
 <!DOCTYPE html>
 <html lang="en-US">
- 
+
 <head>
 
     <meta charset="UTF-8">
 
     <title>AVR Sim</title>
-    
+
     <link rel="stylesheet" href="style.css">
 
     <link href="https://fonts.cdnfonts.com/css/source-code-pro" rel="stylesheet">
 
     <link rel="icon" href="images/favicon.ico">
-    
+
     <script src="simulator.js"></script>
 
 </head>
- 
+
 <body>
 
     <h1 class="h1 page-header">AVR Simulator</h1>
@@ -35,7 +34,9 @@
                     <h4 class="panel-title">Code
                         <small style="background-color: transparent; font-size: 15px;">
                             (
-                            <a style="background-color: transparent;" href="http://ww1.microchip.com/downloads/en/devicedoc/atmel-0856-avr-instruction-set-manual.pdf">Instruction Set</a>
+                            <a style="background-color: transparent;"
+                                href="http://ww1.microchip.com/downloads/en/devicedoc/atmel-0856-avr-instruction-set-manual.pdf">Instruction
+                                Set</a>
                             )
                         </small>
                     </h4>
@@ -76,7 +77,8 @@ ret
                         <option value="100">100</option>
                         <option value="-1">-1</option>
                     </select>
-                    <button class="button button-base" type="button" id="button_base" onclick="app.changeBase()">Base 10</button>
+                    <button class="button button-base" type="button" id="button_base" onclick="app.changeBase()">Base
+                        10</button>
                 </div>
             </div>
 
@@ -261,7 +263,7 @@ ret
                         </tr>
                     </table>
                     <br>
-                    <p class="text-muted">Status Register</p>
+                    <p class="text-muted">Status Register (SREG)</p>
                     <table class="table table-sreg">
                         <tr>
                             <th class="table-sreg-heading">I</th>
@@ -276,42 +278,42 @@ ret
                         <tr>
                             <td class="table-sreg-body">
                                 <div>
-                                    <small id="sreg-I">FALSE</small>
+                                    <small id="sreg-I">0</small>
                                 </div>
                             </td>
                             <td class="table-sreg-body">
                                 <div>
-                                    <small id="sreg-T">FALSE</small>
+                                    <small id="sreg-T">0</small>
                                 </div>
                             </td>
                             <td class="table-sreg-body">
                                 <div>
-                                    <small id="sreg-H">FALSE</small>
+                                    <small id="sreg-H">0</small>
                                 </div>
                             </td>
                             <td class="table-sreg-body">
                                 <div>
-                                    <small id="sreg-S">FALSE</small>
+                                    <small id="sreg-S">0</small>
                                 </div>
                             </td>
                             <td class="table-sreg-body">
                                 <div>
-                                    <small id="sreg-V">FALSE</small>
+                                    <small id="sreg-V">0</small>
                                 </div>
                             </td>
                             <td class="table-sreg-body">
                                 <div>
-                                    <small id="sreg-N">FALSE</small>
+                                    <small id="sreg-N">0</small>
                                 </div>
                             </td>
                             <td class="table-sreg-body">
                                 <div>
-                                    <small id="sreg-Z">FALSE</small>
+                                    <small id="sreg-Z">0</small>
                                 </div>
                             </td>
                             <td class="table-sreg-body">
                                 <div>
-                                    <small id="sreg-C">FALSE</small>
+                                    <small id="sreg-C">0</small>
                                 </div>
                             </td>
                         </tr>
@@ -375,7 +377,7 @@ ret
                         </tr>
                     </table>
                     <br>
-                    <p class="text-muted">PMEM / DMEM</p>
+                    <p class="text-muted">Program Memory (PMEM) & Data Memory (DMEM)</p>
                     <div class="pmem">
                         <table class="table table-pmem">
                             <tr>
@@ -384,10 +386,10 @@ ret
                                         <small class="table-pmem-heading-small" id="pmem-linenum-0">0</small>
                                     </div>
                                 </th>
-                                
                                 <td class="table-pmem-body">
-                                    <div>
-                                        <small id="pmem-line-0">None</small>
+                                    <div class="popup">
+                                        <small id="pmem-line-0" onclick="app.togglePopup(0)">None</small>
+                                        <span class="popuptext" id="popup-0"></span>
                                     </div>
                                 </td>
                             </tr>
@@ -398,8 +400,9 @@ ret
                                     </div>
                                 </th>
                                 <td class="table-pmem-body">
-                                    <div>
-                                        <small id="pmem-line-1">None</small>
+                                    <div class="popup">
+                                        <small id="pmem-line-1" onclick="app.togglePopup(1)">None</small>
+                                        <span class="popuptext" id="popup-1"></span>
                                     </div>
                                 </td>
                             </tr>
@@ -410,8 +413,9 @@ ret
                                     </div>
                                 </th>
                                 <td class="table-pmem-body">
-                                    <div>
-                                        <small id="pmem-line-2">None</small>
+                                    <div class="popup">
+                                        <small id="pmem-line-2" onclick="app.togglePopup(2)">None</small>
+                                        <span class="popuptext" id="popup-2"></span>
                                     </div>
                                 </td>
                             </tr>
@@ -422,8 +426,9 @@ ret
                                     </div>
                                 </th>
                                 <td class="table-pmem-body">
-                                    <div>
-                                        <small id="pmem-line-3">None</small>
+                                    <div class="popup">
+                                        <small id="pmem-line-3" onclick="app.togglePopup(3)">None</small>
+                                        <span class="popuptext" id="popup-3"></span>
                                     </div>
                                 </td>
                             </tr>
@@ -434,8 +439,9 @@ ret
                                     </div>
                                 </th>
                                 <td class="table-pmem-body">
-                                    <div>
-                                        <small id="pmem-line-4">None</small>
+                                    <div class="popup">
+                                        <small id="pmem-line-4" onclick="app.togglePopup(4)">None</small>
+                                        <span class="popuptext" id="popup-4"></span>
                                     </div>
                                 </td>
                             </tr>
@@ -446,8 +452,9 @@ ret
                                     </div>
                                 </th>
                                 <td class="table-pmem-body">
-                                    <div>
-                                        <small id="pmem-line-5">None</small>
+                                    <div class="popup">
+                                        <small id="pmem-line-5" onclick="app.togglePopup(5)">None</small>
+                                        <span class="popuptext" id="popup-5"></span>
                                     </div>
                                 </td>
                             </tr>
@@ -458,8 +465,9 @@ ret
                                     </div>
                                 </th>
                                 <td class="table-pmem-body">
-                                    <div>
-                                        <small id="pmem-line-6">None</small>
+                                    <div class="popup">
+                                        <small id="pmem-line-6" onclick="app.togglePopup(6)">None</small>
+                                        <span class="popuptext" id="popup-6"></span>
                                     </div>
                                 </td>
                             </tr>
@@ -470,15 +478,17 @@ ret
                                     </div>
                                 </th>
                                 <td class="table-pmem-body">
-                                    <div>
-                                        <small id="pmem-line-7">None</small>
+                                    <div class="popup">
+                                        <small id="pmem-line-7" onclick="app.togglePopup(7)">None</small>
+                                        <span class="popuptext" id="popup-7"></span>
                                     </div>
                                 </td>
                             </tr>
                         </table>
                         <button class="button button-pmem-up" type="button" onclick="app.displayPMEMUp()">ʌ</button>
                         <button class="button button-pmem-down" type="button" onclick="app.displayPMEMDown()">v</button>
-                        <button class="button button-toggle-opcode" type="button" id="button-opcode" onclick="app.toggleOpcodeDisplay()">Opcode On</button>
+                        <button class="button button-toggle-opcode" type="button" id="button-opcode"
+                            onclick="app.toggleOpcodeDisplay()">Opcode On</button>
                     </div>
                     <div class="dmem">
                         <table class="table table-dmem">
@@ -828,19 +838,21 @@ ret
                             </tr>
                         </table>
                         <button class="button button-dmem-top" type="button" onclick="app.displayDMEMTop()">Top</button>
-                        <button class="button button-dmem-bottom" type="button" onclick="app.displayDMEMBottom()">Bottom</button>
+                        <button class="button button-dmem-bottom" type="button"
+                            onclick="app.displayDMEMBottom()">Bottom</button>
                         <button class="button button-dmem-up" type="button" onclick="app.displayDMEMUp()">ʌ</button>
                         <button class="button button-dmem-down" type="button" onclick="app.displayDMEMDown()">v</button>
                     </div>
                     <br>
                     <p class="text-muted">Console</p>
                     <textarea class="console" id="console" name="console" rows="7" cols="60" readonly></textarea>
-                    <button class="button button-clear-console" type="button" onclick="app.clearConsole()">Clear Console</button>
+                    <button class="button button-clear-console" type="button" onclick="app.clearConsole()">Clear
+                        Console</button>
                 </div>
             </div>
         </div>
 
-        
+
 
     </div>
 
@@ -855,9 +867,3 @@ ret
 </body>
 
 </html>
-
-
-
-
-
-

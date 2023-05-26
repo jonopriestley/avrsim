@@ -61,10 +61,16 @@ class Register {
 
     getBit(bit) {
         // returns the value of a bit in a number
+        return ((this.getValue() >> bit) & 1);
+        
+        /*
+        
         if ((this.getValue() & (2 ** bit)) !== 0) {
             return 1;
         }
         return 0;
+
+        */
     }
 
     inc() {
@@ -300,102 +306,100 @@ class Instruction {
             return opcode;
         }
 
-        // If it's a more tricky opcode
-        else {
+        // Else if it's a more tricky opcode
 
-            let d, r, K, w, q;
+        let d, r, K, w, q;
 
-            if (inst === 'ADIW') {
-                d = this.binLenDigits(((this.args[0].getValue() / 2) - 12), 2);
-                K = this.binLenDigits(this.args[1].getValue(), 6);
-                return `10010110${K.slice(0, 2)}${d}${K.slice(2)}`;
-            } else if (inst === 'CBR') {
-                d = this.binLenDigits(this.args[0].getValue(), 4);
-                K = this.binLenDigits((0xff - this.args[1].getValue()), 8);
-                return `0111${K.slice(0, 4)}${d}${K.slice(4)}`;
-            } else if (inst === 'CLR') {
-                d = this.binLenDigits(this.args[0].getValue(), 5);
-                return `001001${d.slice(0, 1)}${d}${d.slice(1)}`
-            } else if (inst === 'LD') {
-                d = this.binLenDigits(this.args[0].getValue(), 5);
-                w = this.args[1].getValue();
-                if (w == 'X') {
-                    return `1001000${d}1100`;
-                } else if (w === 'X+') {
-                    return `1001000${d}1101`;
-                } else if (w === '-X') {
-                    return `1001000${d}1110`;
-                } else if (w === 'Y') {
-                    return `1000000${d}1000`;
-                } else if (w === 'Y+') {
-                    return `1001000${d}1001`;
-                } else if (w === '-Y') {
-                    return `1001000${d}1010`;
-                } else if (w === 'Z') {
-                    return `1000000${d}0000`;
-                } else if (w === 'Z+') {
-                    return `1001000${d}0001`;
-                } else if (w === '-Z') {
-                    return `1001000${d}0010`;
-                }
-            } else if (inst === 'LDD') {
-                d = this.binLenDigits(this.args[0].getValue(), 5);
-                w = this.args[1].getValue().slice(0, 1);
-                q = this.binLenDigits(parseInt(this.args[1].getValue().slice(2)), 6);
-                if (w === 'Y') {
-                    return `10${q.slice(0, 1)}0${q.slice(1, 3)}0${d}1${q.slice(3)}`;
-                } else if (w === 'Z') {
-                    return `10${q.slice(0, 1)}0${q.slice(1, 3)}0${d}0${q.slice(3)}`;
-                }
-            } else if (inst === 'LSL') {
-                d = this.binLenDigits(this.args[0].getValue(), 5);
-                return `000011${d.slice(0, 1)}${d}${d.slice(1)}`
-            } else if (inst === 'MOVW') {
-                d = this.binLenDigits((this.args[0].getValue() / 2), 4);
-                r = this.binLenDigits((this.args[1].getValue() / 2), 4);
-                return `00000001${d}${r}`;
-            } else if (inst === 'ROL') {
-                d = this.binLenDigits(this.args[0].getValue(), 5);
-                return `000111${d.slice(0, 1)}${d}${d.slice(1)}`
-            } else if (inst === 'SBIW') {
-                d = this.binLenDigits(((this.args[0].getValue() / 2) - 12), 2);
-                K = this.binLenDigits(this.args[1].getValue(), 6);
-                return `10010111${K.slice(0, 2)}${d}${K.slice(2)}`;
-            } else if (inst === 'ST') {
-                r = this.binLenDigits(this.args[0].getValue(), 5);
-                w = this.args[1].getValue();
-                if (w == 'X') {
-                    return `1001001${r}1100`;
-                } else if (w === 'X+') {
-                    return `1001001${r}1101`;
-                } else if (w === '-X') {
-                    return `1001001${r}1110`;
-                } else if (w === 'Y') {
-                    return `1000001${r}1000`;
-                } else if (w === 'Y+') {
-                    return `1001001${r}1001`;
-                } else if (w === '-Y') {
-                    return `1001001${r}1010`;
-                } else if (w === 'Z') {
-                    return `1000001${r}0000`;
-                } else if (w === 'Z+') {
-                    return `1001001${r}0001`;
-                } else if (w === '-Z') {
-                    return `1001001${r}0010`;
-                }
-            } else if (inst === 'STD') {
-                r = this.binLenDigits(this.args[1].getValue(), 5);
-                w = this.args[0].getValue().slice(0, 1);
-                q = this.binLenDigits(parseInt(this.args[0].getValue().slice(2)), 6);
-                if (w === 'Y') {
-                    return `10${q.slice(0, 1)}0${q.slice(1, 3)}1${r}1${q.slice(3)}`;
-                } else if (w === 'Z') {
-                    return `10${q.slice(0, 1)}0${q.slice(1, 3)}1${r}0${q.slice(3)}`;
-                }
-            } else if (inst === 'TST') {
-                d = this.binLenDigits(this.args[0].getValue(), 5);
-                return `001000${d.slice(0, 1)}${d}${d.slice(1)}`
+        if (inst === 'ADIW') {
+            d = this.binLenDigits(((this.args[0].getValue() / 2) - 12), 2);
+            K = this.binLenDigits(this.args[1].getValue(), 6);
+            return `10010110${K.slice(0, 2)}${d}${K.slice(2)}`;
+        } else if (inst === 'CBR') {
+            d = this.binLenDigits(this.args[0].getValue(), 4);
+            K = this.binLenDigits((0xff - this.args[1].getValue()), 8);
+            return `0111${K.slice(0, 4)}${d}${K.slice(4)}`;
+        } else if (inst === 'CLR') {
+            d = this.binLenDigits(this.args[0].getValue(), 5);
+            return `001001${d.slice(0, 1)}${d}${d.slice(1)}`
+        } else if (inst === 'LD') {
+            d = this.binLenDigits(this.args[0].getValue(), 5);
+            w = this.args[1].getValue();
+            if (w == 'X') {
+                return `1001000${d}1100`;
+            } else if (w === 'X+') {
+                return `1001000${d}1101`;
+            } else if (w === '-X') {
+                return `1001000${d}1110`;
+            } else if (w === 'Y') {
+                return `1000000${d}1000`;
+            } else if (w === 'Y+') {
+                return `1001000${d}1001`;
+            } else if (w === '-Y') {
+                return `1001000${d}1010`;
+            } else if (w === 'Z') {
+                return `1000000${d}0000`;
+            } else if (w === 'Z+') {
+                return `1001000${d}0001`;
+            } else if (w === '-Z') {
+                return `1001000${d}0010`;
             }
+        } else if (inst === 'LDD') {
+            d = this.binLenDigits(this.args[0].getValue(), 5);
+            w = this.args[1].getValue().slice(0, 1);
+            q = this.binLenDigits(parseInt(this.args[1].getValue().slice(2)), 6);
+            if (w === 'Y') {
+                return `10${q.slice(0, 1)}0${q.slice(1, 3)}0${d}1${q.slice(3)}`;
+            } else if (w === 'Z') {
+                return `10${q.slice(0, 1)}0${q.slice(1, 3)}0${d}0${q.slice(3)}`;
+            }
+        } else if (inst === 'LSL') {
+            d = this.binLenDigits(this.args[0].getValue(), 5);
+            return `000011${d.slice(0, 1)}${d}${d.slice(1)}`
+        } else if (inst === 'MOVW') {
+            d = this.binLenDigits((this.args[0].getValue() / 2), 4);
+            r = this.binLenDigits((this.args[1].getValue() / 2), 4);
+            return `00000001${d}${r}`;
+        } else if (inst === 'ROL') {
+            d = this.binLenDigits(this.args[0].getValue(), 5);
+            return `000111${d.slice(0, 1)}${d}${d.slice(1)}`
+        } else if (inst === 'SBIW') {
+            d = this.binLenDigits(((this.args[0].getValue() / 2) - 12), 2);
+            K = this.binLenDigits(this.args[1].getValue(), 6);
+            return `10010111${K.slice(0, 2)}${d}${K.slice(2)}`;
+        } else if (inst === 'ST') {
+            r = this.binLenDigits(this.args[0].getValue(), 5);
+            w = this.args[1].getValue();
+            if (w == 'X') {
+                return `1001001${r}1100`;
+            } else if (w === 'X+') {
+                return `1001001${r}1101`;
+            } else if (w === '-X') {
+                return `1001001${r}1110`;
+            } else if (w === 'Y') {
+                return `1000001${r}1000`;
+            } else if (w === 'Y+') {
+                return `1001001${r}1001`;
+            } else if (w === '-Y') {
+                return `1001001${r}1010`;
+            } else if (w === 'Z') {
+                return `1000001${r}0000`;
+            } else if (w === 'Z+') {
+                return `1001001${r}0001`;
+            } else if (w === '-Z') {
+                return `1001001${r}0010`;
+            }
+        } else if (inst === 'STD') {
+            r = this.binLenDigits(this.args[1].getValue(), 5);
+            w = this.args[0].getValue().slice(0, 1);
+            q = this.binLenDigits(parseInt(this.args[0].getValue().slice(2)), 6);
+            if (w === 'Y') {
+                return `10${q.slice(0, 1)}0${q.slice(1, 3)}1${r}1${q.slice(3)}`;
+            } else if (w === 'Z') {
+                return `10${q.slice(0, 1)}0${q.slice(1, 3)}1${r}0${q.slice(3)}`;
+            }
+        } else if (inst === 'TST') {
+            d = this.binLenDigits(this.args[0].getValue(), 5);
+            return `001000${d.slice(0, 1)}${d}${d.slice(1)}`
         }
     }
 
@@ -483,7 +487,7 @@ class Lexer {
             [/^[rR]\d+/, 'REG'],                 // registers
             [/^-{0,1}0x[\dABCDEFabcdef]+|^-{0,1}\$[\dABCDEFabcdef]+|^-{0,1}0b[01]+/, 'INT'], // numbers
             [/^-{0,1}\d+/, 'INT'],              // numbers
-            [/^[a-zA-Z]{2,6}/, 'INST'],         // instructions --> CAN TURN LABELS USED IN AN INSTRUCTION INTO INST TYPE
+            [/^[a-zA-Z]{2,6}/, 'INST'],         // instructions → CAN TURN LABELS USED IN AN INSTRUCTION INTO INST TYPE
             [/^\".*?\"|^\'.*?\'/, 'STR'],       // string
             [/^\.[^\.\s]+/, 'DIR'],             // directives
             [/^[YZ]\+\d{1,2}/, 'WORDPLUSQ'],    // word+q
@@ -492,7 +496,7 @@ class Lexer {
             [/^[XYZ]/, 'WORD'],                 // word
             [/^,/, 'COMMA'],                    // comma
             [/^[^\w\s]+/, 'SYMBOL'],            // symbols
-            [/^[^\s\d]{1}[\w\d_]*/, 'REF']      // references (like labels used in an instruction) --> Called STRING in sim.py
+            [/^[^\s\d]{1}[\w\d_]*/, 'REF']      // references (like labels used in an instruction) → Called STRING in sim.py
         ];
 
         const tokens = [];
@@ -1352,6 +1356,7 @@ class Interpreter {
         // If it should be finished, set it to finished then return
         if (this.getPC() >= this.flashend) {
             this.finished = true;
+            console.log(this.step_count);
             this.setPC(this.flashend);
             return;
         }
@@ -1360,7 +1365,7 @@ class Interpreter {
         const inst = line.getInst().getValue();
         const line_in_file = this.line_numbers[this.getPC()];
 
-        let Rd, Rr, R, K, k, b, s, A, q, w, H, V, N, Z, C;    // declaring all the variable names
+        let Rd, Rr, R, K, k, b, s, A, q, w, T, H, V, N, Z, C;    // declaring all the variable names
 
         // Big switch statement
 
@@ -1462,6 +1467,19 @@ class Interpreter {
             case 'BCLR':
                 s = this.getArgumentValue(line, 0);
                 this.updateSREGBit(0, s);   // Clear bit s
+                break;
+            case 'BLD':
+                Rd = this.getArgumentValue(line, 0);
+                b = this.getArgumentValue(line, 1);
+                T = this.getBit(this.getSREG(), 6);
+
+                if (T) {
+                    R = Rd | ( 2 ** b );
+                } else {
+                    R = Rd & ( 0xff - ( 2 ** b ) );
+                }
+
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd(b) <-- T 
                 break;
             case 'BRBC':
                 s = this.getArgumentValue(line, 0);
@@ -1588,6 +1606,12 @@ class Interpreter {
             case 'BSET':
                 s = this.getArgumentValue(line, 0);
                 this.updateSREGBit(1, s);   // Set bit s
+                break;
+            case 'BST':
+                Rd = this.getArgumentValue(line, 0);
+                b = this.getArgumentValue(line, 1);
+                T = this.getBit(Rd, b);
+                this.updateSREGBit(T, 6);
                 break;
             case 'CALL':
                 if (line.getArgs()[0].getType() === 'INT') {
@@ -1777,6 +1801,23 @@ class Interpreter {
                 this.updateSREGBit(N, 2);
                 this.updateSREGBit((R === 0), 1);
                 this.updateSREGBit(C, 0);
+                break;
+            case 'CPSE':
+                Rd = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+
+                if ( Rd !== Rr ) {
+                    break;
+                }
+
+                this.incPC();
+
+                if ( this.pmem[this.getPC() + 1] !== null ) {
+                    break;
+                }
+
+                this.incPC();
+
                 break;
             case 'DEC':
                 Rd = this.getArgumentValue(line, 0);
@@ -2033,6 +2074,7 @@ class Interpreter {
             case 'RET':
                 if (this.getSP() == this.ramend) {
                     this.finished = true;
+                    console.log(`Number of steps taken: ${this.step_count + 1}`);
                     return;
                 }
 
@@ -2153,26 +2195,40 @@ class Interpreter {
             case 'SBRC':
                 Rd = this.getArgumentValue(line, 0);
                 b = this.getArgumentValue(line, 1);
-                if (1 - ((this.getSREG() >> b) & 1)) {
-                    k = this.getArgumentValue(line, 0);
-                    this.incPC();
+
+                const is_set = ((this.getSREG() >> b) & 1);
+
+                if (is_set) {
+                    break;
                 }
-                // Skip another line if the next instruction has a 32 bit opcode
-                if (['CALL', 'JMP', 'LDS', 'STS'].includes(this.pmem[this.getPC()].getInst().getValue())) {
-                    this.incPC();
+
+                this.incPC();
+
+                if ( this.pmem[this.getPC() + 1] !== null ) {
+                    break;
                 }
+
+                this.incPC();
+
                 break;
             case 'SBRS':
                 Rd = this.getArgumentValue(line, 0);
                 b = this.getArgumentValue(line, 1);
-                if ((this.getSREG() >> b) & 1) {
-                    k = this.getArgumentValue(line, 0);
-                    this.incPC();
+                
+                const is_cleared = 1 - ((this.getSREG() >> b) & 1);
+
+                if (is_cleared) {
+                    break;
                 }
-                // Skip another line if the next instruction has a 32 bit opcode
-                if (['CALL', 'JMP', 'LDS', 'STS'].includes(this.pmem[this.getPC()].getInst().getValue())) {
-                    this.incPC();
+
+                this.incPC();
+
+                if ( this.pmem[this.getPC() + 1] !== null ) {
+                    break;
                 }
+
+                this.incPC();
+
                 break;
             case 'SEC':
                 this.updateSREGBit(1, 0);
@@ -2330,7 +2386,6 @@ class Interpreter {
 
         // If the number of steps is too large, terminate running the code
         if (this.step_count > 1000000) {
-            this.finished = true;
             this.newError('Number of steps in code too large. Execution terminated.')
             return;
         } 
@@ -2437,16 +2492,22 @@ class Interpreter {
         if (value) {
             this.sreg.setValue(this.sreg.getValue() | (2 ** bit));
         } else {
-            this.sreg.setValue(this.sreg.getValue() & (0x100 - (2 ** bit)));
+            this.sreg.setValue(this.sreg.getValue() & ( 0xff - ( 2 ** bit ) ) );
         }
     }
 
     getBit(value, bit) {
         // returns the value of a bit in a number
+        return ((value >> bit) & 1);
+
+        /*
+
         if (((value >> bit) & 1) !== 0) {
             return 1;
         }
         return 0;
+
+        */
     }
 
     getX() {
@@ -2537,6 +2598,7 @@ class Interpreter {
 }
 
 
+
 FUNCTIONS = [
     'printf'
 ];
@@ -2551,6 +2613,7 @@ INST_LIST = [
     'ANDI',
     'ASR',
     'BCLR',
+    'BLD',
     'BRBC',
     'BRBS',
     'BRCC',
@@ -2572,6 +2635,7 @@ INST_LIST = [
     'BRVC',
     'BRVS',
     'BSET',
+    'BST',
     'CALL',
     'CBI',
     'CBR',
@@ -2588,6 +2652,7 @@ INST_LIST = [
     'CP',
     'CPC',
     'CPI',
+    'CPSE',
     'DEC',
     'EOR',
     'IN',
@@ -2662,6 +2727,7 @@ INST_OPERANDS = {
     'ANDI': [reg_16_31, int_0_255],
     'ASR': [reg_0_31],
     'BCLR': [int_0_7],
+    'BLD': [reg_0_31, int_0_7],
     'BRBC': [int_0_7, int_n64_63],
     'BRBS': [int_0_7, int_n64_63],
     'BRCC': [int_n64_63],
@@ -2683,6 +2749,7 @@ INST_OPERANDS = {
     'BRVC': [int_n64_63],
     'BRVS': [int_n64_63],
     'BSET': [int_0_7],
+    'BST': [reg_0_31, int_0_7],
     'CALL': [new Argument(['INT', 'REF'], 0, 4194303, FUNCTIONS)],
     'CBI': [int_0_31, int_0_7],
     'CBR': [reg_16_31, int_0_255],
@@ -2699,6 +2766,7 @@ INST_OPERANDS = {
     'CP': [reg_0_31, reg_0_31],
     'CPC': [reg_0_31, reg_0_31],
     'CPI': [reg_16_31, int_0_255],
+    'CPSE': [reg_0_31, reg_0_31],
     'DEC': [reg_0_31],
     'EOR': [reg_0_31, reg_0_31],
     'IN': [reg_0_31, int_0_63],
@@ -2762,6 +2830,7 @@ INST_OPCODES = {
     'ANDI': ['d', 'K', '0111KKKKddddKKKK'],
     'ASR': ['d', '1001010ddddd0101'],
     'BCLR': ['s', '100101001sss1000'],
+    'BLD': ['d', 'b', '1111100ddddd0bbb'],
     'BRBC': ['s', 'k', '111101kkkkkkksss'],
     'BRBS': ['s', 'k', '111100kkkkkkksss'],
     'BRCC': ['k', '111101kkkkkkk000'],
@@ -2783,6 +2852,7 @@ INST_OPCODES = {
     'BRVC': ['k', '111101kkkkkkk011'],
     'BRVS': ['k', '111100kkkkkkk011'],
     'BSET': ['s', '100101000sss1000'],
+    'BST': ['d', 'b', '1111101ddddd0bbb'],
     'CALL': ['k', '1001010kkkkk111kkkkkkkkkkkkkkkkk'],
     'CBI': ['A', 'b', '10011000AAAAAbbb'],
     'CBR': null,
@@ -2799,6 +2869,7 @@ INST_OPCODES = {
     'CP': ['d', 'r', '000101rdddddrrrr'],
     'CPC': ['d', 'r', '000001rdddddrrrr'],
     'CPI': ['d', 'K', '0011KKKKddddKKKK'],
+    'CPSE': ['d', 'r', '000100rdddddrrrr'],
     'DEC': ['d', '1001010ddddd1010'],
     'EOR': ['d', 'r', '001001rdddddrrrr'],
     'IN': ['d', 'A', '10110AAdddddAAAA'],
@@ -2883,6 +2954,8 @@ class App {
         this.display_opcode = false;
 
         this.assembled = false;
+
+        this.current_popup = null;
 
     }
 
@@ -2990,6 +3063,7 @@ class App {
         this.populatePointers();
         this.populatePMEM(this.pmem_top);
         this.populateDMEM(this.dmem_top);
+        this.fillPopup();
     }
 
     populateRegisters() {
@@ -3039,9 +3113,11 @@ class App {
                 let flag_value = this.interpreter.sreg.getBit(i); // get the sreg bit value
 
                 if (flag_value) {
-                    flag_value = 'TRUE';
+                    // flag_value = 'TRUE';
+                    flag_value = '1';
                 } else {
-                    flag_value = 'FALSE';
+                    // flag_value = 'FALSE';
+                    flag_value = '0';
                 }
 
                 document.getElementById(`sreg-${flag}`).innerHTML = flag_value;
@@ -3280,6 +3356,1103 @@ class App {
 
     clearConsole() {
         document.getElementById('console').innerHTML = '';
+    }
+
+    togglePopup(row_num) {
+        if ( (this.current_popup !== null) && (this.current_popup !== row_num) ) {
+            this.hideOpenPopup(this.current_popup);
+        }
+
+        const popup = document.getElementById(`popup-${row_num}`);
+        const inst = document.getElementById(`pmem-line-${row_num}`).innerHTML;
+        if (inst !== 'None') {
+            popup.classList.toggle("show");
+        }
+
+        // If you're openning a new popup set it as the current popup and fill it
+        if ( this.current_popup !== row_num && inst !== 'None' ) {
+            this.current_popup = row_num;
+            this.fillPopup();
+        }
+        else {
+            this.current_popup = null;
+        }
+    }
+
+    hideOpenPopup(row_num) {
+        const popup = document.getElementById(`popup-${row_num}`);
+        popup.classList.toggle("show");
+    }
+
+    fillPopup() {
+        if (this.current_popup === null) {
+            return;
+        }
+        const popup = document.getElementById(`popup-${this.current_popup}`);
+        const inst = document.getElementById(`pmem-line-${this.current_popup}`).innerHTML;
+        popup.innerHTML = `${inst}<br><br>`;
+
+        const inst_mnemonic = inst.split(' ')[0];   // e.g. LDI, ASR, MOV.
+        let popup_options;                          // the lines for that given popup
+
+        if (inst_mnemonic === 'LD') {
+            const word_reg = inst.split(' ')[2];
+
+            if ( word_reg.includes('X') ) {
+                popup_options = this.getPopups()['LD_X'].split('\n');
+            }
+            else if ( word_reg.includes('Y') ) {
+                popup_options = this.getPopups()['LD_Y'].split('\n');
+            } else {
+                popup_options = this.getPopups()['LD_Z'].split('\n');
+            }
+        } else if (inst_mnemonic === 'ST') {
+            const word_reg = inst.split(' ')[1];
+
+            if ( word_reg.includes('X') ) {
+                popup_options = this.getPopups()['ST_X'].split('\n');
+            }
+            else if ( word_reg.includes('Y') ) {
+                popup_options = this.getPopups()['ST_Y'].split('\n');
+            } else {
+                popup_options = this.getPopups()['ST_Z'].split('\n');
+            }
+        } else {
+            popup_options = this.getPopups()[inst_mnemonic].split('\n');    // get the text for that instruction
+        }
+
+
+        // Add the text with a break for every \n in the text
+        for (let i = 0; i < popup_options.length; i++) {
+            popup.innerHTML += `${popup_options[i]}<br>`;
+        }
+
+    }
+
+    // Returns the popups instructions list
+    getPopups() {
+        const popups = {
+            'ADC': `Syntax:   ADC Rd, Rr
+                    Family:   Arithmetic Instructions
+                    Function: Adds both registers and the value of the C flag together
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    Rr → [R0 - R31]
+
+                    Operation:
+                    Rd = Rd + Rr + C`,
+            'ADD': `Syntax: ADD Rd, Rr
+                    Family: Arithmetic Instructions
+                    Function: Adds both registers together
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    Rr → [R0 - R31]
+
+                    Operation:
+                    Rd = Rd + Rr`,
+            'ADIW': `Syntax:   ADIW Rd, K
+                    Family:   Arithmetic Instructions
+                    Function: Adds K to the word register Rd+1:Rd
+
+                    Boundaries:
+                    Rd → [R24, R26, R28, R30]
+                    K  → [0 - 63]
+
+                    Operation:
+                    Rd+1:Rd = Rd+1:Rd + K
+
+                    Example:
+                    ADIW R24, 15
+                    → R25:R24 = R25:R24 + 15`,
+            'AND': `Syntax:   AND Rd, Rr
+                    Family:   Logic Instructions
+                    Function: Performs the logical AND on the bit values of Rd and Rr
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    Rr → [R0 - R31]
+
+                    Operation:
+                    Rd = Rd • Rr`,
+            'ANDI': `Syntax:   ANDI Rd, K
+                    Family:   Logic Instructions
+                    Function: Performs the logical AND on the bit values of Rd and K
+
+                    Boundaries:
+                    Rd → [R16 - R31]
+                    K  → [0 - 255]
+
+                    Operation:
+                    Rd = Rd • K`,
+            'ASR': `Syntax:   ASR Rd
+                    Family:   Bit & Bit Test Instructions
+                    Function: Shifts every bit to the right. Bit 7 doesnt change. Bit 0 goes into C flag.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operations:
+                    C = Rd(0)
+                    Rd(7) → unchanged
+                    Rd(6:0) = Rd(7:1)
+
+                    Example:
+                    ASR R20 (where R20 = 10010011 = 147)
+                    → C = 1
+                    → R20 = 11001001 = 201`,
+            'BCLR': `Syntax:   BCLR s
+                    Family:   Bit & Bit Test Instructions
+                    Function: Clears a single flag in the SREG
+
+                    Boundaries:
+                    s → [0 - 7]
+
+                    Operation:
+                    SREG(s) = 0`,
+            'BLD': `Syntax:   BLD Rd, b
+                    Family:   Bit & Bit Test Instructions
+                    Function: Loads the value of the SREG T flag into bit b of Rd
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    b → [0 - 7]
+
+                    Operation:
+                    Rd(b) = T`,
+            'BRBC': `Syntax:   BRBC s, k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG bit s is cleared (SREG(s) = 0)
+
+                    Boundaries:
+                    s → [0 - 7]
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if SREG(s) = 0 }
+                    PC = PC + 1 { else }`,
+            'BRBS': `Syntax:   BRBS s, k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG bit s is set (SREG(s) = 1)
+
+                    Boundaries:
+                    s → [0 - 7]
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if SREG(s) = 1 }
+                    PC = PC + 1 { else }`,
+            'BRCC': `Syntax:   BRCC k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG carry flag is cleared (C = 0)
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if C = 0 }
+                    PC = PC + 1 { else }`,
+            'BRCS': `Syntax:   BRCS k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG carry flag is set (C = 1)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if C = 1 }
+                    PC = PC + 1 { else }`,
+            'BREQ': `Syntax:   BREQ k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG zero flag is set (Z = 1)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if Z = 1 }
+                    PC = PC + 1 { else }`,
+            'BRGE': `Syntax:   BRGE k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG signed flag is cleared (S = 0)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if S = 0 }
+                    PC = PC + 1 { else }`,
+            'BRHC': `Syntax:   BRHC k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG half carry flag is cleared (H = 0)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if H = 0 }
+                    PC = PC + 1 { else }`,
+            'BRHS': `Syntax:   BRHS k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG half carry flag is set (H = 1)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if H = 1 }
+                    PC = PC + 1 { else }`,
+            'BRID': `Syntax:   BRID k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG interrupt flag is cleared (I = 0)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if I = 0 }
+                    PC = PC + 1 { else }`,
+            'BRIE': `Syntax:   BRHC k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG interrupt flag is set (I = 1)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if I = 1 }
+                    PC = PC + 1 { else }`,
+            'BRLO': `Syntax:   BRLO k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG carry flag is set (C = 1)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if C = 1 }
+                    PC = PC + 1 { else }`,
+            'BRLT': `Syntax:   BRLT k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG signed flag is set (S = 1)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if S = 1 }
+                    PC = PC + 1 { else }`,
+            'BRMI': `Syntax:   BRMI k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG negative flag is set (N = 1)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if N = 1 }
+                    PC = PC + 1 { else }`,
+            'BRNE': `Syntax:   BRNE k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG zero flag is cleared (Z = 0)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if Z = 0 }
+                    PC = PC + 1 { else }`,
+            'BRPL': `Syntax:   BRPL k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG negative flag is cleared (N = 0)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if N = 0 }
+                    PC = PC + 1 { else }`,
+            'BRSH': `Syntax:   BRSH k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG carry flag is cleared (C = 0)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if C = 0 }
+                    PC = PC + 1 { else }`,
+            'BRTC': `Syntax:   BRTC k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG transfer flag is cleared (T = 0)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if T = 0 }
+                    PC = PC + 1 { else }`,
+            'BRTS': `Syntax:   BRTS k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG transfer flag is set (T = 1)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if T = 1 }
+                    PC = PC + 1 { else }`,
+            'BRVC': `Syntax:   BRVC k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG overflow flag is cleared (V = 0)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if V = 0 }
+                    PC = PC + 1 { else }`,
+            'BRVS': `Syntax:   BRVS k
+                    Family:   Branch Instructions
+                    Function: Brach k spaces in PMEM if SREG overflow flag is set (V = 1)
+
+                    Boundaries:
+                    k → [-64 - 63]
+
+                    Operations:
+                    PC = PC + k + 1 { if V = 1 }
+                    PC = PC + 1 { else }`,
+            'BSET': `Syntax:   BSET s
+                    Family:   Bit & Bit Test Instructions
+                    Function: Sets a single flag in the SREG
+
+                    Boundaries:
+                    s → [0 - 7]
+
+                    Operation:
+                    SREG(s) = 1`,
+            'BST': `Syntax:   BST Rd, b
+                    Family:   Bit & Bit Test Instructions
+                    Function: Stores the value of Rd bit b into the SREG T flag
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    b → [0 - 7]
+
+                    Operation:
+                    T = Rd(b)`,
+            'CALL': `Syntax:   CALL k
+                    Family:   Branch Instructions
+                    Function: Calls to a subroutine within the entire Program memory. The return address (to the instruction after the CALL) will be stored onto the Stack. The Stack Pointer uses a post-decrement scheme during CALL.
+
+                    Boundaries:
+                    k → [0 - 65535]
+
+                    Operations:
+                    PC = k
+                    SP = SP - 2
+                    STACK ← PC + 2`,
+            'CBI': `Syntax:   CBI A, b
+                    Family:   Bit & Bit Test Instructions
+                    Function: Clears a specified bit in an I/O register. This instruction operates on the lower 32 I/O registers with addresses 0-31.
+
+                    Boundaries:
+                    A → [0 - 31]
+                    b → [0 - 7]
+
+                    Operation:
+                    I/O(A, b) = 0`,
+            'CBR': `Syntax:   CBR Rd, K
+                    Family:   Logic Instructions
+                    Function: Clears the bits of Rd that correspond to the 1's in the binary value of K. CBR does this by performing the logical AND between Rd and the complement of K.
+
+                    Boundaries:
+                    Rd → [R16 - R31]
+                    K  → [0 - 255]
+
+                    Operation:
+                    Rd = Rd • (255 - K)`,
+            'CLC': `Syntax:   CLC
+                    Family:   Bit & Bit Test Instructions
+                    Function: Clears the carry flag (C) in the SREG
+
+                    Operation:
+                    C = 0`,
+            'CLH': `Syntax:   CLH
+                    Family:   Bit & Bit Test Instructions
+                    Function: Clears the half carry flag (H) in the SREG
+
+                    Operation:
+                    H = 0`,
+            'CLI': `Syntax:   CLI
+                    Family:   Bit & Bit Test Instructions
+                    Function: Clears the global interrupt flag (I) in the SREG
+
+                    Operation:
+                    I = 0`,
+            'CLN': `Syntax:   CLN
+                    Family:   Bit & Bit Test Instructions
+                    Function: Clears the negative flag (N) in the SREG
+
+                    Operation:
+                    N = 0`,
+            'CLR': `Syntax:   CLR Rd
+                    Family:   Logic Instructions
+                    Function: Clears a register. This instruction performs an Exclusive OR between a register and itself. This will clear all bits in the register.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operation:
+                    Rd = Rd ⊕ Rd`,
+            'CLS': `Syntax:   CLS
+                    Family:   Bit & Bit Test Instructions
+                    Function: Clears the signed flag (S) in the SREG
+
+                    Operation:
+                    S = 0`,
+            'CLT': `Syntax:   CLT
+                    Family:   Bit & Bit Test Instructions
+                    Function: Clears the transfer bit flag (T) in the SREG
+
+                    Operation:
+                    T = 0`,
+            'CLV': `Syntax:   CLV
+                    Family:   Bit & Bit Test Instructions
+                    Function: Clears the overflow flag (V) in the SREG
+
+                    Operation:
+                    V = 0`,
+            'CLZ': `Syntax:   CLZ
+                    Family:   Bit & Bit Test Instructions
+                    Function: Clears the zero flag (Z) in the SREG
+
+                    Operation:
+                    Z = 0`,
+            'COM': `Syntax:   COM Rd
+                    Family:   Logic Instructions
+                    Function: Performs a ones complement of register Rd
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operation:
+                    Rd = 255 - Rd`,
+            'CP': `Syntax:   CP Rd, Rr
+                    Family:   Branch Instructions
+                    Function: Performs a compare between two registers Rd and Rr. None of the registers are changed. All conditional branches can be used after this instruction.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    Rr → [R0 - R31]
+
+                    Operation:
+                    Rd - Rr (not stored back into any register)`,
+            'CPC': `Syntax:   CPC Rd, Rr
+                    Family:   Branch Instructions
+                    Function: Performs a compare between two registers Rd and Rr and also takes into account the previous carry. None of the registers are changed. All conditional branches can be used after this instruction.                    
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    Rr → [R0 - R31]
+
+                    Operation:
+                    Rd - Rr - C (not stored back into any register)`,
+            'CPI': `Syntax:   CPI Rd, K
+                    Family:   Branch Instructions
+                    Function: Performs a compare between register Rd and a constant. The register is not changed. All conditional branches can be used after this instruction.
+
+                    Boundaries:
+                    Rd → [R16 - R31]
+                    K → [0 - 255]
+
+                    Operation:
+                    Rd - K (not stored back into any register)`,
+            'CPSE': `Syntax:   CPSE Rd, Rr
+                    Family:   Branch Instructions
+                    Function: Performs a compare between two registers Rd and Rr, and skips the next instruction if Rd = Rr
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    Rr → [R0 - R31]
+
+                    Operation Options:
+                    PC = PC + 1 { if Rd != Rr }
+                    PC = PC + 2 { if Rd = Rr and the next instruction is 16 bits }
+                    PC = PC + 3 { if Rd = Rr and the next instruction is 32 bits }`,
+            'DEC': `Syntax:   DEC Rd
+                    Family:   Arithmetic Instructions
+                    Function: Subtracts 1 from the contents of register Rd and places the result in the destination register Rd. The C flag in SREG is not affected by the operation.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operation:
+                    Rd = Rd - 1`,
+            'EOR': `Syntax:   EOR Rd, Rr
+                    Family:   Logic Instructions
+                    Function: Performs the logical EOR between the contents of register Rd and register Rr and places the result in the destination register Rd
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    Rr → [R0 - R31]
+
+                    Operation:
+                    Rd = Rd ⊕ Rr`,
+            'IN': `Syntax:   IN Rd, A
+                    Family:   Data Transfer Instructions
+                    Function: Loads data from the I/O space (ports, timers, configuration registers, etc.) into register Rd in the register file
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    A → [0 - 63]
+
+                    Operation:
+                    Rd = I/O(A)`,
+            'INC': `Syntax:   INC Rd
+                    Family:   Arithmetic Instructions
+                    Function: Adds 1 to the contents of register Rd and places the result in the destination register Rd. The C flag in SREG is not affected by the operation.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operation:
+                    Rd = Rd + 1`,
+            'JMP': `Syntax:   JMP k
+                    Family:   Branch Instructions
+                    Function: Jump to an address within the entire program memory. See also RJMP. This instruction is not available in all devices. Refer to the device specific instruction set summary.
+
+                    Boundaries:
+                    k → [0 - 4194303]
+
+                    Operation:
+                    PC = k`,
+            'LD_X': `Syntax: (i) LD Rd, X
+                    &emsp;&emsp;&emsp;&ensp;(ii) LD Rd, X+
+                    &emsp;&emsp;&emsp;&nbsp;(iii) LD Rd, -X
+                    Family: Data Transfer Instructions
+                    Function: Loads one byte indirect from data memory into register Rd using X as the pointer to the data memory cell. Can post-increment X with the X+ variant or can pre-decrement X with the -X variant.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operation Options:
+                    (i) &ensp;Rd ← (X)
+                    (ii)&ensp;Rd ← (X), X = X + 1
+                    (iii) X = X - 1, Rd ← (X)`,
+            'LD_Y': `Syntax: (i) LD Rd, Y
+                    &emsp;&emsp;&emsp;&ensp;(ii) LD Rd, Y+
+                    &emsp;&emsp;&emsp;&nbsp;(iii) LD Rd, -Y
+                    Family:   Data Transfer Instructions
+                    Function: Loads one byte indirect from data memory into register Rd using Y as the pointer to the data memory cell. Can post-increment Y with the Y+ variant or can pre-decrement Y with the -Y variant.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operation Options:
+                    (i) &ensp;Rd ← (Y)
+                    (ii)&ensp;Rd ← (Y), Y = Y + 1
+                    (iii) Y = Y - 1, Rd ← (Y)`,
+            'LD_Z': `Syntax: (i) LD Rd, Z
+                    &emsp;&emsp;&emsp;&ensp;(ii) LD Rd, Z+
+                    &emsp;&emsp;&emsp;&nbsp;(iii) LD Rd, -Z
+                    Family:   Data Transfer Instructions
+                    Function: Loads one byte indirect from data memory into register Rd using Z as the pointer to the data memory cell. Can post-increment Z with the Z+ variant or can pre-decrement Z with the -Z variant.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operation Options:
+                    (i) &ensp;Rd ← (Z)
+                    (ii)&ensp;Rd ← (Z), Z = Z + 1
+                    (iii) Z = Z - 1, Rd ← (Z)`,
+            'LDD': `Syntax: (i) LDD Rd, Y+q
+                    &emsp;&emsp;&emsp;&ensp;(ii) LDD Rd, Z+q
+                    Family: Data Transfer Instructions
+                    Function: Uses the Y (or Z) word-register as a pointer to data memory and loads the value at address Y+q (or Z+q) into register Rd, using q as the displacement from Y (or Z). Y (or Z) is left unchanged after the operation.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    q → [0 - 63]
+
+                    Operation Options:
+                    (i)&ensp;Rd ← (Y+q) 
+                    (ii) Rd ← (Z+q)`,
+            'LDI': `Syntax: LDI Rd, K
+                    Family: Data Transfer Instructions
+                    Function: Loads an 8-bit constant directly to register 16 to 31
+
+                    Boundaries:
+                    Rd → [R16 - R31]
+                    K → [0 - 255]
+
+                    Operation:
+                    Rd = K`,
+            'LDS': `Syntax: LDS Rd, k
+                    Family: Data Transfer Instructions
+                    Function: Loads one byte indirect from data memory into register Rd using k as a pointer
+
+                    Boundaries:
+                    Rd → [R16 - R31]
+                    k → [0 - 65535]
+
+                    Operation:
+                    Rd ← (k)`,
+            'LSL': `Syntax:   LSL Rd
+                    Family:   Bit & Bit Test Instructions
+                    Function: Shifts all bits in Rd one place to the left. Bit 0 is cleared. Bit 7 is loaded into the C flag of the SREG. This operation effectively multiplies signed and unsigned values by two.
+                    
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operations:
+                    C = Rd(7)
+                    Rd(7:1) = Rd(6:0)
+                    Rd(0) = 0
+
+                    Example:
+                    LSL R20 (where R20 = 10010011 = 147)
+                    → C = 1
+                    → R20 = 00100110 = 38`,
+            'LSR': `Syntax:   LSR Rd
+                    Family:   Bit & Bit Test Instructions
+                    Function: Shifts all bits in Rd one place to the right. Bit 7 is cleared. Bit 0 is loaded into the C flag of the SREG. This operation effectively divides an unsigned value by two. The C flag can be used to round the result.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operations:
+                    C = Rd(0)
+                    Rd(6:0) = Rd(7:1)
+                    Rd(7) = 0
+
+                    Example:
+                    LSR R20 (where R20 = 10010011 = 147)
+                    → C = 1
+                    → R20 = 01001001 = 73`,
+            'MOV': `Syntax: MOV Rd, Rr
+                    Family: Data Transfer Instructions
+                    Function: Makes a copy of one register into another. The source register Rr is left unchanged, while the destination register Rd is loaded with a copy of Rr.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    Rr → [R0 - R31]
+
+                    Operation:
+                    Rd = Rr`,
+            'MOVW': `Syntax: MOVW Rd, Rr
+                    Family: Data Transfer Instructions
+                    Function: Makes a copy of one register pair into another register pair. The source register pair Rr+1:Rr is left unchanged, while the destination register pair Rd+1:Rd is loaded with a copy of Rr+1:Rr.
+
+                    Boundaries:
+                    Rd → [R0, R2, R4, R6, etc] (even registers)
+                    Rr → [R0, R2, R4, R6, etc] (even registers)
+
+                    Operation:
+                    Rd+1:Rd = Rr+1:Rr`,
+            'MUL': `Syntax:   MUL Rd, Rr
+                    Family:   Arithmetic Instructions
+                    Function: This instruction performs 8-bit x 8-bit → 16-bit unsigned multiplication. The resulting value is stored in R1:R0.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    Rr → [R0 - R31]
+
+                    Operation:
+                    R1:R0 ← Rd x Rr (unsigned ← unsigned x unsigned)`,
+            'MULS': `Syntax:   MULS Rd, Rr
+                    Family:   Arithmetic Instructions
+                    Function: This instruction performs 8-bit x 8-bit → 16-bit signed multiplication. The resulting value is stored in R1:R0.
+
+                    Boundaries:
+                    Rd → [R16 - R31]
+                    Rr → [R16 - R31]
+
+                    Operation:
+                    R1:R0 ← Rd x Rr (signed ← signed x signed)`,
+            'MULSU': `Syntax:   MULS Rd, Rr
+                    Family:   Arithmetic Instructions
+                    Function: This instruction performs 8-bit x 8-bit → 16-bit multiplication of a signed and an unsigned number. The resulting value is stored in R1:R0.
+
+                    Boundaries:
+                    Rd → [R16 - R23]
+                    Rr → [R16 - R23]
+
+                    Operation:
+                    R1:R0 ← Rd x Rr (signed ← signed x unsigned)`,
+            'NEG': `Syntax:   NEG Rd
+                    Family:   Logic Instructions
+                    Function: Performs a twos complement of register Rd. The value 128 is left unchanged.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operation:
+                    Rd = 0 - Rd`,
+            'NOP': `Syntax:   NOP
+                    Family:   MCU Control Instructions
+                    Function: Performs a single cycle no operation
+
+                    Operation:
+                    No operation`,
+            'OR': `Syntax: OR Rd, Rr
+                    Family: Logic Instructions
+                    Function: Performs the logical OR on the bit values of Rd and Rr
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    Rr → [R0 - R31]
+
+                    Operation:
+                    Rd = Rd ∨ Rr`,
+            'ORI': `Syntax: ORI Rd, K
+                    Family: Logic Instructions
+                    Function: Performs the logical OR on the bit values of Rd and K
+
+                    Boundaries:
+                    Rd → [R16 - R31]
+                    K → [0 - 255]
+
+                    Operation:
+                    Rd = Rd ∨ K`,
+            'OUT': `Syntax:   OUT A, Rr
+                    Family:   Data Transfer Instructions
+                    Function: Stores data into the I/O space (ports, timers, configuration registers, etc.) from register Rr in the register file
+
+                    Boundaries:
+                    A → [0 - 63]
+                    Rr → [R0 - R31]
+
+                    Operation:
+                    I/O(A) = Rr`,
+            'POP': `Syntax:   POP Rd
+                    Family:   Data Transfer Instructions
+                    Function: Loads register Rd with a byte from the STACK. The Stack Pointer is pre-incremented by 1 before the POP.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operation:
+                    SP = SP + 1
+                    Rd ← STACK (top value from the stack)`,
+            'PUSH': `Syntax:   PUSH Rr
+                    Family:   Data Transfer Instructions
+                    Function: Stores the contents of register Rr on the STACK. The Stack Pointer is post-decremented by 1 after the PUSH.
+
+                    Boundaries:
+                    Rr → [R0 - R31]
+
+                    Operation:
+                    STACK ← Rr (Rr onto the top of the stack)
+                    SP = SP - 1`,
+            'RET': `Syntax:   RET
+                    Family:   Branch Instructions
+                    Function: Returns from subroutine. The return address is loaded from the STACK. The Stack Pointer uses a preincrement scheme during RET.
+
+                    Operation:
+                    PC(15:0) ← STACK`,
+            'RJMP': `Syntax:   RJMP k
+                    Family:   Branch Instructions
+                    Function: Relative jump to an address within PC - 2047 and PC + 2048 (words)
+
+                    Boundaries:
+                    k → [-2048 - 2047]
+
+                    Operation:
+                    PC = PC + k + 1`,
+            'ROL': `Syntax:   ROL Rd
+                    Family:   Bit & Bit Test Instructions
+                    Function: Shifts all bits in Rd one place to the left. The C flag is shifted into bit 0 of Rd. Bit 7 is shifted into the C flag. This operation, combined with LSL, effectively multiplies multi-byte signed and unsigned values by two.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Diagram:
+                    &emsp;&emsp;&emsp;&emsp;&ensp;←
+                    C ← [b7---------b0] ← C
+
+                    Operations:
+                    C = Rd(7)
+                    Rd(7:1) = Rd(6:0)
+                    Rd(0) = C
+
+                    Example:
+                    ROL R20 (where R20 = 00010011 = 19 and C = 1)
+                    → C = 0
+                    → R20 = 00100111 = 39`,
+            'ROR': `Syntax:   ROR Rd
+                    Family:   Bit & Bit Test Instructions
+                    Function: Shifts all bits in Rd one place to the right. The C flag is shifted into bit 7 of Rd. Bit 0 is shifted into the C flag. This operation, combined with ASR, effectively divides multi-byte signed values by two. Combined with LSR it effectively divides multi-byte unsigned values by two. The carry flag can be used to round the result.
+                    
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Diagram:
+                    &emsp;&emsp;&emsp;&emsp;&ensp;→
+                    C → [b7---------b0] → C
+
+                    Operations:
+                    C = Rd(0)
+                    Rd(6:0) = Rd(7:1)
+                    Rd(7) = C
+
+                    Example:
+                    ROR R20 (where R20 = 00010010 = 18 and C = 1)
+                    → C = 0
+                    → R20 = 10001001 = 137`,
+            'SBC': `Syntax:   SBC Rd, Rr
+                    Family:   Arithmetic Instructions
+                    Function: Subtracts two registers and subtracts with the C flag
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    Rr → [R0 - R31]
+
+                    Operation:
+                    Rd = Rd - Rr - C`,
+            'SBCI': `Syntax:   SBC Rd, K
+                    Family:   Arithmetic Instructions
+                    Function: Subtracts a constant from a register and subtracts with the C flag
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    K → [0 - 255]
+
+                    Operation:
+                    Rd = Rd - K - C`,
+            'SBI': `Syntax:   SBI A, b
+                    Family:   Bit & Bit Test Instructions
+                    Function: Sets a specified bit in an I/O register. This instruction operates on the lower 32 I/O registers with addresses 0-31.
+
+                    Boundaries:
+                    A → [0 - 31]
+                    b → [0 - 7]
+
+                    Operation:
+                    I/O(A, b) = 1`,
+            'SBIW': `Syntax:   SBIW Rd, K
+                    Family:   Arithmetic Instructions
+                    Function: Subtracts K from the word register Rd+1:Rd
+
+                    Boundaries:
+                    Rd → [R24, R26, R28, R30]
+                    K  → [0 - 63]
+
+                    Operation:
+                    Rd+1:Rd = Rd+1:Rd - K
+
+                    Example:
+                    SBIW R24, 15
+                    → R25:R24 = R25:R24 - 15`,
+            'SBR': `Syntax: SBR Rd, K
+                    Family: Logic Instructions
+                    Function: Performs the logical OR on the bit values of Rd and K
+
+                    Boundaries:
+                    Rd → [R16 - R31]
+                    K → [0 - 255]
+
+                    Operation:
+                    Rd = Rd ∨ K`,
+            'SBRC': `Syntax:   SBRC Rr, b
+                    Family:   Branch Instructions
+                    Function: Tests a single bit in a register and skips the next instruction if the bit is cleared
+
+                    Boundaries:
+                    Rr → [R0 - R31]
+                    b → [0 - 7]
+
+                    Operation Options:
+                    PC = PC + 1 { if Rr(b) = 1 }
+                    PC = PC + 2 { if Rr(b) = 0 and the next instruction is 16 bits }
+                    PC = PC + 3 { if Rr(b) = 0 and the next instruction is 32 bits }`,
+            'SBRS': `Syntax:   SBRS Rr, b
+                    Family:   Branch Instructions
+                    Function: Tests a single bit in a register and skips the next instruction if the bit is set
+
+                    Boundaries:
+                    Rr → [R0 - R31]
+                    b → [0 - 7]
+
+                    Operation Options:
+                    PC = PC + 1 { if Rr(b) = 0 }
+                    PC = PC + 2 { if Rr(b) = 1 and the next instruction is 16 bits }
+                    PC = PC + 3 { if Rr(b) = 1 and the next instruction is 32 bits }`,
+            'SEC': `Syntax:   SEC
+                    Family:   Bit & Bit Test Instructions
+                    Function: Sets the carry flag (C) in the SREG
+
+                    Operation:
+                    C = 1`,
+            'SEH': `Syntax:   SEH
+                    Family:   Bit & Bit Test Instructions
+                    Function: Sets the half carry flag (H) in the SREG
+
+                    Operation:
+                    H = 1`,
+            'SEI': `Syntax:   SEI
+                    Family:   Bit & Bit Test Instructions
+                    Function: Sets the global interrupt flag (I) in the SREG
+
+                    Operation:
+                    I = 1`,
+            'SEN': `Syntax:   SEN
+                    Family:   Bit & Bit Test Instructions
+                    Function: Sets the negative flag (N) in the SREG
+
+                    Operation:
+                    N = 1`,
+            'SER': `Syntax:   SER
+                    Family:   Logic Instructions
+                    Function: Loads 255 directly to register Rd
+
+                    Boundaries:
+                    Rd → [R16 - R31]
+
+                    Operation:
+                    Rd = 255`,
+            'SES': `Syntax:   SES
+                    Family:   Bit & Bit Test Instructions
+                    Function: Sets the signed flag (S) in the SREG
+
+                    Operation:
+                    S = 1`,
+            'SET': `Syntax:   SET
+                    Family:   Bit & Bit Test Instructions
+                    Function: Sets the transfer bit flag (T) in the SREG
+
+                    Operation:
+                    T = 1`,
+            'SEV': `Syntax:   SEV
+                    Family:   Bit & Bit Test Instructions
+                    Function: Sets the overflow flag (V) in the SREG
+
+                    Operation:
+                    V = 1`,
+            'SEZ': `Syntax:   SEZ
+                    Family:   Bit & Bit Test Instructions
+                    Function: Sets the zero flag (Z) in the SREG
+
+                    Operation:
+                    Z = 1`,
+            'ST_X': `Syntax: (i) ST X, Rr
+                    &emsp;&emsp;&emsp;&ensp;(ii) ST X+, Rr
+                    &emsp;&emsp;&emsp;&nbsp;(iii) ST -X, Rr
+                    Family: Data Transfer Instructions
+                    Function: Stores one byte from register Rr into data memory using indirection with X as the pointer to the data memory cell. Can post-increment X with the X+ variant or can pre-decrement X with the -X variant.
+
+                    Boundaries:
+                    Rr → [R0 - R31]
+
+                    Operation Options:
+                    (i) &ensp;(X) ← Rr
+                    (ii)&ensp;(X) ← Rr, X = X + 1
+                    (iii) X = X - 1, (X) ← Rr`,
+            'ST_Y': `Syntax: (i) ST Y, Rr
+                    &emsp;&emsp;&emsp;&ensp;(ii) ST Y+, Rr
+                    &emsp;&emsp;&emsp;&nbsp;(iii) ST -Y, Rr
+                    Family: Data Transfer Instructions
+                    Function: Stores one byte from register Rr into data memory using indirection with Y as the pointer to the data memory cell. Can post-increment Y with the Y+ variant or can pre-decrement Y with the -Y variant.
+
+                    Boundaries:
+                    Rr → [R0 - R31]
+
+                    Operation Options:
+                    (i) &ensp;(Y) ← Rr
+                    (ii)&ensp;(Y) ← Rr, Y = Y + 1
+                    (iii) Y = Y - 1, (Y) ← Rr`,
+            'ST_Z': `Syntax: (i) ST Z, Rr
+                    &emsp;&emsp;&emsp;&ensp;(ii) ST Z+, Rr
+                    &emsp;&emsp;&emsp;&nbsp;(iii) ST -Z, Rr
+                    Family: Data Transfer Instructions
+                    Function: Stores one byte from register Rr into data memory using indirection with Z as the pointer to the data memory cell. Can post-increment Z with the Z+ variant or can pre-decrement Z with the -Y variant.
+
+                    Boundaries:
+                    Rr → [R0 - R31]
+
+                    Operation Options:
+                    (i) &ensp;(Z) ← Rr
+                    (ii)&ensp;(Z) ← Rr, Z = Z + 1
+                    (iii) Z = Z - 1, (Z) ← Rr`,
+            'STD': `Syntax: (i) LDD Y+q, Rr
+                    &emsp;&emsp;&emsp;&ensp;(ii) LDD Z+q, Rr
+                    Family: Data Transfer Instructions
+                    Function: Uses the Y (or Z) word-register as a pointer to data memory and store the value of register Rr into address Y+q (or Z+q), using q as the displacement from Y (or Z). Y (or Z) is left unchanged after the operation.
+
+                    Boundaries:
+                    Rr → [R0 - R31]
+                    q → [0 - 63]
+
+                    Operation Options:
+                    (i)&ensp;(Y+q) ← Rr 
+                    (ii) (z+q) ← Rr `,
+            'STS': `Syntax: STS k, Rr
+                    Family: Data Transfer Instructions
+                    Function: Stores the value of register Rr indirectly into data memory using k as a pointer
+
+                    Boundaries:
+                    k → [0 - 65535]
+                    Rr → [R0 - R31]
+
+                    Operation:
+                    (k) ← Rr`,
+            'SUB': `Syntax: SUB Rd, Rr
+                    Family: Arithmetic Instructions
+                    Function: Subtracts one register from another
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+                    Rr → [R0 - R31]
+
+                    Operation:
+                    Rd = Rd - Rr`,
+            'SUBI': `Syntax:   SUBI Rd, K
+                    Family:   Arithmetic Instructions
+                    Function: Subtracts the constant K from the register Rd
+
+                    Boundaries:
+                    Rd → [R16 - R31]
+                    K  → [0 - 255]
+
+                    Operation:
+                    Rd = Rd - K`,
+            'SWAP': `Syntax:   SWAP Rd
+                    Family:   Bit & Bit Test Instructions
+                    Function: Swaps the high and low 4 bits in a register
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operations:
+                    Rd(7:4) = Rd(3:0)
+                    Rd(3:0) = Rd(7:4)
+
+                    Example:
+                    SWAP R20 (where R20 = 11110000 = 240)
+                    → R20 = 00001111 = 15`,
+            'TST': `Syntax:   TST Rd
+                    Family:   Logic Instructions
+                    Function: Tests if a register is zero or negative. Performs a logical AND between a register and itself. The register will remain unchanged.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operation:
+                    Rd = Rd • Rd`,
+            'XCH': `Syntax:   XCH Z, Rd
+                    Family:   Data Transfer Instructions
+                    Function: Exchanges one byte indirect between register and data space using Z as a pointer to the data memory cell
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operations:
+                    (Z) ← Rd
+                    Rd ← (Z)`
+        };
+
+        return popups;
+
     }
 
 }
