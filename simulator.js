@@ -3418,7 +3418,11 @@ class App {
                 popup_options = this.getPopups()['ST_Z'].split('\n');
             }
         } else {
-            popup_options = this.getPopups()[inst_mnemonic].split('\n');    // get the text for that instruction
+            if ( INST_LIST.includes(inst_mnemonic) ) {
+                popup_options = this.getPopups()[inst_mnemonic].split('\n'); // get the text for that instruction
+            } else {
+                popup_options = '';
+            }
         }
 
 
