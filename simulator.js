@@ -1,32 +1,24 @@
-
 class Token {
     constructor(type_, value = null) {
         this.type = type_;
         this.value = value;
     }
-
     getType() {
         return this.type;
     }
-
     getValue() {
         return this.value;
     }
-
     setType(type_) {
         this.type = type_;
     }
-
     setValue(value) {
         this.value = value;
     }
-
     toString() {
         return `${this.type}:${this.value}`;
     }
 }
-
-
 
 class Register {
     constructor(name, value = 0, changed = 0) {
@@ -34,60 +26,38 @@ class Register {
         this.value = value;
         this.changed = changed;
     }
-
     toString() {
         return `${this.name}: ${this.value}`
     }
-
     clearChange() {
         `To be done at the start of
         every new instruction.`
 
         this.changed = 0;
     }
-
     setChange() {
         this.changed = 1;
     }
-
     setValue(new_value) {
         this.value = ((new_value % 256) + 256) % 256;
         this.setChange();
     }
-
     getValue() {
         return this.value;
     }
-
     getBit(bit) {
         // returns the value of a bit in a number
         return ((this.getValue() >> bit) & 1);
-        
-        /*
-        
-        if ((this.getValue() & (2 ** bit)) !== 0) {
-            return 1;
-        }
-        return 0;
-
-        */
     }
-
     inc() {
         this.setValue(this.getValue() + 1);
     }
-
     dec() {
         this.setValue(this.getValue() - 1);
     }
-
-
 }
 
-
-
 class Argument {
-
     constructor(token_type, min_val = null, max_val = null, options_list = null, exact_value = null) {
         this.token_type = token_type; // the token you're expecting for the argument
         this.min_val = min_val; // the min value you're expecting for that token
@@ -95,12 +65,8 @@ class Argument {
         this.options_list = options_list;
         this.exact_value = exact_value;
     }
-
     isLegalToken(tok, line_num) {
-        /*
-         * Takes a token and checks if it matches with the argument.
-         */
-
+        // Takes a token and checks if it matches with the argument.
         const legal_token_types = this.getTokenType(); // the legal token types for this argument
 
         // CHECK IF IT'S A LEGAL ARGUMENT
@@ -112,16 +78,12 @@ class Argument {
                 this.newError(`Illegal token 'R${tok.getValue()}' on line ${line_num}.`);
             }
         }
-
         // CHECK ITS LEGAL TOKEN TYPE AND WITHIN THE LEGAL BOUNDS
         if (this.hasValueRange()) {
-
             let val = tok.getValue(); // value of the token
-
             if (tok.getType() === 'WORDPLUSQ') {
                 val = parseInt(val.substring(2)); // get rid of the Z+ or Y+ part
             }   
-
             if (tok.getType() !== 'REF' && !(this.getMinVal() <= val && val <= this.getMaxVal())) {
                 if (tok.getType() === 'REG') {
                     tok.setValue(`R${tok.getValue()}`); // set it to register
@@ -129,53 +91,41 @@ class Argument {
                 this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
             }
         }
-
         // CHECK ITS LEGAL TOKEN TYPE AND IN THE LEGAL LIST
         if (this.hasOptionsList() && !this.getOptionsList().includes(tok.getValue())) {
             if (tok.getType() !== 'INT') {
                 this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
             }
         }
-
         // CHECK ITS LEGAL TOKEN TYPE AND IN THE LEGAL LIST
         if (this.hasExactValue() && tok.getValue() !== this.getExactValue()) {
             this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
         }
-
     }
-
     getTokenType() {
         return this.token_type;
     }
-
     getMinVal() {
         return this.min_val;
     }
-
     getMaxVal() {
         return this.max_val;
     }
-
     getOptionsList() {
         return this.options_list;
     }
-
     getExactValue() {
         return this.exact_value;
     }
-
     hasValueRange() {
         return this.min_val !== null && this.max_val !== null;
     }
-
     hasOptionsList() {
         return this.options_list !== null;
     }
-
     hasExactValue() {
         return this.exact_value !== null;
     }
-
     newError(text) {
         document.getElementById('error').innerHTML = text;
         document.getElementById('output').innerHTML = null;
@@ -184,16 +134,12 @@ class Argument {
     }
 }
 
-
-
 class Instruction {
-
     constructor(tokens) {
         this.inst = tokens[0];
         this.args = tokens.slice(1);
         this.opcode = this.makeOpcode();
     }
-
     twosComp(number, digits) {
 
         if (number >= 0) {
@@ -208,38 +154,28 @@ class Instruction {
             b = b.slice(b.length - digits);
             return b;
         }
-
         // Add digits to the front if it's too short
         const zeros = digits - b.length;
         for (let i = 0; i < zeros; i++) {
             b = '1' + b;
         }
-
-
         return b;
     }
-
     binLenDigits(number, digits) {
-
         let b = number.toString(2);
-
         // Remove digits from the front if it's too long
         if (b.length >= digits) {
             b = b.slice(b.length - digits);
             return b;
         }
-
         // Add digits to the front if it's too short
         const zeros = digits - b.length;
         for (let i = 0; i < zeros; i++) {
             b = '0' + b;
         }
-
         return b;
     }
-
     countElements(string, symbol) {
-
         let count = 0;
         for (let i = 0; i < string.length; i++) {
             if (string[i] === symbol) {
@@ -248,50 +184,34 @@ class Instruction {
         }
         return count;
     }
-
     makeOpcode() {
-
         const inst = this.inst.getValue();
-
         const opcode_requirements = INST_OPCODES[inst];
-
         // If it's a simple opcode
         if (opcode_requirements !== null) {
-
             const arg_len = this.args.length;
-
             // Return the opcode if it's always the same opcode
             if (opcode_requirements.length === 1) {
                 return opcode_requirements[0];
             }
-
             // Get the opcode for use later
             let opcode = opcode_requirements[opcode_requirements.length - 1];
-
             // GO THROUGH EACH ARGUMENT AND SYMBOL ASSOCIATED WITH IT AND REPLACE THEM IN THE GIVEN OPCODE
             for (let arg_num = 0; arg_num < arg_len; arg_num++) {
-
                 const symbol = opcode_requirements[arg_num]; //  the symbol for replacing in the opcode e.g. 'd'
-
                 const digit_count = this.countElements(opcode, symbol); // number of digits the argument takes up in the opcode
-
                 if (digit_count === 0) { // skip if it's an argument that doesnt matter (like Z in XCH)
                     continue
                 }
-
                 const arg = this.args[arg_num].getValue(); // the argument value
-
                 let var_value;
-
                 // If it's a 2's comp value then make it 2's comp
                 if (['RJMP'].concat(INST_LIST.slice(7, 27)).includes(this.inst.getValue())) {
                     var_value = this.twosComp(arg, digit_count);
                 }
-
                 else if (FUNCTIONS.includes(arg)) {
                     var_value = '1111111111111111111111';
                 }
-
                 // Otherwise just make it regular binary
                 else {
                     var_value = this.binLenDigits(arg, digit_count);
@@ -455,8 +375,6 @@ class Instruction {
 
 }
 
-
-
 class Lexer {
     constructor() {
     }
@@ -481,7 +399,7 @@ class Lexer {
         const patterns = [
             [/^;.*/, null],                      // comments
             [/^\s+/, null],                      // whitespace
-            [/^[\w_]{1}.*:/, 'LABEL'],           // labels
+            [/^[\w_]{1}[^;]*:/, 'LABEL'],        // labels
             [/^lo8|^LO8/, 'LO8'],                // lo8
             [/^hi8|^HI8/, 'HI8'],                // hi8
             [/^[rR]\d+/, 'REG'],                 // registers
@@ -595,8 +513,6 @@ class Lexer {
     }
 
 }
-
-
 
 class Parser {
     constructor() {
@@ -1299,7 +1215,6 @@ class Parser {
     }
 
 }
-
 
 // Also called simulator
 class Interpreter {
@@ -2597,13 +2512,9 @@ class Interpreter {
 
 }
 
-
-
 FUNCTIONS = [
     'printf'
 ];
-
-
 
 INST_LIST = [
     'ADC',
@@ -2705,7 +2616,6 @@ INST_LIST = [
     'TST',
     'XCH'
 ];
-
 
 const reg_0_31 = new Argument('REG', 0, 31);
 const reg_16_31 = new Argument('REG', 16, 31);
@@ -2820,7 +2730,6 @@ INST_OPERANDS = {
     'XCH': [new Argument('WORD', null, null, null, 'Z'), reg_0_31]
 }
 
-
 // Most op codes can be easily obtained from this
 INST_OPCODES = {
     'ADC': ['d', 'r', '000111rdddddrrrr'],
@@ -2923,8 +2832,6 @@ INST_OPCODES = {
     'XCH': ['Z', 'd', '1001001ddddd0100']
 }
 
-
-
 DIRECTIVES = [
     '.section',
     '.end',
@@ -2938,8 +2845,6 @@ DIRECTIVES = [
     '.space',
     '.def'
 ];
-
-
 
 class App {
     constructor() {
@@ -4460,8 +4365,6 @@ class App {
     }
 
 }
-
-
 
 app = new App();
 
