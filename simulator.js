@@ -749,8 +749,11 @@ class Parser {
                     if (current_tok.getType() !== 'INT') { // expecting integer
                         this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
-
+                    if (current_tok.getValue() < 0) {                               // JS has weird behaviour for -n % m so we need to correct for it
+                        this.dmem.push(0x100 + (current_tok.getValue() % 0x100));   // fix then add to data
+                    } else {
                     this.dmem.push(current_tok.getValue() % 0x100); // add to data
+                    }
                 }
 
                 // String, Ascii, Asciz directives
