@@ -547,11 +547,12 @@ class Parser {
 
         this.parse();
 
-        // FILLING IN DMEM AND PMEM WITH 0/NOP
+        // FILLING IN DMEM WITH 0s
         for (let i = this.dmem.length; i < (this.ramend + 1); i++) {
             this.dmem.push(0);
         }
 
+        // FILLING IN PMEM WITH NOP INSTRUCTIONS
         for (let i = this.pmem.length; i < (this.flashend + 1); i++) {
             this.pmem.push(new Instruction([new Token('INST', 'NOP')]));
         }
@@ -749,7 +750,7 @@ class Parser {
                         this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
 
-                    this.dmem.push(current_tok.getValue()); // add to data
+                    this.dmem.push(current_tok.getValue() % 0x100); // add to data
                 }
 
                 // String, Ascii, Asciz directives
@@ -812,11 +813,11 @@ class Parser {
                             this.newError(`Bad character \'${char}\' on line ${line_in_file}.`);
                         }
 
-                        this.dmem.push(char_ascii_value);                 // add to data
+                        this.dmem.push(char_ascii_value % 0x100);           // add to data
                     }
 
-                    if (['.string', '.asciz'].includes(line_directive)) {  // add NULL if directive requires it
-                        this.dmem.push(0);                                // add NULL to data
+                    if (['.string', '.asciz'].includes(line_directive)) {   // add NULL if directive requires it
+                        this.dmem.push(0);                                  // add NULL to data
                     }
 
                 }
@@ -853,7 +854,7 @@ class Parser {
                         const space_value = current_tok.getValue();             // value of the spaces
                         const number_of_spaces = line[tok_num - 2].getValue();  // the number of spaces we're making
                         for (let i = 0; i < number_of_spaces; i++) {
-                            this.dmem.push(space_value);                      // add the value for as many spaces as needed
+                            this.dmem.push(space_value % 0x100);                // add the value for as many spaces as needed
                         }
                     }
 
