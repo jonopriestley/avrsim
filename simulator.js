@@ -1284,6 +1284,8 @@ class Interpreter {
         const inst = line.getInst().getValue();
         const line_in_file = this.line_numbers[this.getPC()];
 
+        let skip_inc = false;
+
         let Rd, Rr, R, K, k, b, s, A, q, w, T, H, V, N, Z, C;    // declaring all the variable names
 
         // Big switch statement
@@ -1404,122 +1406,142 @@ class Interpreter {
                 s = this.getArgumentValue(line, 0);
                 if (1 - ((this.getSREG() >> s) & 1)) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRBS':
                 s = this.getArgumentValue(line, 0);
                 if ((this.getSREG() >> s) & 1) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRCC':
                 if (1 - (this.getSREG() & 1)) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRCS':
                 if (this.getSREG() & 1) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BREQ':
                 if ((this.getSREG() >> 1) & 1) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRGE':
                 if (1 - ((this.getSREG() >> 4) & 1)) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRHC':
                 if (1 - ((this.getSREG() >> 5) & 1)) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRHS':
                 if ((this.getSREG() >> 5) & 1) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRID':
                 if (1 - ((this.getSREG() >> 7) & 1)) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRIE':
                 if ((this.getSREG() >> 7) & 1) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRLO':
                 if (this.getSREG() & 1) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRLT':
                 if ((this.getSREG() >> 4) & 1) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRMI':
                 if ((this.getSREG() >> 2) & 1) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRNE':
                 if (1 - ((this.getSREG() >> 1) & 1)) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRPL':
                 if (1 - ((this.getSREG() >> 2) & 1)) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRSH':
                 if (1 - (this.getSREG() & 1)) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRTC':
                 if (1 - ((this.getSREG() >> 6) & 1)) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRTS':
                 if ((this.getSREG() >> 6) & 1) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRVC':
                 if (1 - ((this.getSREG() >> 3) & 1)) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BRVS':
                 if ((this.getSREG() >> 3) & 1) {
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
                 }
                 break;
             case 'BSET':
@@ -1548,7 +1570,8 @@ class Interpreter {
                     this.decSP();
 
                     k = this.getArgumentValue(line, 0);
-                    this.setPC(k - 1);
+                    this.setPC(k);
+                    skip_inc = true;
                     break;
                 }
 
@@ -1787,7 +1810,8 @@ class Interpreter {
                 break;
             case 'JMP':
                 k = this.getArgumentValue(line, 0);
-                this.setPC(k - 1);
+                this.setPC(k);
+                skip_inc = true;
                 break;
             case 'LD':
                 w = line.getArgs()[1].getValue();
@@ -1988,7 +2012,8 @@ class Interpreter {
                 break;
             case 'RJMP':
                 k = this.getArgumentValue(line, 0);
-                this.setPC(this.getPC() + k);
+                this.setPC(this.getPC() + k + 1);
+                skip_inc = true;
                 break;
             case 'RET':
                 if (this.getSP() == this.ramend) {
@@ -2007,7 +2032,8 @@ class Interpreter {
                 let ret_line = (0x100 * this.getDMEM()[this.getSP()]); // get the ret high value
                 this.incSP();
                 ret_line += this.getDMEM()[this.getSP()]; // add the ret low value to the ret high value
-                this.setPC(ret_line - 1); // -1 to counteract the increment at the end of the switch statement
+                this.setPC(ret_line);
+                skip_inc = true;
                 break;
             case 'ROL':
                 Rd = this.getArgumentValue(line, 0);
@@ -2299,8 +2325,10 @@ class Interpreter {
                 break;
         }
 
-        this.incPC(); // almost every instruction does this, so its easier to counterract it if you don't want to do exactly that
-        
+        if (skip_inc === false) { // almost every instruction does this, so its easier to counterract it if you don't want to do exactly that
+            this.incPC(); 
+        }
+
         this.step_count += 1 // count the number of steps to prevent infinite loops
 
         // If the number of steps is too large, terminate running the code
