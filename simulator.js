@@ -3270,12 +3270,12 @@ class App {
     changeBase() {
         if (this.base === 16) {
             this.base = 10;
-            document.getElementById('button_base').innerHTML = 'Base 16';
+            document.getElementById('button_base').innerHTML = 'Currently: Base 10';
         }
 
         else {
             this.base = 16;
-            document.getElementById('button_base').innerHTML = 'Base 10';
+            document.getElementById('button_base').innerHTML = 'Currently: Base 16';
         }
 
         this.populateAll();
