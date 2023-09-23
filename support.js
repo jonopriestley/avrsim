@@ -17,11 +17,10 @@ code_box.addEventListener('keydown', event => {
       event.preventDefault();
     }
     
-
 }
 );
 
-// Let tab be '\t' instead of move to next element
+// Make the line numbers on keyup
 code_box.addEventListener('keyup', event => {
   // count lines and make the line counter display that many lines
   const line_count = code_box.value.split('\n').length;
@@ -35,8 +34,7 @@ code_box.addEventListener('keyup', event => {
 );
 
 
-
-// Let tab be '\t' instead of move to next element
+// Scroll both boxes
 code_box.addEventListener('scroll', event => {
   
   const lines_box = document.getElementById('lines_box');

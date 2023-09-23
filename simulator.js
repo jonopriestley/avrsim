@@ -244,7 +244,7 @@ class Instruction {
         } else if (inst === 'LD') {
             d = this.binLenDigits(this.args[0].getValue(), 5);
             w = this.args[1].getValue();
-            if (w == 'X') {
+            if (w === 'X') {
                 return `1001000${d}1100`;
             } else if (w === 'X+') {
                 return `1001000${d}1101`;
@@ -289,7 +289,7 @@ class Instruction {
         } else if (inst === 'ST') {
             r = this.binLenDigits(this.args[0].getValue(), 5);
             w = this.args[1].getValue();
-            if (w == 'X') {
+            if (w === 'X') {
                 return `1001001${r}1100`;
             } else if (w === 'X+') {
                 return `1001001${r}1101`;
@@ -873,7 +873,7 @@ class Parser {
                     }
 
                     // if it's the 3rd last argument (expecting REF)
-                    if ((tok_num + 3) == line_length && current_tok.getType() !== 'REF') {
+                    if ((tok_num + 3) === line_length && current_tok.getType() !== 'REF') {
                         this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`)
                     }
 
@@ -883,7 +883,7 @@ class Parser {
                     }
 
                     // If it's the last token (expecting REG)
-                    else if ((tok_num + 1) == line_length) {
+                    else if ((tok_num + 1) === line_length) {
 
                         if (current_tok.getType() !== 'REG') {
                             this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`);
@@ -1132,7 +1132,7 @@ class Parser {
 
             let line = this.pmem[line_num];                     // the line up to
 
-            if (line == null) {                               // skip over none lines
+            if (line === null) {                               // skip over none lines
                 continue
             }
 
@@ -2016,7 +2016,7 @@ class Interpreter {
                 skip_inc = true;
                 break;
             case 'RET':
-                if (this.getSP() == this.ramend) {
+                if (this.getSP() === this.ramend) {
                     this.finished = true;
                     console.log(`Number of steps taken: ${this.step_count + 1}`);
                     return;
@@ -2878,6 +2878,34 @@ DIRECTIVES = [
     '.def'
 ];
 
+
+// ###################################################################################################################
+// # AN EASTER EGG - POEM                                                                                            #
+// ###################################################################################################################
+
+/*
+O that you would know my heart,
+Your ways, greater than my own,
+To you I give my every hour,
+Just to you and you alone.
+
+O that you would see my eyes,
+Looking only at your shape,
+Spending time in your presence,
+Looking at you for escape.
+
+O that you would know my mind,
+Long I strive to let you see,
+Night and day I work for you,
+Just for you, not you for me.
+
+O that you would see my hands,
+Patiently they labour strong,
+Intro to Computer Systems,
+Man, you're tough and very long.
+*/
+
+
 class App {
     constructor() {
         this.pmem_top = 0;
@@ -2900,6 +2928,8 @@ class App {
 
         // Getting text from the text window
         let txt = document.getElementById('code_box').value;
+
+        this.hideOpenPopup(this.current_popup); // hide any open popup
 
         if (txt.length > 0) {
 
@@ -2929,6 +2959,9 @@ class App {
     }
 
     step() {
+
+        this.hideOpenPopup(this.current_popup); // hide any open popup
+        
         for (let i = 0; i < 32; i++) {
             this.interpreter.getDMEM()[i].clearChange();    // set changed = 0 for all registers
         }
@@ -2955,6 +2988,9 @@ class App {
     }
 
     run() {
+
+        this.hideOpenPopup(this.current_popup); // hide any open popup
+
         for (let i = 0; i < 32; i++) {
             this.interpreter.getDMEM()[i].clearChange();    // set changed = 0 for all registers
         }
@@ -3212,6 +3248,9 @@ class App {
     }
 
     displayPMEMUp() {
+
+        this.hideOpenPopup(this.current_popup); // hide any open popup
+
         if (this.pmem_top >= 8) {
             this.pmem_top -= 8;
             this.populatePMEM(this.pmem_top);
@@ -3219,6 +3258,9 @@ class App {
     }
 
     displayPMEMDown() {
+        
+        this.hideOpenPopup(this.current_popup); // hide any open popup
+
         if (this.pmem_top <= (this.parser.flashend - 8)) {
             this.pmem_top += 8;
             this.populatePMEM(this.pmem_top);
@@ -3226,6 +3268,9 @@ class App {
     }
 
     displayDMEMUp() {
+
+        this.hideOpenPopup(this.current_popup); // hide any open popup
+
         if (this.dmem_top >= 0x140) {
             this.dmem_top -= 0x40;
             this.populateDMEM(this.dmem_top);
@@ -3233,6 +3278,9 @@ class App {
     }
 
     displayDMEMDown() {
+
+        this.hideOpenPopup(this.current_popup); // hide any open popup
+
         if (this.dmem_top <= (this.parser.ramend - 0x40)) {
             this.dmem_top += 0x40;
             this.populateDMEM(this.dmem_top);
@@ -3240,11 +3288,13 @@ class App {
     }
 
     displayDMEMTop() {
+        this.hideOpenPopup(this.current_popup); // hide any open popup
         this.dmem_top = 0x100;
         this.populateDMEM(this.dmem_top);
     }
 
     displayDMEMBottom() {
+        this.hideOpenPopup(this.current_popup); // hide any open popup
         this.dmem_top = (this.parser.ramend - 0x3f);
         this.populateDMEM(this.dmem_top);
     }
@@ -3268,6 +3318,9 @@ class App {
     }
 
     changeBase() {
+
+        this.hideOpenPopup(this.current_popup); // hide any open popup
+
         if (this.base === 16) {
             this.base = 10;
             document.getElementById('button_base').innerHTML = 'Currently: Base 10';
@@ -3282,6 +3335,7 @@ class App {
     }
 
     toggleOpcodeDisplay() {
+        this.hideOpenPopup(this.current_popup); // hide any open popup
         this.display_opcode = !(this.display_opcode);
         if (this.display_opcode) {
             document.getElementById('button-opcode').innerHTML = 'Opcode Off';
@@ -3292,44 +3346,73 @@ class App {
     }
 
     clearConsole() {
+        this.hideOpenPopup(this.current_popup); // hide any open popup
         document.getElementById('console').innerHTML = '';
     }
 
-    togglePopup(row_num) {
-        if ( (this.current_popup !== null) && (this.current_popup !== row_num) ) {
+    togglePopup(name) {
+        // Remove any open popups 
+        if ( (this.current_popup !== null) && (this.current_popup !== name) ) {
             this.hideOpenPopup(this.current_popup);
         }
 
-        const popup = document.getElementById(`popup-${row_num}`);
-        const inst = document.getElementById(`pmem-line-${row_num}`).innerHTML;
-        if (inst !== 'None') {
-            popup.classList.toggle("show");
+        const popup = document.getElementById(`popup-${name}`);
+
+        let inst = null;
+
+        if (!['PC', 'SP', 'X', 'Y', 'Z'].includes(name)) {
+            inst = document.getElementById(`pmem-line-${name}`).innerHTML;
         }
 
-        // If you're openning a new popup set it as the current popup and fill it
-        if ( this.current_popup !== row_num && inst !== 'None' ) {
-            this.current_popup = row_num;
+        if (inst === 'None') {
+            return
+        }
+
+        popup.classList.toggle("show");
+
+        // If you're opening a new popup set it as the current popup and fill it
+        if ( this.current_popup !== name) {
+            this.current_popup = name;
             this.fillPopup();
         }
+        // Else set the popup to null since you've closed an already open popup
         else {
             this.current_popup = null;
         }
     }
 
-    hideOpenPopup(row_num) {
-        const popup = document.getElementById(`popup-${row_num}`);
-        popup.classList.toggle("show");
+    hideOpenPopup(name) {
+        if (this.current_popup !== null) {
+            const popup = document.getElementById(`popup-${name}`);
+            popup.classList.toggle("show", false);
+        }
     }
 
     fillPopup() {
+        // Do nothing for closed popups
         if (this.current_popup === null) {
             return;
         }
-        const popup = document.getElementById(`popup-${this.current_popup}`);
-        const inst = document.getElementById(`pmem-line-${this.current_popup}`).innerHTML;
-        popup.innerHTML = `${inst}<br><br>`;
 
-        const inst_mnemonic = inst.split(' ')[0];   // e.g. LDI, ASR, MOV.
+        const popup = document.getElementById(`popup-${this.current_popup}`);
+
+        // Make adjustments for PMEM popups
+        let inst = null;
+        if (!['PC', 'SP', 'X', 'Y', 'Z'].includes(this.current_popup)) {
+            inst = document.getElementById(`pmem-line-${this.current_popup}`).innerHTML;
+            popup.innerHTML = `${inst}<br><br>`;
+        } else {
+            popup.innerHTML = '';
+        }
+
+        // Get the instruction mnemonic if it's a PMEM popup 
+        let inst_mnemonic;
+        if (inst !== null) {
+            inst_mnemonic = inst.split(' ')[0];   // e.g. LDI, ASR, MOV.
+        } else {
+            inst_mnemonic = this.current_popup;
+        }
+
         let popup_options;                          // the lines for that given popup
 
         if (inst_mnemonic === 'LD') {
@@ -3355,7 +3438,7 @@ class App {
                 popup_options = this.getPopups()['ST_Z'].split('\n');
             }
         } else {
-            if ( INST_LIST.includes(inst_mnemonic) ) {
+            if ( INST_LIST.includes(inst_mnemonic) ||  ['PC', 'SP', 'X', 'Y', 'Z'].includes(inst_mnemonic)) {
                 popup_options = this.getPopups()[inst_mnemonic].split('\n'); // get the text for that instruction
             } else {
                 popup_options = '';
@@ -4389,7 +4472,22 @@ class App {
 
                     Operations:
                     (Z) ← Rd
-                    Rd ← (Z)`
+                    Rd ← (Z)`,
+            'PC':  `Program Counter
+
+                    The purpose of the program counter is to store what line of the PMEM to execute next. The line number will be highlighted in blue to help show what line.`,
+            'SP':  `Stack Pointer
+
+                    The purpose of the stack pointer is to store the location of the top of the stack. In AVR the stack pointer points to the line above the top value on the stack.`,
+            'X':   `Definition: X means R27:R26 (two registers read as one 2 byte number)
+                    Calculation: Value of X = (R27 * 256) + R26
+                    Purpose: X is used to store the 2 byte address of a cell in DMEM. It is used in load and store instructions as a pointer to the relevant cell.`,
+            'Y':   `Definition: Y means R29:R28 (two registers read as one 2 byte number)
+                    Calculation: Value of Y = (R29 * 256) + R28
+                    Purpose: Y is used to store the 2 byte address of a cell in DMEM. It is used in load and store instructions as a pointer to the relevant cell.`,
+            'Z':   `Definition: Z means R31:R30 (two registers read as one 2 byte number)
+                    Calculation: Value of Z = (R31 * 256) + R30
+                    Purpose: Z is used to store the 2 byte address of a cell in DMEM. It is used in load and store instructions as a pointer to the relevant cell.`,
         };
 
         return popups;
@@ -4399,4 +4497,13 @@ class App {
 }
 
 app = new App();
+
+
+
+
+// TODO
+// Add popups for X Y Z
+// Remove popups when clicking another button
+// Make side scroll for text box
+// Make left and right side size changeable
 
