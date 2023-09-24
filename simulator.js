@@ -4480,13 +4480,19 @@ class App {
 
                     The purpose of the stack pointer is to store the location of the top of the stack. In AVR the stack pointer points to the line above the top value on the stack.`,
             'X':   `Definition: X means R27:R26 (two registers read as one 2 byte number)
+                    
                     Calculation: Value of X = (R27 * 256) + R26
+                    
                     Purpose: X is used to store the 2 byte address of a cell in DMEM. It is used in load and store instructions as a pointer to the relevant cell.`,
             'Y':   `Definition: Y means R29:R28 (two registers read as one 2 byte number)
+                    
                     Calculation: Value of Y = (R29 * 256) + R28
+                    
                     Purpose: Y is used to store the 2 byte address of a cell in DMEM. It is used in load and store instructions as a pointer to the relevant cell.`,
             'Z':   `Definition: Z means R31:R30 (two registers read as one 2 byte number)
+                    
                     Calculation: Value of Z = (R31 * 256) + R30
+                    
                     Purpose: Z is used to store the 2 byte address of a cell in DMEM. It is used in load and store instructions as a pointer to the relevant cell.`,
         };
 
