@@ -4508,8 +4508,7 @@ app = new App();
 
 
 // TODO
-// Add popups for X Y Z
-// Remove popups when clicking another button
 // Make side scroll for text box
 // Make left and right side size changeable
+// Make code error when before first label
 

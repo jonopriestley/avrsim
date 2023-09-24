@@ -199,6 +199,11 @@ textarea {
     border: 1px solid #c0c0c0;
 }
 
+.button-guide {
+    padding: 8px 15px;
+    float: right;
+}
+
 .button-assemble {
     padding: 15px 15px;
 }
