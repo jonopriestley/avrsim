@@ -24,6 +24,7 @@ class Register {
     constructor(name, value = 0, changed = 0) {
         this.name = name;
         this.value = value;
+        this.last_value = value;
         this.changed = changed;
     }
     toString() {
@@ -38,16 +39,30 @@ class Register {
     setChange() {
         this.changed = 1;
     }
+    getChange() {
+        return this.changed;
+    }
     setValue(new_value) {
+        this.last_value = this.value;
         this.value = ((new_value % 256) + 256) % 256;
+        console.log(this.name);
+        console.log(this.last_value);
+        console.log(this.value);
         this.setChange();
     }
     getValue() {
         return this.value;
     }
+    getLastValue() {
+        return this.last_value;
+    }
     getBit(bit) {
         // returns the value of a bit in a number
         return ((this.getValue() >> bit) & 1);
+    }
+    getLastBit(bit) {
+        // returns the value of a bit in a number
+        return ((this.getLastValue() >> bit) & 1);
     }
     inc() {
         this.setValue(this.getValue() + 1);
@@ -93,7 +108,10 @@ class Argument {
         }
         // CHECK ITS LEGAL TOKEN TYPE AND IN THE LEGAL LIST
         if (this.hasOptionsList() && !this.getOptionsList().includes(tok.getValue())) {
-            if (tok.getType() !== 'INT') {
+            if (tok.getType() === 'REG') {
+                this.newError(`Illegal argument 'R${tok.getValue()}' on line ${line_num}.`);
+            }
+            else if (tok.getType() !== 'INT') {
                 this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
             }
         }
@@ -1309,12 +1327,7 @@ class Interpreter {
                 V = (this.getBit(Rd, 7) & this.getBit(Rr, 7) & (1 - this.getBit(R, 7))) | ((1 - this.getBit(Rd, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(R, 7));
                 N = this.getBit(R, 7);
                 C = (this.getBit(Rd, 7) & this.getBit(Rr, 7)) | (this.getBit(Rr, 7) & (1 - this.getBit(R, 7))) | (this.getBit(Rd, 7) & (1 - this.getBit(R, 7)));
-                this.updateSREGBit(H, 5);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit(C, 0);
+                this.updateSREG(null, null, H, N ^ V, V, N, (R === 0), C);
                 break;
             case 'ADD':
                 Rd = this.getArgumentValue(line, 0);
@@ -1327,12 +1340,7 @@ class Interpreter {
                 V = (this.getBit(Rd, 7) & this.getBit(Rr, 7) & (1 - this.getBit(R, 7))) | ((1 - this.getBit(Rd, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(R, 7));
                 N = this.getBit(R, 7);
                 C = (this.getBit(Rd, 7) & this.getBit(Rr, 7)) | (this.getBit(Rr, 7) & (1 - this.getBit(R, 7))) | (this.getBit(Rd, 7) & (1 - this.getBit(R, 7)));
-                this.updateSREGBit(H, 5);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit(C, 0);
+                this.updateSREG(null, null, H, N ^ V, V, N, (R === 0), C);
                 break;
             case 'ADIW':
                 Rd = this.getArgumentValue(line, 0);
@@ -1344,6 +1352,13 @@ class Interpreter {
                     R = Rd + K;
                 }
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
+
+                R = this.getDMEM()[line.getArgs()[0].getValue()] + (0x100 * this.getDMEM()[line.getArgs()[0].getValue() + 1]);
+                
+                V = ((R - K) <= 0x7fff) && ((R >> 15) & 1);
+                N = (R > 0x7fff);
+                C = (R <= 0x7fff) && ((R - K) < 0);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), C);
                 break;
             case 'AND':
                 Rd = this.getArgumentValue(line, 0);
@@ -1354,10 +1369,7 @@ class Interpreter {
 
                 V = 0;
                 N = this.getBit(R, 7);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), null);
                 break;
             case 'ANDI':
                 Rd = this.getArgumentValue(line, 0);
@@ -1368,10 +1380,7 @@ class Interpreter {
 
                 V = 0;
                 N = this.getBit(R, 7);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), null);
                 break;
             case 'ASR':
                 Rd = this.getArgumentValue(line, 0);
@@ -1385,11 +1394,7 @@ class Interpreter {
                 N = this.getBit(R, 7);
                 C = Rd & 1;
                 V = N ^ C;
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit(C, 0);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), C);
                 break;
             case 'BCLR':
                 s = this.getArgumentValue(line, 0);
@@ -1650,10 +1655,7 @@ class Interpreter {
 
                 V = 0;
                 N = this.getBit(R, 7);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), null);
                 break;
             case 'CLC':
                 this.updateSREGBit(0, 0);
@@ -1669,10 +1671,7 @@ class Interpreter {
                 break;
             case 'CLR':
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(0);   // Rd <-- 0
-                this.updateSREGBit(0, 4);
-                this.updateSREGBit(0, 3);
-                this.updateSREGBit(0, 2);
-                this.updateSREGBit(1, 1);
+                this.updateSREG(null, null, null, 0, 0, 0, 1, null);
                 break;
             case 'CLS':
                 this.updateSREGBit(0, 4);
@@ -1694,11 +1693,7 @@ class Interpreter {
 
                 V = 0;
                 N = this.getBit(R, 7);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit(1, 0);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), 1);
                 break;
             case 'CP':
                 Rd = this.getArgumentValue(line, 0);
@@ -1709,12 +1704,7 @@ class Interpreter {
                 V = (this.getBit(R, 7) & this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | ((1 - this.getBit(R, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(Rd, 7));
                 N = this.getBit(R, 7);
                 C = (this.getBit(R, 7) & this.getBit(Rr, 7)) | (this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | (this.getBit(R, 7) & (1 - this.getBit(Rd, 7)));
-                this.updateSREGBit(H, 5);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit(C, 0);
+                this.updateSREG(null, null, H, N ^ V, V, N, (R === 0), C);
                 break;
             case 'CPC':
                 Rd = this.getArgumentValue(line, 0);
@@ -1727,12 +1717,7 @@ class Interpreter {
                 Z = (R === 0) & ((this.getSREG() >> 1) & 1);
                 N = this.getBit(R, 7);
                 C = (this.getBit(R, 7) & this.getBit(Rr, 7)) | (this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | (this.getBit(R, 7) & (1 - this.getBit(Rd, 7)));
-                this.updateSREGBit(H, 5);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit(Z, 1);
-                this.updateSREGBit(C, 0);
+                this.updateSREG(null, null, H, N ^ V, V, N, Z, C);
                 break;
             case 'CPI':
                 Rd = this.getArgumentValue(line, 0);
@@ -1743,12 +1728,7 @@ class Interpreter {
                 V = (this.getBit(R, 7) & this.getBit(K, 7) & (1 - this.getBit(Rd, 7))) | ((1 - this.getBit(R, 7)) & (1 - this.getBit(K, 7)) & this.getBit(Rd, 7));
                 N = this.getBit(R, 7);
                 C = (this.getBit(R, 7) & this.getBit(K, 7)) | (this.getBit(K, 7) & (1 - this.getBit(Rd, 7))) | (this.getBit(R, 7) & (1 - this.getBit(Rd, 7)));
-                this.updateSREGBit(H, 5);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit(C, 0);
+                this.updateSREG(null, null, H, N ^ V, V, N, (R === 0), C);
                 break;
             case 'CPSE':
                 Rd = this.getArgumentValue(line, 0);
@@ -1775,10 +1755,7 @@ class Interpreter {
 
                 V = (R === 127);
                 N = this.getBit(R, 7);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), null);
                 break;
             case 'EOR':
                 Rd = this.getArgumentValue(line, 0);
@@ -1789,10 +1766,7 @@ class Interpreter {
 
                 V = 0;
                 N = this.getBit(R, 7);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), null);
                 break;
             case 'IN':
                 Rd = this.getArgumentValue(line, 0);
@@ -1809,10 +1783,7 @@ class Interpreter {
 
                 V = (R === 128);
                 N = this.getBit(R, 7);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), null);
                 break;
             case 'JMP':
                 k = this.getArgumentValue(line, 0);
@@ -1882,12 +1853,7 @@ class Interpreter {
                 N = this.getBit(R, 7);
                 C = this.getBit(Rd, 7);
                 V = N ^ C;
-                this.updateSREGBit(H, 5);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit(C, 0);
+                this.updateSREG(null, null, H, N ^ V, V, N, (R === 0), C);
                 break;
             case 'LSR':
                 Rd = this.getArgumentValue(line, 0);
@@ -1897,11 +1863,7 @@ class Interpreter {
                 N = 0;
                 C = Rd & 1;
                 V = N ^ C;
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit(C, 0);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), C);
                 break;
             case 'MOV':
                 Rr = this.getArgumentValue(line, 1);
@@ -1921,8 +1883,7 @@ class Interpreter {
                 this.getDMEM()[0].setValue(R % 256);
                 this.getDMEM()[1].setValue((R - (R % 256)) / 256);
 
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit((R >> 15) & 1, 0);
+                this.updateSREG(null, null, null, null, null, null, (R === 0), (R >> 15) & 1);
                 break;
             case 'MULS':
                 Rd = this.getArgumentValue(line, 0);
@@ -1932,8 +1893,7 @@ class Interpreter {
                 this.getDMEM()[0].setValue(R % 256);
                 this.getDMEM()[1].setValue((R - (R % 256)) / 256);
 
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit((R >> 15) & 1, 0);
+                this.updateSREG(null, null, null, null, null, null, (R === 0), (R >> 15) & 1);
                 break;
             case 'MULSU':
                 Rd = this.getArgumentValue(line, 0);
@@ -1943,8 +1903,7 @@ class Interpreter {
                 this.getDMEM()[0].setValue(R % 256);
                 this.getDMEM()[1].setValue((R - (R % 256)) / 256);
 
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit((R >> 15) & 1, 0);
+                this.updateSREG(null, null, null, null, null, null, (R === 0), (R >> 15) & 1);
                 break;
             case 'NEG':
                 Rd = this.getArgumentValue(line, 0);
@@ -1955,12 +1914,7 @@ class Interpreter {
                 H = this.getBit(R, 3) | (1 - this.getBit(Rd, 3));
                 V = (R === 128);
                 N = this.getBit(R, 7);
-                this.updateSREGBit(H, 5);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit((R !== 0), 1);
+                this.updateSREG(null, null, H, N ^ V, V, N, (R === 0), (R !== 0));
                 break;
             case 'NOP':
                 break;
@@ -1973,10 +1927,7 @@ class Interpreter {
 
                 V = 0;
                 N = this.getBit(R, 7);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), null);
                 break;
             case 'ORI':
                 Rd = this.getArgumentValue(line, 0);
@@ -1987,10 +1938,7 @@ class Interpreter {
 
                 V = 0;
                 N = this.getBit(R, 7);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), null);
                 break;
             case 'OUT':
                 A = this.getArgumentValue(line, 0);
@@ -2043,34 +1991,28 @@ class Interpreter {
                 break;
             case 'ROL':
                 Rd = this.getArgumentValue(line, 0);
-                C = (Rd >> 7) & 1;
+                C = this.getSREG() & 1;
                 R = ((Rd << 1) & 0xff) + C;
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
 
                 H = this.getBit(Rd, 3);
                 N = this.getBit(R, 7);
+                C = (Rd >> 7) & 1;
                 V = N ^ C;
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit(C, 0);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), C);
                 break;
             case 'ROR':
                 Rd = this.getArgumentValue(line, 0);
-                C = Rd & 1;
+                C = this.getSREG() & 1;
                 R = ((Rd >> 1) & 0xff) + (128 * C);
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
 
                 N = this.getBit(R, 7);
+                C = Rd & 1;
                 V = N ^ C;
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit(C, 0);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), C);
                 break;
             case 'SBC':
                 Rd = this.getArgumentValue(line, 0);
@@ -2085,12 +2027,7 @@ class Interpreter {
                 N = this.getBit(R, 7);
                 Z = (R === 0) & ((this.getSREG() >> 1) & 1);
                 C = (this.getBit(R, 7) & this.getBit(Rr, 7)) | (this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | (this.getBit(R, 7) & (1 - this.getBit(Rd, 7)));
-                this.updateSREGBit(H, 5);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit(Z, 1);
-                this.updateSREGBit(C, 0);
+                this.updateSREG(null, null, H, N ^ V, V, N, Z, C);
                 break;
             case 'SBCI':
                 Rd = this.getArgumentValue(line, 0);
@@ -2105,12 +2042,7 @@ class Interpreter {
                 N = this.getBit(R, 7);
                 Z = (R === 0) & ((this.getSREG() >> 1) & 1);
                 C = (this.getBit(R, 7) & this.getBit(K, 7)) | (this.getBit(K, 7) & (1 - this.getBit(Rd, 7))) | (this.getBit(R, 7) & (1 - this.getBit(Rd, 7)));
-                this.updateSREGBit(H, 5);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit(Z, 1);
-                this.updateSREGBit(C, 0);
+                this.updateSREG(null, null, H, N ^ V, V, N, Z, C);
                 break;
             case 'SBI':
                 A = this.getArgumentValue(line, 0);
@@ -2128,6 +2060,13 @@ class Interpreter {
                     R = Rd - K;
                 }
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
+
+                R = this.getDMEM()[line.getArgs()[0].getValue()] + (0x100 * this.getDMEM()[line.getArgs()[0].getValue() + 1]);
+                
+                V = ((R - K) <= 0x7fff) && ((R >> 15) & 1);
+                N = (R > 0x7fff);
+                C = V;
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), C);
                 break;
             case 'SBR':
                 Rd = this.getArgumentValue(line, 0);
@@ -2138,10 +2077,7 @@ class Interpreter {
 
                 V = 0;
                 N = this.getBit(R, 7);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), null);
                 break;
             case 'SBRC':
                 Rd = this.getArgumentValue(line, 0);
@@ -2273,12 +2209,7 @@ class Interpreter {
                 V = (this.getBit(R, 7) & this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | ((1 - this.getBit(R, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(Rd, 7));
                 N = this.getBit(R, 7);
                 C = (this.getBit(R, 7) & this.getBit(Rr, 7)) | (this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | (this.getBit(R, 7) & (1 - this.getBit(Rd, 7)));
-                this.updateSREGBit(H, 5);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit(C, 0);
+                this.updateSREG(null, null, H, N ^ V, V, N, (R === 0), C);
                 break;
             case 'SUBI':
                 Rd = this.getArgumentValue(line, 0);
@@ -2291,12 +2222,7 @@ class Interpreter {
                 V = (this.getBit(R, 7) & this.getBit(K, 7) & (1 - this.getBit(Rd, 7))) | ((1 - this.getBit(R, 7)) & (1 - this.getBit(K, 7)) & this.getBit(Rd, 7));
                 N = this.getBit(R, 7);
                 C = (this.getBit(R, 7) & this.getBit(K, 7)) | (this.getBit(K, 7) & (1 - this.getBit(Rd, 7))) | (this.getBit(R, 7) & (1 - this.getBit(Rd, 7)));
-                this.updateSREGBit(H, 5);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
-                this.updateSREGBit(C, 0);
+                this.updateSREG(null, null, H, N ^ V, V, N, (R === 0), C);
                 break;
             case 'SWAP':
                 Rd = this.getArgumentValue(line, 0);
@@ -2310,10 +2236,7 @@ class Interpreter {
 
                 V = 0;
                 N = this.getBit(R, 7);
-                this.updateSREGBit(N ^ V, 4);
-                this.updateSREGBit(V, 3);
-                this.updateSREGBit(N, 2);
-                this.updateSREGBit((R === 0), 1);
+                this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), null);
                 break;
             case 'XCH':
                 k = this.getZ();
@@ -2447,6 +2370,37 @@ class Interpreter {
         } else {
             this.sreg.setValue(this.sreg.getValue() & ( 0xff - ( 2 ** bit ) ) );
         }
+    }
+
+    updateSREG(I = null, T = null, H = null, S = null, V = null, N = null, Z = null, C = null) {
+        let val = 0;
+
+        if (I !== null) {
+            val = val + (128 * I);
+        }
+        if (T !== null) {
+            val = val + (64 * T);
+        }
+        if (H !== null) {
+            val = val + (32 * H);
+        }
+        if (S !== null) {
+            val = val + (16 * S);
+        }
+        if (V !== null) {
+            val = val + (8 * V);
+        }
+        if (N !== null) {
+            val = val + (4 * N);
+        }
+        if (Z !== null) {
+            val = val + (2 * Z);
+        }
+        if (C !== null) {
+            val = val + C;
+        }
+
+        this.sreg.setValue(val);    // set the value of the SREG
     }
 
     getBit(value, bit) {
@@ -3046,196 +3000,215 @@ class App {
     }
 
     populateRegisters() {
-        if (this.assembled) {
+        if (!this.assembled) {
+            return;
+        }
 
-            const num_lines = 4; // number of lines in the table
-            const regs_per_line = 8;
-            const registers = this.interpreter.getDMEM().slice(0, 32);
+        const num_lines = 4; // number of lines in the table
+        const regs_per_line = 8;
+        const registers = this.interpreter.getDMEM().slice(0, 32);
 
-            const no_change_background_colour = '#ddd';
-            const no_change_text_colour = '#444';
-            const change_background_colour = '#fd0002';
-            const change_text_colour = '#fff';
+        const no_change_background_colour = '#ddd';
+        const no_change_text_colour = '#444';
+        const change_background_colour = '#fd0002';
+        const change_text_colour = '#fff';
 
-            // Go through the lines
-            for (let line = 0; line < num_lines; line++) {
+        // Go through the lines
+        for (let line = 0; line < num_lines; line++) {
 
-                // Don't need to populate the table headings since they never change
+            // Don't need to populate the table headings since they never change
 
-                // Go through each reg in the line
-                for (let reg = 0; reg < regs_per_line; reg++) {
-                    const reg_num = reg + (line * regs_per_line);
-                    const reg_value = this.convertValueToBase(registers[reg_num].getValue(), 2);
-                    document.getElementById(`reg-${reg_num}`).innerHTML = reg_value;
+            // Go through each reg in the line
+            for (let reg = 0; reg < regs_per_line; reg++) {
+                const reg_num = reg + (line * regs_per_line);
+                const reg_value = this.convertValueToBase(registers[reg_num].getValue(), 2);
+                document.getElementById(`reg-${reg_num}`).innerHTML = reg_value;
 
-                    // If it's changed, make the display different
-                    if (registers[reg_num].changed) {
-                        document.getElementById(`reg-${reg_num}`).style.backgroundColor = change_background_colour;
-                        document.getElementById(`reg-${reg_num}`).style.color = change_text_colour;
-                    } else {
-                        document.getElementById(`reg-${reg_num}`).style.backgroundColor = no_change_background_colour;
-                        document.getElementById(`reg-${reg_num}`).style.color = no_change_text_colour;
-                    }
+                // If it's changed, make the display different
+                if (registers[reg_num].getChange()) {
+                    document.getElementById(`reg-${reg_num}`).style.backgroundColor = change_background_colour;
+                    document.getElementById(`reg-${reg_num}`).style.color = change_text_colour;
+                } else {
+                    document.getElementById(`reg-${reg_num}`).style.backgroundColor = no_change_background_colour;
+                    document.getElementById(`reg-${reg_num}`).style.color = no_change_text_colour;
                 }
             }
-
         }
     }
 
     populateSREG() {
-        if (this.assembled) {
+        // Don't populate before assembling code
+        if (!this.assembled) {
+            return;
+        }
 
-            const sreg_flags = ['C', 'Z', 'N', 'V', 'S', 'H', 'T', 'I'];
-            for (let i = 0; i < 8; i++) {
-                const flag = sreg_flags[i];
+        const no_change_background_colour = '#ddd';
+        const no_change_text_colour = '#444';
+        const change_background_colour = '#fd0002';
+        const change_text_colour = '#fff';
 
-                let flag_value = this.interpreter.sreg.getBit(i); // get the sreg bit value
+        const sreg_flags = ['C', 'Z', 'N', 'V', 'S', 'H', 'T', 'I'];
+        for (let i = 0; i < 8; i++) {
+            const flag = sreg_flags[i];
 
-                if (flag_value) {
-                    // flag_value = 'TRUE';
-                    flag_value = '1';
-                } else {
-                    // flag_value = 'FALSE';
-                    flag_value = '0';
-                }
+            let flag_value = this.interpreter.sreg.getBit(i); // get the sreg bit value
+            let last_flag_value = this.interpreter.sreg.getLastBit(i); // get the last sreg bit value
 
-                document.getElementById(`sreg-${flag}`).innerHTML = flag_value;
-
+            if (flag_value) {   // flag_value = 'TRUE';
+                flag_value = '1';
+            } else {            // flag_value = 'FALSE';
+                flag_value = '0';
             }
+            
+            document.getElementById(`sreg-${flag}`).innerHTML = flag_value; // set the inner HTML
+
+            // If it's changed, make the display different
+            if (flag_value !== last_flag_value) {
+                document.getElementById(`sreg-${flag}`).style.backgroundColor = change_background_colour;
+                document.getElementById(`sreg-${flag}`).style.color = change_text_colour;
+            } else {
+                document.getElementById(`sreg-${flag}`).style.backgroundColor = no_change_background_colour;
+                document.getElementById(`sreg-${flag}`).style.color = no_change_text_colour;
+            }
+
         }
     }
 
     populatePointers() {
         // can't all be done in a loop since theyre all different
 
-        if (this.assembled) {
-
-            const pc = this.convertValueToBase(this.interpreter.getPC(), 4);
-            const sp = this.convertValueToBase(this.interpreter.getSP(), 4);
-            const x = this.convertValueToBase(this.interpreter.getX(), 4);
-            const y = this.convertValueToBase(this.interpreter.getY(), 4);
-            const z = this.convertValueToBase(this.interpreter.getZ(), 4);
-
-            document.getElementById('reg-PC').innerHTML = pc;
-            document.getElementById('reg-SP').innerHTML = sp;
-            document.getElementById('reg-X').innerHTML = x;
-            document.getElementById('reg-Y').innerHTML = y;
-            document.getElementById('reg-Z').innerHTML = z;
-
+        if (!this.assembled) {
+            return;
         }
+
+        const pc = this.convertValueToBase(this.interpreter.getPC(), 4);
+        const sp = this.convertValueToBase(this.interpreter.getSP(), 4);
+        const x = this.convertValueToBase(this.interpreter.getX(), 4);
+        const y = this.convertValueToBase(this.interpreter.getY(), 4);
+        const z = this.convertValueToBase(this.interpreter.getZ(), 4);
+
+        document.getElementById('reg-PC').innerHTML = pc;
+        document.getElementById('reg-SP').innerHTML = sp;
+        document.getElementById('reg-X').innerHTML = x;
+        document.getElementById('reg-Y').innerHTML = y;
+        document.getElementById('reg-Z').innerHTML = z;
 
     }
 
     populatePMEM(start_cell) {
-        if (this.assembled) {
-
-            const num_lines = 8; // number of lines in the table
-
-            const pc = this.interpreter.getPC();
-            const normal_background_colour = '#bbb';
-            const normal_text_colour = '#333';
-            const pc_background_colour = '#4a5cff';
-            const pc_text_colour = '#fff';
-
-            for (let line = 0; line < num_lines; line++) {
-                let real_line = start_cell + line;
-                document.getElementById(`pmem-linenum-${line}`).innerHTML = real_line.toString(this.base);
-
-                let line_value = this.interpreter.getPMEM()[start_cell + line];  // get the line to print
-
-                // If the opcode display = true 
-                if (this.display_opcode) {
-                    if (line_value !== null) {                    // replace null lines with (two line inst.)
-                        line_value = line_value.getOpcode().slice(0, 16);
-                    } else {
-                        line_value = this.interpreter.getPMEM()[start_cell + line - 1];
-                        line_value = line_value.getOpcode().slice(16);
-                    }
-                }
-
-                // If the instruction is to be display, not the opcode
-                else {
-
-                    if (line_value !== null) {                    // replace null lines with (two line inst.)
-                        line_value = line_value.toString(this.base);
-                    } else {
-                        line_value = '(two line inst.)';
-                    }
-                }
-
-                document.getElementById(`pmem-line-${line}`).innerHTML = line_value;
-
-                // If it's the pc line
-                // If it's changed, make the display different
-                if ((start_cell + line) === pc) {
-                    document.getElementById(`pmem-linenum-${line}`).style.backgroundColor = pc_background_colour;
-                    document.getElementById(`pmem-linenum-${line}`).style.color = pc_text_colour;
-                } else {
-                    document.getElementById(`pmem-linenum-${line}`).style.backgroundColor = normal_background_colour;
-                    document.getElementById(`pmem-linenum-${line}`).style.color = normal_text_colour;
-                }
-
-            }
+        if (!this.assembled) {
+            return;
         }
+
+        const num_lines = 8; // number of lines in the table
+
+        const pc = this.interpreter.getPC();
+        const normal_background_colour = '#bbb';
+        const normal_text_colour = '#333';
+        const pc_background_colour = '#4a5cff';
+        const pc_text_colour = '#fff';
+
+        for (let line = 0; line < num_lines; line++) {
+            let real_line = start_cell + line;
+            document.getElementById(`pmem-linenum-${line}`).innerHTML = real_line.toString(this.base);
+
+            let line_value = this.interpreter.getPMEM()[start_cell + line];  // get the line to print
+
+            // If the opcode display = true 
+            if (this.display_opcode) {
+                if (line_value !== null) {                    // replace null lines with (two line inst.)
+                    line_value = line_value.getOpcode().slice(0, 16);
+                } else {
+                    line_value = this.interpreter.getPMEM()[start_cell + line - 1];
+                    line_value = line_value.getOpcode().slice(16);
+                }
+            }
+
+            // If the instruction is to be display, not the opcode
+            else {
+
+                if (line_value !== null) {                    // replace null lines with (two line inst.)
+                    line_value = line_value.toString(this.base);
+                } else {
+                    line_value = '(two line inst.)';
+                }
+            }
+
+            document.getElementById(`pmem-line-${line}`).innerHTML = line_value;
+
+            // If it's the pc line
+            // If it's changed, make the display different
+            if ((start_cell + line) === pc) {
+                document.getElementById(`pmem-linenum-${line}`).style.backgroundColor = pc_background_colour;
+                document.getElementById(`pmem-linenum-${line}`).style.color = pc_text_colour;
+            } else {
+                document.getElementById(`pmem-linenum-${line}`).style.backgroundColor = normal_background_colour;
+                document.getElementById(`pmem-linenum-${line}`).style.color = normal_text_colour;
+            }
+
+        }
+        
     }
 
     populateDMEM(start_cell) {
-        if (this.assembled) {
+        if (!this.assembled) {
+            return;
+        }
 
-            const num_lines = 8; // number of lines in the table
-            const num_rows = 8; // number of lines in the table
+        const num_lines = 8; // number of lines in the table
+        const num_rows = 8; // number of lines in the table
 
-            const sp = this.interpreter.getSP();
-            const x = this.interpreter.getX();
-            const y = this.interpreter.getY();
-            const z = this.interpreter.getZ();
+        const sp = this.interpreter.getSP();
+        const x = this.interpreter.getX();
+        const y = this.interpreter.getY();
+        const z = this.interpreter.getZ();
 
-            const normal_background_colour = '#ddd';
-            const normal_text_colour = '#444';
+        const normal_background_colour = '#ddd';
+        const normal_text_colour = '#444';
 
-            const sp_background_colour = '#da920d';
-            const x_background_colour = '#32bd32';
-            const y_background_colour = '#20a3a3';
-            const z_background_colour = '#bd0c47';
-            const pointer_text_colour = '#fff';
+        const sp_background_colour = '#da920d';
+        const x_background_colour = '#32bd32';
+        const y_background_colour = '#20a3a3';
+        const z_background_colour = '#bd0c47';
+        const pointer_text_colour = '#fff';
 
-            for (let line = 0; line < num_lines; line++) {
+        for (let line = 0; line < num_lines; line++) {
 
-                let line_value = (start_cell + (num_rows * line)).toString(this.base);     // Calculate line start cell number as base 16 string
+            let line_value = (start_cell + (num_rows * line)).toString(this.base);     // Calculate line start cell number as base 16 string
 
-                // Add 0's to the front until it's 4 digits long
-                for (let i = line_value.length; i < 4; i++) {
-                    line_value = '0' + line_value;
-                }
+            // Add 0's to the front until it's 4 digits long
+            for (let i = line_value.length; i < 4; i++) {
+                line_value = '0' + line_value;
+            }
 
-                // Put the line value in the html
-                document.getElementById(`dmem-linenum-${line}`).innerHTML = line_value;
+            // Put the line value in the html
+            document.getElementById(`dmem-linenum-${line}`).innerHTML = line_value;
 
-                // Put the cell values in the html
-                for (let row = 0; row < num_rows; row++) {
-                    const cell_number = start_cell + row + (num_rows * line);
-                    let cell_value = this.interpreter.getDMEM()[cell_number];
-                    cell_value = this.convertValueToBase(cell_value, 2);
+            // Put the cell values in the html
+            for (let row = 0; row < num_rows; row++) {
+                const cell_number = start_cell + row + (num_rows * line);
+                let cell_value = this.interpreter.getDMEM()[cell_number];
+                cell_value = this.convertValueToBase(cell_value, 2);
 
-                    document.getElementById(`dmem-line-${line}${row}`).innerHTML = cell_value;
-                    document.getElementById(`dmem-line-${line}${row}`).style.color = pointer_text_colour;
+                document.getElementById(`dmem-line-${line}${row}`).innerHTML = cell_value;
+                document.getElementById(`dmem-line-${line}${row}`).style.color = pointer_text_colour;
 
-                    // Check if it's SP, X, Y, Z
-                    if (cell_number === sp) {
-                        document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = sp_background_colour;
-                    } else if (cell_number === z) {
-                        document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = z_background_colour;
-                    } else if (cell_number === y) {
-                        document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = y_background_colour;
-                    } else if (cell_number === x) {
-                        document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = x_background_colour;
-                    } else {
-                        document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = normal_background_colour;
-                        document.getElementById(`dmem-line-${line}${row}`).style.color = normal_text_colour;
-                    }
+                // Check if it's SP, X, Y, Z
+                if (cell_number === sp) {
+                    document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = sp_background_colour;
+                } else if (cell_number === z) {
+                    document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = z_background_colour;
+                } else if (cell_number === y) {
+                    document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = y_background_colour;
+                } else if (cell_number === x) {
+                    document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = x_background_colour;
+                } else {
+                    document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = normal_background_colour;
+                    document.getElementById(`dmem-line-${line}${row}`).style.color = normal_text_colour;
                 }
             }
         }
+        
     }
 
     success(text) {
