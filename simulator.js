@@ -916,24 +916,24 @@ class Parser {
         //////////////// TEXT SECTION ////////////////
         //////////////////////////////////////////////
 
-        /// CHECK .global LINE
+        // Check .global line
         line_num += 1;                                          // move to the .global line
         let line = this.token_lines[line_num];                  // current line
 
         if (line.length !== 2 || line[0].getValue() !== '.global') {
-            const line_in_file = this.line_numbers[line_num]; // the current line if there's an error
+            const line_in_file = this.line_numbers[line_num];   // the current line used for raising an error
             this.newError(`Must begin text section with a valid \'.global\' directive: line ${line_in_file}.`);
         }
 
-        /// Some variables for later
-        const global_funct_name = line[1].getValue();           // the name of the glibal function for later
+        // Some variables for later
+        const global_funct_name = line[1].getValue();           // the name of the global function for later
         line_num += 1;                                          // move to instructions part of text section
         const data_labels = Object.keys(this.labels);           // to be used for replacing data labels in instructions
         const definition_keys = Object.keys(definitions);
         const pmem_file_lines = [];                             // where in the text file each pmem line is 
         const opcode_32_bit = ['CALL', 'JMP', 'LDS', 'STS'];    // instructions with 32 bit opcode
 
-        //////// CREATE PMEM AND GET THE LABEL LOCATIONS
+        // CREATE PMEM AND GET THE LABEL LOCATIONS
         while (line_num < (this.token_lines.length - 1)) {
 
             let line = this.token_lines[line_num]; // current line
@@ -961,9 +961,10 @@ class Parser {
 
                     const label = current_tok.getValue().slice(0, (current_tok.getValue().length - 1)); // remove the colon from the end
                     this.labels[label] = this.pmem.length; //  add it to the labels dictionary
-
-                    if (this.pmem.length === 0 && label !== global_funct_name) {
-                        this.newError(`Incorrect global function name starting the text section on line ${line_in_file}.`);
+                    
+                    // Check the global function label when you get to it
+                    if (label === global_funct_name && this.pmem.length !== 0) {
+                        this.newError(`Incorrect global function location on line ${line_in_file}. The line \'${global_funct_name}:\' must be directly after the .global line.`);
                     }
 
                     has_label = true;
@@ -1068,9 +1069,14 @@ class Parser {
 
         }
 
+        // Check you've found the global function name
+        if (this.labels[global_funct_name] === undefined) {
+            this.newError(`Cannot find the global label \'${global_funct_name}\' to begin the program. Check spelling if unsure.`);
+        }
+
         const control_flow_instructions = ['CALL', 'JMP', 'RJMP'].concat(INST_LIST.slice(7, 27)); // all the branching instructions
 
-        ////////// TURN ALL REFS INTO CORRECT FORM
+        // TURN ALL REFS INTO CORRECT FORM
         for (let line_num = 0; line_num < this.pmem.length; line_num++) {
 
             const line = this.pmem[line_num]; // current line
@@ -4503,7 +4509,6 @@ class App {
 }
 
 app = new App();
-
 
 
 
