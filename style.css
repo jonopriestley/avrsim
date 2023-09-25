@@ -204,6 +204,12 @@ textarea {
     float: right;
 }
 
+.button-manual {
+    padding: 6px 10px;
+    margin-right: 8px;
+    float: right;
+}
+
 .button-assemble {
     padding: 15px 15px;
 }
