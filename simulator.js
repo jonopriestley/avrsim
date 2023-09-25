@@ -45,9 +45,6 @@ class Register {
     setValue(new_value) {
         this.last_value = this.value;
         this.value = ((new_value % 256) + 256) % 256;
-        console.log(this.name);
-        console.log(this.last_value);
-        console.log(this.value);
         this.setChange();
     }
     getValue() {
@@ -2365,39 +2362,43 @@ class Interpreter {
     }
 
     updateSREGBit(value, bit) {
-        if (value) {
-            this.sreg.setValue(this.sreg.getValue() | (2 ** bit));
-        } else {
-            this.sreg.setValue(this.sreg.getValue() & ( 0xff - ( 2 ** bit ) ) );
-        }
+        // Set the bit to 0 then OR it with the new value bit shifted
+        let sreg_val = this.sreg.getValue();
+        this.sreg.setValue( (sreg_val & (0xff - (1 << bit))) | (value * (1 << bit)) );
+
+        //if (value) {
+        //    this.sreg.setValue(this.sreg.getValue() | (2 ** bit));
+        //} else {
+        //    this.sreg.setValue(this.sreg.getValue() & ( 0xff - ( 2 ** bit ) ) );
+        //}
     }
 
     updateSREG(I = null, T = null, H = null, S = null, V = null, N = null, Z = null, C = null) {
-        let val = 0;
+        let val = this.sreg.getValue();
 
         if (I !== null) {
-            val = val + (128 * I);
+            val = (val & 127) | (128 * I);
         }
         if (T !== null) {
-            val = val + (64 * T);
+            val = (val & 191) | (64 * T);
         }
         if (H !== null) {
-            val = val + (32 * H);
+            val = (val & 223) | (32 * H);
         }
         if (S !== null) {
-            val = val + (16 * S);
+            val = (val & 239) | (16 * S);
         }
         if (V !== null) {
-            val = val + (8 * V);
+            val = (val & 247) | (8 * V);
         }
         if (N !== null) {
-            val = val + (4 * N);
+            val = (val & 251) | (4 * N);
         }
         if (Z !== null) {
-            val = val + (2 * Z);
+            val = (val & 253) | (2 * Z);
         }
         if (C !== null) {
-            val = val + C;
+            val = (val & 254) |  C;
         }
 
         this.sreg.setValue(val);    // set the value of the SREG
@@ -2922,7 +2923,7 @@ class App {
 
         this.hideOpenPopup(this.current_popup); // hide any open popup
         
-        for (let i = 0; i < 32; i++) {
+        for (let i = 0; i < 0xff; i++) {
             this.interpreter.getDMEM()[i].clearChange();    // set changed = 0 for all registers
         }
 
@@ -3047,12 +3048,14 @@ class App {
         const change_background_colour = '#fd0002';
         const change_text_colour = '#fff';
 
+        const change = this.interpreter.sreg.getValue() ^ this.interpreter.sreg.getLastValue();
+
+
         const sreg_flags = ['C', 'Z', 'N', 'V', 'S', 'H', 'T', 'I'];
         for (let i = 0; i < 8; i++) {
             const flag = sreg_flags[i];
 
             let flag_value = this.interpreter.sreg.getBit(i); // get the sreg bit value
-            let last_flag_value = this.interpreter.sreg.getLastBit(i); // get the last sreg bit value
 
             if (flag_value) {   // flag_value = 'TRUE';
                 flag_value = '1';
@@ -3063,7 +3066,7 @@ class App {
             document.getElementById(`sreg-${flag}`).innerHTML = flag_value; // set the inner HTML
 
             // If it's changed, make the display different
-            if (flag_value !== last_flag_value) {
+            if (this.interpreter.sreg.getChange() && ((change >> i) & 1)) {
                 document.getElementById(`sreg-${flag}`).style.backgroundColor = change_background_colour;
                 document.getElementById(`sreg-${flag}`).style.color = change_text_colour;
             } else {

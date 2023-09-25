@@ -321,6 +321,12 @@ td {
     table-layout: fixed;
 }
 
+.table-sreg-small {
+    padding-left: 3%;
+    padding-right: 3%;
+    border-radius: 5px;
+}
+
 
 .table-sreg-heading {
     text-align: center;
