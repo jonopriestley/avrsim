@@ -4488,7 +4488,3 @@ app = new App();
 
 
 
-// TODO
-// Make side scroll for text box
-// Make left and right side size changeable
-
