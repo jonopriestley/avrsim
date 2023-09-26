@@ -1245,6 +1245,11 @@ class Parser {
 class Interpreter {
 
     constructor() {
+        this.emptyData();
+        
+    }
+
+    emptyData() {
         this.pmem = [];
         this.dmem = [];
         this.line_numbers = [];
@@ -1255,7 +1260,6 @@ class Interpreter {
         this.sph = new Token('REG', 0); // SP hi8
 
         this.finished = false;
-        
     }
 
     newData(pmem, dmem, pmem_line_numbers, txt) {
@@ -2894,6 +2898,9 @@ class App {
 
         if (txt.length > 0) {
 
+            // Clear the current data for if there's an error
+            this.resetAll();
+
             // Tokenizing
             this.lexer.newData(txt);
             console.log(this.lexer.getTokenLines());
@@ -2991,6 +2998,54 @@ class App {
         }
     }
 
+    resetAll() {
+        this.interpreter.emptyData();           // remove the data from the interpreter
+        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.assembled = false;                 // reset the assembling
+
+        const normal_background_colour = '#ddd';
+        const normal_text_colour = '#444';
+
+        // Registers
+        for (let reg_num = 0; reg_num < 32; reg_num++) {
+            document.getElementById(`reg-${reg_num}`).innerHTML = '00';
+            document.getElementById(`reg-${reg_num}`).style.backgroundColor = normal_background_colour;
+            document.getElementById(`reg-${reg_num}`).style.color = normal_text_colour;
+        }
+
+        // SREG
+        const sreg_flags = ['C', 'Z', 'N', 'V', 'S', 'H', 'T', 'I'];
+        for (let i = 0; i < 8; i++) {
+            document.getElementById(`sreg-${sreg_flags[i]}`).innerHTML = '0'; // set the inner HTML
+            document.getElementById(`sreg-${sreg_flags[i]}`).style.backgroundColor = normal_background_colour;
+            document.getElementById(`sreg-${sreg_flags[i]}`).style.color = normal_text_colour;
+        }
+
+        // Pointers
+        document.getElementById('reg-PC').innerHTML = '0000';
+        document.getElementById('reg-SP').innerHTML = '0000';
+        document.getElementById('reg-X').innerHTML = '0000';
+        document.getElementById('reg-Y').innerHTML = '0000';
+        document.getElementById('reg-Z').innerHTML = '0000';
+
+        const pmem_line_num_normal_background_colour = '#bbb';
+        const pmem_line_num_normal_text_colour = '#333';
+
+        // PMEM
+        for (let line = 0; line < 8; line++) {
+            document.getElementById(`pmem-line-${line}`).innerHTML = 'None';
+            document.getElementById(`pmem-linenum-${line}`).style.backgroundColor = pmem_line_num_normal_background_colour;
+            document.getElementById(`pmem-linenum-${line}`).style.color = pmem_line_num_normal_text_colour;
+        }
+
+        for (let line = 0; line < 8; line++) {
+            for (let row = 0; row < 8; row++) {
+                document.getElementById(`dmem-line-${line}${row}`).innerHTML = '00';
+            }
+        }
+        
+    }
+
     populateAll() {
         this.populateRegisters();
         this.populateSREG();
@@ -3005,8 +3060,6 @@ class App {
             return;
         }
 
-        const num_lines = 4; // number of lines in the table
-        const regs_per_line = 8;
         const registers = this.interpreter.getDMEM().slice(0, 32);
 
         const no_change_background_colour = '#ddd';
@@ -3014,25 +3067,18 @@ class App {
         const change_background_colour = '#fd0002';
         const change_text_colour = '#fff';
 
-        // Go through the lines
-        for (let line = 0; line < num_lines; line++) {
+        // Go through each reg in the line
+        for (let reg_num = 0; reg_num < 32; reg_num++) {
+            const reg_value = this.convertValueToBase(registers[reg_num].getValue(), 2);
+            document.getElementById(`reg-${reg_num}`).innerHTML = reg_value;
 
-            // Don't need to populate the table headings since they never change
-
-            // Go through each reg in the line
-            for (let reg = 0; reg < regs_per_line; reg++) {
-                const reg_num = reg + (line * regs_per_line);
-                const reg_value = this.convertValueToBase(registers[reg_num].getValue(), 2);
-                document.getElementById(`reg-${reg_num}`).innerHTML = reg_value;
-
-                // If it's changed, make the display different
-                if (registers[reg_num].getChange()) {
-                    document.getElementById(`reg-${reg_num}`).style.backgroundColor = change_background_colour;
-                    document.getElementById(`reg-${reg_num}`).style.color = change_text_colour;
-                } else {
-                    document.getElementById(`reg-${reg_num}`).style.backgroundColor = no_change_background_colour;
-                    document.getElementById(`reg-${reg_num}`).style.color = no_change_text_colour;
-                }
+            // If it's changed, make the display different
+            if (registers[reg_num].getChange()) {
+                document.getElementById(`reg-${reg_num}`).style.backgroundColor = change_background_colour;
+                document.getElementById(`reg-${reg_num}`).style.color = change_text_colour;
+            } else {
+                document.getElementById(`reg-${reg_num}`).style.backgroundColor = no_change_background_colour;
+                document.getElementById(`reg-${reg_num}`).style.color = no_change_text_colour;
             }
         }
     }
