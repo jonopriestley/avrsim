@@ -546,6 +546,7 @@ class Parser {
     newData(token_lines, line_numbers, txt) {
         this.token_lines = token_lines;
         this.line_numbers = line_numbers;
+        this.pmem_line_numbers = [];
         this.txt = txt;
         this.lines = this.txt.split('\n');
 
@@ -1267,6 +1268,7 @@ class Interpreter {
         this.pmem = pmem;
         this.dmem = dmem;
         this.line_numbers = pmem_line_numbers;
+        console.log(this.line_numbers);
         this.txt = txt;
 
         this.lines = this.txt.split('\n');
@@ -1949,7 +1951,7 @@ class Interpreter {
                 break;
             case 'POP':
                 if (this.getSP() >= this.ramend) {
-                    this.newError(`Bad stack pointer for PUSH on line ${line_in_file}.`)
+                    this.newError(`Bad stack pointer for POP on line ${line_in_file}.`)
                     return;
                 }
                 this.incSP();                                                       // increment the SP by 1
@@ -1958,7 +1960,7 @@ class Interpreter {
                 break;
             case 'PUSH':
                 if (this.getSP() <= 0x100) {
-                    this.newError(`Bad stack pointer for PUSH on line ${line_in_file}.`)
+                    this.newError(`Stack overflow. Bad stack pointer for PUSH on line ${line_in_file}.`)
                     return;
                 }
                 Rr = this.getArgumentValue(line, 0);            // register held value
