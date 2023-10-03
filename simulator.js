@@ -2084,7 +2084,7 @@ class Interpreter {
                 Rd = this.getArgumentValue(line, 0);
                 b = this.getArgumentValue(line, 1);
 
-                const is_set = ((this.getSREG() >> b) & 1);
+                const is_set = ((Rd >> b) & 1);
 
                 if (is_set) {
                     break;
@@ -2103,7 +2103,7 @@ class Interpreter {
                 Rd = this.getArgumentValue(line, 0);
                 b = this.getArgumentValue(line, 1);
                 
-                const is_cleared = 1 - ((this.getSREG() >> b) & 1);
+                const is_cleared = 1 - ((Rd >> b) & 1);
 
                 if (is_cleared) {
                     break;
