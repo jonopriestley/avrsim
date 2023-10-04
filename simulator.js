@@ -1616,7 +1616,7 @@ class Interpreter {
                         document.getElementById('console').innerHTML += char;           // add it to the console
                     }
 
-                    document.getElementById('console').innerHTML += '\n';
+                    //document.getElementById('console').innerHTML += '\n';               // add a new line after a print
 
                     // Push X value back onto stack
                     this.getDMEM()[this.getSP()] = this.getDMEM()[27].getValue();
