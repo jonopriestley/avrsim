@@ -1268,7 +1268,6 @@ class Interpreter {
         this.pmem = pmem;
         this.dmem = dmem;
         this.line_numbers = pmem_line_numbers;
-        console.log(this.line_numbers);
         this.txt = txt;
 
         this.lines = this.txt.split('\n');
@@ -2973,6 +2972,11 @@ class App {
 
         this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
 
+        this.populateAll();
+    }
+
+    stepBackOne() {
+        this.stepBack(-1);
         this.populateAll();
     }
 
