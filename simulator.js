@@ -2881,12 +2881,16 @@ class App {
         this.parser = new Parser();
         this.interpreter = new Interpreter();
 
+        // Displays
         this.base = 16; // value base for display
         this.display_opcode = false;
+        this.display_ascii = false;
 
         this.assembled = false;
 
-        this.current_popup = null;
+        this.current_popup = null; 
+
+        this.ascii_table = this.makeAsciiTable();
 
     }
 
@@ -3014,7 +3018,7 @@ class App {
 
         // Registers
         for (let reg_num = 0; reg_num < 32; reg_num++) {
-            document.getElementById(`reg-${reg_num}`).innerHTML = '00';
+            document.getElementById(`reg-${reg_num}`).innerHTML = '?';
             document.getElementById(`reg-${reg_num}`).style.backgroundColor = normal_background_colour;
             document.getElementById(`reg-${reg_num}`).style.color = normal_text_colour;
         }
@@ -3022,31 +3026,34 @@ class App {
         // SREG
         const sreg_flags = ['C', 'Z', 'N', 'V', 'S', 'H', 'T', 'I'];
         for (let i = 0; i < 8; i++) {
-            document.getElementById(`sreg-${sreg_flags[i]}`).innerHTML = '0'; // set the inner HTML
+            document.getElementById(`sreg-${sreg_flags[i]}`).innerHTML = '?'; // set the inner HTML
             document.getElementById(`sreg-${sreg_flags[i]}`).style.backgroundColor = normal_background_colour;
             document.getElementById(`sreg-${sreg_flags[i]}`).style.color = normal_text_colour;
         }
 
         // Pointers
-        document.getElementById('reg-PC').innerHTML = '0000';
-        document.getElementById('reg-SP').innerHTML = '0000';
-        document.getElementById('reg-X').innerHTML = '0000';
-        document.getElementById('reg-Y').innerHTML = '0000';
-        document.getElementById('reg-Z').innerHTML = '0000';
+        document.getElementById('reg-PC').innerHTML = '?';
+        document.getElementById('reg-SP').innerHTML = '?';
+        document.getElementById('reg-X').innerHTML = '?';
+        document.getElementById('reg-Y').innerHTML = '?';
+        document.getElementById('reg-Z').innerHTML = '?';
 
         const pmem_line_num_normal_background_colour = '#bbb';
         const pmem_line_num_normal_text_colour = '#333';
 
         // PMEM
         for (let line = 0; line < 8; line++) {
-            document.getElementById(`pmem-line-${line}`).innerHTML = 'None';
+            document.getElementById(`pmem-line-${line}`).innerHTML = '?';
             document.getElementById(`pmem-linenum-${line}`).style.backgroundColor = pmem_line_num_normal_background_colour;
             document.getElementById(`pmem-linenum-${line}`).style.color = pmem_line_num_normal_text_colour;
         }
 
         for (let line = 0; line < 8; line++) {
             for (let row = 0; row < 8; row++) {
-                document.getElementById(`dmem-line-${line}${row}`).innerHTML = '00';
+                document.getElementById(`dmem-line-${line}${row}`).innerHTML = '?';
+                document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = normal_background_colour;
+                document.getElementById(`dmem-line-${line}${row}`).style.color = normal_text_colour;
+
             }
         }
         
@@ -3243,7 +3250,12 @@ class App {
             for (let row = 0; row < num_rows; row++) {
                 const cell_number = start_cell + row + (num_rows * line);
                 let cell_value = this.interpreter.getDMEM()[cell_number];
-                cell_value = this.convertValueToBase(cell_value, 2);
+
+                if (this.display_ascii) {
+                    cell_value = this.getAscii(cell_value);
+                } else {
+                    cell_value = this.convertValueToBase(cell_value, 2);
+                }
 
                 document.getElementById(`dmem-line-${line}${row}`).innerHTML = cell_value;
                 document.getElementById(`dmem-line-${line}${row}`).style.color = pointer_text_colour;
@@ -3379,6 +3391,17 @@ class App {
         this.populatePMEM(this.pmem_top);
     }
 
+    toggleAsciiDisplay() {
+        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.display_ascii = !(this.display_ascii);
+        if (this.display_ascii) {
+            document.getElementById('button-ascii').innerHTML = 'Ascii Off';
+        } else {
+            document.getElementById('button-ascii').innerHTML = 'Ascii On';
+        }
+        this.populateDMEM(this.dmem_top);
+    }
+
     clearConsole() {
         this.hideOpenPopup(this.current_popup); // hide any open popup
         document.getElementById('console').innerHTML = '';
@@ -3485,6 +3508,29 @@ class App {
             popup.innerHTML += `${popup_options[i]}<br>`;
         }
 
+    }
+
+    makeAsciiTable() {
+        return [
+            'NUL', 'SOH', 'STX', 'ETX', 'EOT', 'ENQ', 'ACK', 'BEL', 'BS', 'HT', 'LF', 'VT', 'FF', 'CR', 'SO', 'SI',
+            'DLE', 'DC1', 'DC2', 'DC3', 'DC4', 'NAK', 'SYN', 'ETB', 'CAN', 'EM', 'SUB', 'ESC', 'FS', 'GS', 'RS', 'US',
+            'SP', '!', '\"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/', '0', '1', '2', '3', '4',
+            '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?', '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I',
+            'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '\\', ']', '^',
+            '_', '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
+            't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~', 'DEL', '€', 'N/A', '‚', 'ƒ', '„', '…', '†', '‡', 'ˆ',
+            '‰', 'Š', '‹', 'Œ', 'N/A', 'Ž', 'N/A', 'N/A', '‘', '’', '“', '”', '•', '–', '—', '˜', '™', 'š', '›', 'œ',
+            'N/A', 'ž', 'Ÿ', 'NBSP', '¡', '¢', '£', '¤', '¥', '¦', '§', '¨', '©', 'ª', '«', '¬', 'SHY', '®', '¯', '°',
+            '±', '²', '³', '´', 'µ', '¶', '·', '¸', '¹', 'º', '»', '¼', '½', '¾', '¿', 'À', 'Á', 'Â', 'Ã', 'Ä', 'Å',
+            'Æ', 'Ç', 'È', 'É', 'Ê', 'Ë', 'Ì', 'Í', 'Î', 'Ï', 'Ð', 'Ñ', 'Ò', 'Ó', 'Ô', 'Õ', 'Ö', '×', 'Ø', 'Ù', 'Ú',
+            'Û', 'Ü', 'Ý', 'Þ', 'ß', 'à', 'á', 'â', 'ã', 'ä', 'å', 'æ', 'ç', 'è', 'é', 'ê', 'ë', 'ì', 'í', 'î', 'ï',
+            'ð', 'ñ', 'ò', 'ó', 'ô', 'õ', 'ö', '÷', 'ø', 'ù', 'ú', 'û', 'ü', 'ý', 'þ', 'ÿ'
+        ];
+    }
+
+    // Returns the ASCII equivalent character
+    getAscii(n) {
+        return this.ascii_table[n];
     }
 
     // Returns the popups instructions list
