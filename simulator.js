@@ -713,7 +713,20 @@ class Parser {
 
         let line_num = 0;
 
-        const definitions = Object.create(null);;
+        const definitions = Object.create(null);
+
+        // Create pre-existing definitions
+        const reg_defs = {
+            'ZH': 31,
+            'ZL': 30,
+            'YH': 29,
+            'YL': 28,
+            'XH': 27,
+            'XL': 26
+        };
+        for (let [key, value] of Object.entries(reg_defs)) {
+            definitions[key] = value;
+        }
 
         // GO THROUGH LINES IN DATA SECTION
         while (data_section_exists && (line_num < text_section_start)) {
@@ -798,7 +811,7 @@ class Parser {
                         'f': 0x0c,
                         'v': 0x0b,
                         '0': 0x00
-                    } // I have chosen not to add \o and \x for oct and hex numbers
+                    }; // I have chosen not to add \o and \x for oct and hex numbers
 
                     // Go through each character and add it's ascii code to the data
                     for (let i = 0; i < string_text.length; i++) {
@@ -3047,7 +3060,8 @@ class App {
             document.getElementById(`pmem-linenum-${line}`).style.backgroundColor = pmem_line_num_normal_background_colour;
             document.getElementById(`pmem-linenum-${line}`).style.color = pmem_line_num_normal_text_colour;
         }
-
+        
+        // DMEM
         for (let line = 0; line < 8; line++) {
             for (let row = 0; row < 8; row++) {
                 document.getElementById(`dmem-line-${line}${row}`).innerHTML = '?';
@@ -4478,14 +4492,14 @@ class App {
                     (i) &ensp;(Z) ← Rr
                     (ii)&ensp;(Z) ← Rr, Z = Z + 1
                     (iii) Z = Z - 1, (Z) ← Rr`,
-            'STD': `Syntax: (i) LDD Y+q, Rr
-                    &emsp;&emsp;&emsp;&ensp;(ii) LDD Z+q, Rr
+            'STD': `Syntax: (i) STD Y+q, Rr
+                    &emsp;&emsp;&emsp;&ensp;(ii) STD Z+q, Rr
                     Family: Data Transfer Instructions
                     Function: Uses the Y (or Z) word-register as a pointer to data memory and store the value of register Rr into address Y+q (or Z+q), using q as the displacement from Y (or Z). Y (or Z) is left unchanged after the operation.
 
                     Boundaries:
-                    Rr → [R0 - R31]
                     q → [0 - 63]
+                    Rr → [R0 - R31]
 
                     Operation Options:
                     (i)&ensp;(Y+q) ← Rr 
