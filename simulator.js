@@ -412,12 +412,12 @@ class Lexer {
 
         // Define regular expressions for each token type
         const patterns = [
-            [/^;.*/, null],                      // comments
-            [/^\s+/, null],                      // whitespace
-            [/^[\w_]{1}[^;]*:/, 'LABEL'],        // labels
-            [/^lo8|^LO8/, 'LO8'],                // lo8
-            [/^hi8|^HI8/, 'HI8'],                // hi8
-            [/^[rR]\d+/, 'REG'],                 // registers
+            [/^;.*/, null],                     // comments
+            [/^\s+/, null],                     // whitespace
+            [/^[\w_]{1}[^;]*:/, 'LABEL'],       // labels
+            [/^lo8(?=[(])|^LO8(?=[(])/, 'LO8'],               // lo8
+            [/^hi8(?=[(])|^HI8(?=[(])/, 'HI8'],               // hi8
+            [/^[rR]\d+(?=[,; ])/, 'REG'],                // registers
             [/^-{0,1}0x[\dABCDEFabcdef]+|^-{0,1}\$[\dABCDEFabcdef]+|^-{0,1}0b[01]+/, 'INT'], // numbers
             [/^-{0,1}\d+/, 'INT'],              // numbers
             [/^[a-zA-Z]{2,6}/, 'INST'],         // instructions → CAN TURN LABELS USED IN AN INSTRUCTION INTO INST TYPE
@@ -429,7 +429,7 @@ class Lexer {
             [/^[XYZ]/, 'WORD'],                 // word
             [/^,/, 'COMMA'],                    // comma
             [/^[^\w\s]+/, 'SYMBOL'],            // symbols
-            [/^[^\s\d]{1}[\w\d_]*/, 'REF']      // references (like labels used in an instruction) → Called STRING in sim.py
+            [/^[^\s\d]{1}[\w\d_]*/, 'REF']      // references (like labels used in an instruction)
         ];
 
         const tokens = [];
@@ -488,7 +488,6 @@ class Lexer {
                 if (i > 0 && !['COMMA', 'SYMBOL'].includes(current_tok.getType()) && line_toks[i - 1].getType() === 'REF') {
                     line_toks[i - 1].setValue(line_toks[i - 1].getValue() + current_tok.getValue());
                     line_toks.splice(i, 1); // Virtually advancing
-
                 }
 
                 // Actually advancing if you haven't shortened the list length as above
