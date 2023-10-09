@@ -25,6 +25,7 @@
             onclick=" window.open('AVR Simulator Guide.pdf','_blank', 'noopener noreferrer')" value="AVR Simulator Guide"
             download="AVR Simulator Guide" target="_blank" rel="noopener noreferrer"/>
         </form>
+        <button class="button button-theme" id="button_theme" type="button" onclick="app.toggleTheme()">Theme: Light</button>
     </h1>
 
     <div class="body">
@@ -45,7 +46,7 @@
                         </form>
                     </h4>
                 </div>
-                <div class="panel-body">
+                <div class="panel-body" id="panel_code_body">
                     <div class="line-numbers">
                         <textarea class="lines-box" id="lines_box" rows="27" readonly>
 1
@@ -90,7 +91,7 @@ ret
                 <div class="panel-heading">
                     <h4 class="panel-title">CPU & Memory</h4>
                 </div>
-                <div class="panel-body">
+                <div class="panel-body" id="panel_cpu_body">
                     <p class="text-muted">Registers</p>
                     <table class="table table-reg">
                         <tr>
@@ -857,6 +858,7 @@ ret
                     <br>
                     <p class="text-muted">Console</p>
                     <textarea class="console" id="console" name="console" rows="7" cols="75" readonly></textarea>
+                    <br>
                     <button class="button button-clear-console" type="button" onclick="app.clearConsole()">Clear
                         Console</button>
                 </div>

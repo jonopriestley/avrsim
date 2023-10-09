@@ -134,7 +134,6 @@ textarea {
     resize: none;
 }
 
-
 .line-numbers {
     margin-right: 0;
     width: 10%;
@@ -196,6 +195,12 @@ textarea {
     color: #000;
     background-color: #ddd;
     border: 1px solid #c0c0c0;
+}
+
+.button-theme {
+    padding: 8px 15px;
+    float: right;
+    margin-right: 5px;
 }
 
 .button-guide {

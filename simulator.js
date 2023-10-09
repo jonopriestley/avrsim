@@ -2904,6 +2904,8 @@ class App {
 
         this.ascii_table = this.makeAsciiTable();
 
+        this.theme = 'light';
+
     }
 
     assemble() {
@@ -3088,8 +3090,15 @@ class App {
 
         const registers = this.interpreter.getDMEM().slice(0, 32);
 
-        const no_change_background_colour = '#ddd';
-        const no_change_text_colour = '#444';
+        let no_change_background_colour, no_change_text_colour;
+
+        if (this.theme === 'light') {
+            no_change_background_colour = '#ddd';
+            no_change_text_colour = '#444';
+        } else {
+            no_change_background_colour = '#7e7e7e';
+            no_change_text_colour = '#fff';
+        }
         const change_background_colour = '#fd0002';
         const change_text_colour = '#fff';
 
@@ -3115,8 +3124,15 @@ class App {
             return;
         }
 
-        const no_change_background_colour = '#ddd';
-        const no_change_text_colour = '#444';
+        let no_change_background_colour, no_change_text_colour;
+
+        if (this.theme === 'light') {
+            no_change_background_colour = '#ddd';
+            no_change_text_colour = '#444';
+        } else {
+            no_change_background_colour = '#7e7e7e';
+            no_change_text_colour = '#fff';
+        }
         const change_background_colour = '#fd0002';
         const change_text_colour = '#fff';
 
@@ -3178,8 +3194,17 @@ class App {
         const num_lines = 8; // number of lines in the table
 
         const pc = this.interpreter.getPC();
-        const normal_background_colour = '#bbb';
-        const normal_text_colour = '#333';
+
+        let normal_background_colour, normal_text_colour;
+
+        if (this.theme === 'light') {
+            normal_background_colour = '#bbb';
+            normal_text_colour = '#333';
+        } else {
+            normal_background_colour = '#474747';
+            normal_text_colour = '#fff';
+        }
+
         const pc_background_colour = '#4a5cff';
         const pc_text_colour = '#fff';
 
@@ -3238,8 +3263,15 @@ class App {
         const y = this.interpreter.getY();
         const z = this.interpreter.getZ();
 
-        const normal_background_colour = '#ddd';
-        const normal_text_colour = '#444';
+        let normal_background_colour, normal_text_colour;
+
+        if (this.theme === 'light') {
+            normal_background_colour = '#ddd';
+            normal_text_colour = '#444';
+        } else {
+            normal_background_colour = '#7e7e7e';
+            normal_text_colour = '#fff';
+        }
 
         const sp_background_colour = '#da920d';
         const x_background_colour = '#32bd32';
@@ -4591,6 +4623,119 @@ class App {
 
         return popups;
 
+    }
+
+    toggleTheme() {
+
+        let bg, fg, table_heading_bg, table_body_bg, borderColor, borderStyle, borderThickness, status_background_colour, border_radius, muted_text_colour;
+
+        if (this.theme === 'light') {
+            this.theme = 'dark';
+            bg = '#2e2e2e';
+            fg = "#fff";
+            table_heading_bg = '#474747';
+            table_body_bg = '#7e7e7e';
+            borderColor = '#4e4e4e';
+            borderStyle = 'solid';
+            borderThickness = '1px';
+            status_background_colour = '#404040';
+            border_radius = '10px';
+            muted_text_colour = '#aaa';
+
+            document.getElementById('button_theme').innerHTML = 'Theme: Dark';
+        } else {
+            this.theme = 'light';
+            bg = '#fff';
+            fg = "#444";
+            table_heading_bg = '#bbb';
+            table_body_bg = '#ddd';
+            borderColor = '#e0e0e0';
+            borderStyle = 'solid';
+            borderThickness = '1px';
+            status_background_colour = '#eee';
+            border_radius = '10px';
+            muted_text_colour = '#777';
+
+            document.getElementById('button_theme').innerHTML = 'Theme: Light';
+        }
+
+        document.body.style.backgroundColor = bg;
+        document.body.style.color = fg;
+
+        document.getElementById('status').style.backgroundColor = status_background_colour;
+        document.getElementById('status').style.color = fg;
+        document.getElementById('status').style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
+
+
+        const panels = document.getElementsByClassName('panel-default');
+        for (let i = 0; i < panels.length; i++) {
+            panels[i].style.backgroundColor = bg;
+            panels[i].style.color = fg;
+            panels[i].style.borderRadius = border_radius;
+            panels[i].style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
+        }
+
+        const muted_text = document.getElementsByClassName('text-muted');
+        for (let i = 0; i < muted_text.length; i++) {
+            muted_text[i].style.color = muted_text_colour;
+        }
+
+        let buttons = document.getElementsByTagName('button');
+        for (let i = 0; i < buttons.length; i++) {
+            buttons[i].style.backgroundColor = bg;
+            buttons[i].style.color = fg;
+            buttons[i].style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
+        }
+
+        // Include the ISA link button and download link button
+        buttons = document.getElementsByClassName('button');
+        for (let i = 0; i < buttons.length; i++) {
+            buttons[i].style.backgroundColor = bg;
+            buttons[i].style.color = fg;
+            buttons[i].style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
+        }
+
+        const selects = document.getElementsByClassName('select');
+        for (let i = 0; i < selects.length; i++) {
+            selects[i].style.backgroundColor = bg;
+            selects[i].style.color = fg;
+            selects[i].style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
+        }
+
+        const text_boxes = document.getElementsByTagName('textarea');
+        for (let i = 0; i < text_boxes.length; i++) {
+            text_boxes[i].style.backgroundColor = bg;
+            text_boxes[i].style.color = fg;
+            text_boxes[i].style.borderColor = borderColor;
+        }
+
+        const table_headings = document.getElementsByTagName('th');
+        for (let i = 0; i < table_headings.length; i++) {
+            table_headings[i].style.backgroundColor = table_heading_bg;
+            table_headings[i].style.color = fg;
+        }
+
+        const table_bodies = document.getElementsByTagName('td');
+        for (let i = 0; i < table_bodies.length; i++) {
+            table_bodies[i].style.backgroundColor = table_body_bg;
+            table_bodies[i].style.color = fg;
+        }
+
+        const smalls_body = [...document.getElementsByClassName('table-reg-small'),
+        ...document.getElementsByClassName('table-sreg-small'),
+        ...document.getElementsByClassName('table-dmem-body-small')];
+        for (let i = 0; i < smalls_body.length; i++) {
+            smalls_body[i].style.backgroundColor = table_body_bg;
+            smalls_body[i].style.color = fg;
+        }
+
+        const smalls_headings = document.getElementsByClassName('table-pmem-heading-small');
+        for (let i = 0; i < smalls_headings.length; i++) {
+            smalls_headings[i].style.backgroundColor = table_heading_bg;
+            smalls_headings[i].style.color = fg;
+        }
+
+        this.populateAll();
     }
 
 }
