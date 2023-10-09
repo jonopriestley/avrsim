@@ -417,7 +417,7 @@ class Lexer {
             [/^[\w_]{1}[^;]*:/, 'LABEL'],       // labels
             [/^lo8(?=[(])|^LO8(?=[(])/, 'LO8'],               // lo8
             [/^hi8(?=[(])|^HI8(?=[(])/, 'HI8'],               // hi8
-            [/^[rR]\d+(?=[,; ])/, 'REG'],                // registers
+            [/^[rR]\d+/, 'REG'],                // registers
             [/^-{0,1}0x[\dABCDEFabcdef]+|^-{0,1}\$[\dABCDEFabcdef]+|^-{0,1}0b[01]+/, 'INT'], // numbers
             [/^-{0,1}\d+/, 'INT'],              // numbers
             [/^[a-zA-Z]{2,6}/, 'INST'],         // instructions → CAN TURN LABELS USED IN AN INSTRUCTION INTO INST TYPE
