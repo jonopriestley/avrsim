@@ -428,7 +428,7 @@ class Lexer {
             [/^-[XYZ]/, 'MINUSWORD'],           // -word
             [/^[XYZ]/, 'WORD'],                 // word
             [/^,/, 'COMMA'],                    // comma
-            [/^[^\w\s]+/, 'SYMBOL'],            // symbols
+            [/^[^\w\s;]+/, 'SYMBOL'],            // symbols
             [/^[^\s\d]{1}[\w\d_]*/, 'REF']      // references (like labels used in an instruction)
         ];
 
