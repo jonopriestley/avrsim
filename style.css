@@ -185,18 +185,6 @@ textarea {
     border-radius: 10px;
 }
 
-.button:hover {
-    color: #000;
-    background-color: #eee;
-    border: 1px solid #d0d0d0;
-}
-
-.button:active {
-    color: #000;
-    background-color: #ddd;
-    border: 1px solid #c0c0c0;
-}
-
 .button-theme {
     padding: 8px 15px;
     float: right;

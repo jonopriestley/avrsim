@@ -4680,26 +4680,12 @@ class App {
             muted_text[i].style.color = muted_text_colour;
         }
 
-        let buttons = document.getElementsByTagName('button');
-        for (let i = 0; i < buttons.length; i++) {
-            buttons[i].style.backgroundColor = bg;
-            buttons[i].style.color = fg;
-            buttons[i].style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
-        }
-
         // Include the ISA link button and download link button
-        buttons = document.getElementsByClassName('button');
+        const buttons = document.getElementsByClassName('button');
         for (let i = 0; i < buttons.length; i++) {
             buttons[i].style.backgroundColor = bg;
             buttons[i].style.color = fg;
             buttons[i].style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
-        }
-
-        const selects = document.getElementsByClassName('select');
-        for (let i = 0; i < selects.length; i++) {
-            selects[i].style.backgroundColor = bg;
-            selects[i].style.color = fg;
-            selects[i].style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
         }
 
         const text_boxes = document.getElementsByTagName('textarea');
