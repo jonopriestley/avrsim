@@ -302,8 +302,8 @@ class Instruction {
             K = this.binLenDigits(this.args[1].getValue(), 6);
             return `10010111${K.slice(0, 2)}${d}${K.slice(2)}`;
         } else if (inst === 'ST') {
-            r = this.binLenDigits(this.args[0].getValue(), 5);
-            w = this.args[1].getValue();
+            r = this.binLenDigits(this.args[1].getValue(), 5);
+            w = this.args[0].getValue();
             if (w === 'X') {
                 return `1001001${r}1100`;
             } else if (w === 'X+') {
@@ -529,6 +529,7 @@ class Lexer {
 }
 
 class Parser {
+    
     constructor() {
         this.token_lines = [];
         this.line_numbers = [];
@@ -2834,7 +2835,7 @@ INST_OPCODES = {
     'SEZ': ['1001010000011000'],
     'ST': null,
     'STD': null,
-    'STS': ['k', 'r', '1001001ddddd0000kkkkkkkkkkkkkkkk'],
+    'STS': ['k', 'r', '1001001rrrrr0000kkkkkkkkkkkkkkkk'],
     'SUB': ['d', 'r', '000110rdddddrrrr'],
     'SUBI': ['d', 'K', '0101KKKKddddKKKK'],
     'SWAP': ['d', '1001010ddddd0010'],
@@ -2885,6 +2886,7 @@ Man, you're tough and very long.
 
 
 class App {
+
     constructor() {
         this.pmem_top = 0;
         this.dmem_top = 0x100;
@@ -2915,33 +2917,31 @@ class App {
 
         this.hideOpenPopup(this.current_popup); // hide any open popup
 
-        if (txt.length > 0) {
-
-            // Clear the current data for if there's an error
-            this.resetAll();
-
-            // Tokenizing
-            this.lexer.newData(txt);
-            console.log(this.lexer.getTokenLines());
-
-            // Parsing
-            this.parser.newData(this.lexer.getTokenLines(), this.lexer.getLineNumbers(), txt);
-
-            // Interpreter Initialisation
-            this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), this.parser.getPMEMLineNumbers(), txt);
-
-            // Success!
-            this.success('Success! Your code can be run.');
-
-            // Populating Display with Data
-            this.pmem_top = 0;
-            this.populateAll();
-
-        }
-
-        else {
+        // Stop if no text
+        if (txt.length <= 0) {
             this.newError('No code to parse. Please input code in the code box.');
         }
+
+        // Clear the current data for if there's an error
+        this.resetAll();
+
+        // Tokenizing
+        this.lexer.newData(txt);
+        console.log(this.lexer.getTokenLines());
+
+        // Parsing
+        this.parser.newData(this.lexer.getTokenLines(), this.lexer.getLineNumbers(), txt);
+
+        // Interpreter Initialisation
+        this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), this.parser.getPMEMLineNumbers(), txt);
+
+        // Success!
+        this.success('Success! Your code can be run.');
+
+        // Populating Display with Data
+        this.pmem_top = 0;
+        this.populateAll();
+
 
     }
 
