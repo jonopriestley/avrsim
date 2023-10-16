@@ -992,9 +992,10 @@ class Parser {
                     this.labels[label] = this.pmem.length; //  add it to the labels dictionary
                     
                     // Check the global function label when you get to it
-                    if (label === global_funct_name && this.pmem.length !== 0) {
-                        this.newError(`Incorrect global function location on line ${line_in_file}. The line \'${global_funct_name}:\' must be directly after the .global line.`);
-                    }
+                    if (label === global_funct_name) {
+                        this.dmem[0x5B].setValue(this.pmem.length % 0x100);
+                        this.dmem[0x5C].setValue(parseInt((this.pmem.length - (this.pmem.length % 0x100)) / 0x100)); 
+                        }
 
                     has_label = true;
                 }
@@ -1021,8 +1022,8 @@ class Parser {
                         this.newError(`Illegal ${current_tok.getValue()} right bracket on line ${line_in_file}.`);
                     }
 
-                    // Check the variable is defined
-                    if (this.labels[variable.getValue()] === undefined || variable.getType() !== 'REF') {
+                    // Check the variable is defined or is an int
+                    if (( this.labels[variable.getValue()] === undefined && variable.getType() !== 'INT') || !['REF', 'INT'].includes(variable.getType()) ) {
                         this.newError(`Illegal ${current_tok.getValue()} variable on line ${line_in_file}.`);
                     }
 
@@ -1030,11 +1031,19 @@ class Parser {
 
                     // Convert the value to the hi8/lo8 value
                     if (current_tok.getType() === 'HI8') {
+                        if ( variable.getType() !== 'INT' ) {
                         int_value = this.hi8(this.labels[variable.getValue()]);
+                        } else {
+                            int_value = ( variable.getValue() >> 8 ) & 0xff;
+                        }
                     }
 
                     else {
+                        if ( variable.getType() !== 'INT' ) {
                         int_value = this.lo8(this.labels[variable.getValue()]);
+                        } else {
+                            int_value = variable.getValue() & 0xff;
+                        }
                     }
 
                     line[tok_num] = new Token('INT', int_value);
@@ -1227,11 +1236,13 @@ class Parser {
     }
 
     hi8(val) {
-        return parseInt((val - (val % 0x100)) / 0x100);
+        return ( val >> 8 ) & 0xff;
+        // return parseInt((val - (val % 0x100)) / 0x100);
     }
 
     lo8(val) {
-        return (val % 0x100);
+        return val & 0xff;
+        // return (val % 0x100);
     }
 
     getPMEM() {
@@ -1297,10 +1308,8 @@ class Interpreter {
         // SETTING PC = 0 & SREG = RAMEND
         this.flashend = this.pmem.length - 1;
         this.ramend = this.dmem.length - 1;
-        this.setPC(0);
-        this.setSP(this.ramend);
-
-        
+        this.setPC(0x100 * this.pch.getValue() + this.pcl.getValue());
+        this.setSP(this.ramend); 
         
     }
 
@@ -2295,12 +2304,8 @@ class Interpreter {
     }
 
     setPC(new_value) {
-
-        const hi8 = (new_value - (new_value % 0x100)) / 0x100;
-        const lo8 = (new_value % 0x100);
-
-        this.pch.setValue(hi8);
-        this.pcl.setValue(lo8);
+        this.pch.setValue(( new_value >> 8 ) & 0xff);
+        this.pcl.setValue(new_value & 0xff);
     }
 
     getSP() {
@@ -2308,12 +2313,8 @@ class Interpreter {
     }
 
     setSP(new_value) {
-
-        const hi8 = (new_value - (new_value % 0x100)) / 0x100;
-        const lo8 = (new_value % 0x100);
-
-        this.sph.setValue(hi8);
-        this.spl.setValue(lo8);
+        this.sph.setValue(( new_value >> 8 ) & 0xff);
+        this.spl.setValue(new_value & 0xff);
     }
 
     incSP() {
@@ -2939,7 +2940,7 @@ class App {
         this.success('Success! Your code can be run.');
 
         // Populating Display with Data
-        this.pmem_top = 0;
+        this.pmem_top = this.interpreter.getPC() - ( this.interpreter.getPC() % 8 );
         this.populateAll();
 
 
