@@ -837,9 +837,9 @@ class Parser {
                             escape = false;
                         }
 
-                        if (char_ascii_value > 127) { // check it's a valid character
-                            this.newError(`Bad character \'${char}\' on line ${line_in_file}.`);
-                        }
+                        //if (char_ascii_value > 127) { // check it's a valid character
+                        //    this.newError(`Bad character \'${char}\' on line ${line_in_file}.`);
+                        //}
 
                         this.dmem.push(char_ascii_value % 0x100);           // add to data
                     }
@@ -1295,8 +1295,10 @@ class Interpreter {
         this.step_count = 0;
 
         // DEFINING PC, SP AND SREG
-        this.pcl = this.dmem[0x5B]; // PC lo8
-        this.pch = this.dmem[0x5C]; // PC hi8
+        this.pcl = new Register('PCL', this.dmem[0x5B].getValue(), 0);
+        this.pch = new Register('PCH', this.dmem[0x5C].getValue(), 0);
+        this.dmem[0x5B].setValue(0); // PC was stored in these two previously to
+        this.dmem[0x5C].setValue(0); // easily transfer the information
         this.spl = this.dmem[0x5D]; // SP lo8
         this.sph = this.dmem[0x5E]; // SP hi8
         this.sreg = this.dmem[0x5F]; // SREG
@@ -1304,7 +1306,7 @@ class Interpreter {
         // SETTING PC = 0 & SREG = RAMEND
         this.flashend = this.pmem.length - 1;
         this.ramend = this.dmem.length - 1;
-        this.setPC(0x100 * this.pch.getValue() + this.pcl.getValue());
+        this.setPC((this.pch.getValue() << 8) + this.pcl.getValue());
         this.setSP(this.ramend); 
         
     }
@@ -1373,7 +1375,7 @@ class Interpreter {
                 }
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
 
-                R = this.getDMEM()[line.getArgs()[0].getValue()] + (0x100 * this.getDMEM()[line.getArgs()[0].getValue() + 1]);
+                R = this.getDMEM()[line.getArgs()[0].getValue()] + (this.getDMEM()[line.getArgs()[0].getValue() + 1] << 8);
                 
                 V = ((R - K) <= 0x7fff) && ((R >> 15) & 1);
                 N = (R > 0x7fff);
@@ -2003,8 +2005,8 @@ class Interpreter {
                 }
 
                 // Get the return line and move the SP
-                this.incSP();;
-                let ret_line = (0x100 * this.getDMEM()[this.getSP()]); // get the ret high value
+                this.incSP();
+                let ret_line = (this.getDMEM()[this.getSP()] << 8); // get the ret high value
                 this.incSP();
                 ret_line += this.getDMEM()[this.getSP()]; // add the ret low value to the ret high value
                 this.setPC(ret_line);
@@ -2082,7 +2084,7 @@ class Interpreter {
                 }
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
 
-                R = this.getDMEM()[line.getArgs()[0].getValue()] + (0x100 * this.getDMEM()[line.getArgs()[0].getValue() + 1]);
+                R = this.getDMEM()[line.getArgs()[0].getValue()] + (this.getDMEM()[line.getArgs()[0].getValue() + 1] << 8);
                 
                 V = ((R - K) <= 0x7fff) && ((R >> 15) & 1);
                 N = (R > 0x7fff);
@@ -2297,7 +2299,7 @@ class Interpreter {
     }
 
     getPC() {
-        return (0x100 * this.pch.getValue()) + this.pcl.getValue();
+        return (this.pch.getValue() << 8) + this.pcl.getValue();
     }
 
     setPC(new_value) {
@@ -2306,7 +2308,7 @@ class Interpreter {
     }
 
     getSP() {
-        return (0x100 * this.sph.getValue()) + this.spl.getValue();
+        return (this.sph.getValue() << 8) + this.spl.getValue();
     }
 
     setSP(new_value) {
