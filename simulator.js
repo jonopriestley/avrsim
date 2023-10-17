@@ -44,7 +44,7 @@ class Register {
     }
     setValue(new_value) {
         this.last_value = this.value;
-        this.value = ((new_value % 256) + 256) % 256;
+        this.value = ((new_value % 0x100) + 0x100) % 0x100;
         this.setChange();
     }
     getValue() {
@@ -1030,7 +1030,7 @@ class Parser {
                         if ( variable.getType() !== 'INT' ) {
                         int_value = this.hi8(this.labels[variable.getValue()]);
                         } else {
-                            int_value = ( variable.getValue() >> 8 ) & 0xff;
+                            int_value = (variable.getValue() >> 8) & 0xff;
                         }
                     }
 
@@ -1232,7 +1232,7 @@ class Parser {
     }
 
     hi8(val) {
-        return ( val >> 8 ) & 0xff;
+        return (val >> 8) & 0xff;
         // return parseInt((val - (val % 0x100)) / 0x100);
     }
 
@@ -1615,17 +1615,21 @@ class Interpreter {
                         return;
                     }
                     
-                    // Pop address into X
-                    this.incSP();                                                       // increment the SP by 1
-                    this.getDMEM()[26].setValue(this.getDMEM()[this.getSP()]);
-                    this.incSP();                                                       // increment the SP by 1
-                    this.getDMEM()[27].setValue(this.getDMEM()[this.getSP()]);
+                    const sp = this.getSP();
+                    let address = this.getDMEM()[this.getSP() + 1] + ( this.getDMEM()[this.getSP() + 2] << 8);
+
+                    this.getDMEM()[26].setValue(0xff);
+                    this.getDMEM()[27].setValue(0x08);
+                    this.getDMEM()[30].setValue(0x02);
+                    this.getDMEM()[31].setValue(0x01);
                     
                     // Do the printing
                     let K, char;
+                    let W = 0;
                     while (true) {
-                        K = this.getDMEM()[this.getX()]
-                        this.incX();
+                        K = this.getDMEM()[address];
+                        address = address + 1;
+                        W = W + 1;
                         if (K === 0) {
                             break;
                         }
@@ -1633,14 +1637,11 @@ class Interpreter {
                         document.getElementById('console').innerHTML += char;           // add it to the console
                     }
 
+                    this.getDMEM()[24].setValue( W & 0xff );
+                    this.getDMEM()[25].setValue( (W >> 8) & 0xff );
+
                     //document.getElementById('console').innerHTML += '\n';               // add a new line after a print
 
-                    // Push X value back onto stack
-                    this.getDMEM()[this.getSP()] = this.getDMEM()[27].getValue();
-                    this.decSP();                                                       // decrement the SP by 1
-                    this.getDMEM()[this.getSP()] = this.getDMEM()[26].getValue();
-                    this.decSP();                                                       // decrement the SP by 1
-                    
                     // Increment to go past the double instruction
                     this.incPC();    
                     
@@ -2300,7 +2301,7 @@ class Interpreter {
     }
 
     setPC(new_value) {
-        this.pch.setValue(( new_value >> 8 ) & 0xff);
+        this.pch.setValue((new_value >> 8) & 0xff);
         this.pcl.setValue(new_value & 0xff);
     }
 
@@ -2309,7 +2310,7 @@ class Interpreter {
     }
 
     setSP(new_value) {
-        this.sph.setValue(( new_value >> 8 ) & 0xff);
+        this.sph.setValue((new_value >> 8) & 0xff);
         this.spl.setValue(new_value & 0xff);
     }
 
@@ -2433,8 +2434,27 @@ class Interpreter {
         */
     }
 
+    getW() {
+        return (this.getDMEM()[25].getValue() << 8) + this.getDMEM()[24].getValue()
+    }
+
+    incW() {
+        const W = this.getW() + 1;
+        this.getDMEM()[25].setValue((W>>8) & 0xff);
+        this.getDMEM()[24].setValue(W & 0xff);
+    }
+
+    decW() {
+        const WL = this.getDMEM()[24].getValue();
+        const WH = this.getDMEM()[25].getValue();
+        if (WL === 0) {
+            this.getDMEM()[25].setValue(WH - 1);
+        }
+        this.getDMEM()[24].setValue(WL - 1);
+    }
+
     getX() {
-        return (0x100 * this.getDMEM()[27].getValue()) + this.getDMEM()[26].getValue()
+        return (this.getDMEM()[27].getValue() << 8) + this.getDMEM()[26].getValue();
     }
 
     incX() {
@@ -2456,7 +2476,7 @@ class Interpreter {
     }
 
     getY() {
-        return (0x100 * this.getDMEM()[29].getValue()) + this.getDMEM()[28].getValue()
+        return (this.getDMEM()[29].getValue() << 8) + this.getDMEM()[28].getValue()
     }
 
     incY() {
@@ -2478,7 +2498,7 @@ class Interpreter {
     }
 
     getZ() {
-        return (0x100 * this.getDMEM()[31].getValue()) + this.getDMEM()[30].getValue()
+        return (this.getDMEM()[31].getValue() << 8) + this.getDMEM()[30].getValue();
     }
 
     incZ() {
