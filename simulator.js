@@ -698,10 +698,6 @@ class Parser {
 
             }
 
-
-
-
-
         }
 
         //////////////////////////////////////////////
@@ -745,7 +741,7 @@ class Parser {
             // DEAL WITH LABELS AT THE START OF THE LINE
             if (line[tok_num].getType() === 'LABEL') {
                 let label = line[0].getValue();                 // get label with the colon at the end
-                label = label.slice(0, (label.length - 1));
+                label = label.slice(0, (label.length - 1)).trim();
                 this.labels[label] = this.dmem.length;          // add location of the data label
                 tok_num += 1;
                 if (tok_num >= line_length) {
@@ -988,7 +984,7 @@ class Parser {
                         this.newError(`Illegal label location on line ${line_in_file}.`);
                     }
 
-                    const label = current_tok.getValue().slice(0, (current_tok.getValue().length - 1)); // remove the colon from the end
+                    const label = current_tok.getValue().slice(0, (current_tok.getValue().length - 1)).trim(); // remove the colon from the end
                     this.labels[label] = this.pmem.length; //  add it to the labels dictionary
                     
                     // Check the global function label when you get to it
