@@ -423,7 +423,8 @@ class Lexer {
             [/^[a-zA-Z]{2,6}/, 'INST'],         // instructions → CAN TURN LABELS USED IN AN INSTRUCTION INTO INST TYPE
             [/^\".*?\"|^\'.*?\'/, 'STR'],       // string
             [/^\.[^\.\s]+/, 'DIR'],             // directives
-            [/^[YZ]\+\d{1,2}/, 'WORDPLUSQ'],    // word+q
+            [/^[YZ][ \t]*\+[ \t]*\d{1,2}/, 'WORDPLUSQ'],    // word+q
+            [/^[X][ \t]*\+[ \t]*\d{1,2}/, 'XPLUSQ'],    // X+q
             [/^[XYZ]\+/, 'WORDPLUS'],           // word+
             [/^-[XYZ]/, 'MINUSWORD'],           // -word
             [/^[XYZ]/, 'WORD'],                 // word
@@ -1130,34 +1131,36 @@ class Parser {
                 const current_tok = line[tok_num];
 
                 // Replace REF with integer for branching
-                if (current_tok.getType() === 'REF') {
-
-                    // Check the label reference is a real label or function
-                    if (this.labels[current_tok.getValue()] === undefined && !FUNCTIONS.includes(current_tok.getValue())) {
-                        this.newError(`Illegal token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
-                    }
-
-                    // If it's a non relative control flow instruction and it's not a function
-                    if (control_flow_instructions.slice(0, 2).includes(first_tok.getValue()) && !FUNCTIONS.includes(current_tok.getValue())) {
-
-                        let k = this.labels[current_tok.getValue()];      // Get k for label
-
-                        // Replace it in the line
-                        current_tok.setType('INT');
-                        current_tok.setValue(k);
-                    }
-
-                    // If it's a relative control flow instruction
-                    else if (control_flow_instructions.slice(2).includes(first_tok.getValue())) {
-
-                        let k = this.labels[current_tok.getValue()];      // Get k for label
-                        let relative_k = k - 1 - line_num;                  // the k for relative jumping instructions
-
-                        // Replace it in the line
-                        current_tok.setType('INT');
-                        current_tok.setValue(relative_k);
-                    }
+                if (current_tok.getType() !== 'REF') {
+                    continue
                 }
+
+                // Check the label reference is a real label or function
+                if (this.labels[current_tok.getValue()] === undefined && !FUNCTIONS.includes(current_tok.getValue())) {
+                    this.newError(`Illegal token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
+                }
+
+                // If it's a non relative control flow instruction and it's not a function
+                if (control_flow_instructions.slice(0, 2).includes(first_tok.getValue()) && !FUNCTIONS.includes(current_tok.getValue())) {
+
+                    let k = this.labels[current_tok.getValue()];      // Get k for label
+
+                    // Replace it in the line
+                    current_tok.setType('INT');
+                    current_tok.setValue(k);
+                }
+
+                // If it's a relative control flow instruction
+                else if (control_flow_instructions.slice(2).includes(first_tok.getValue())) {
+
+                    let k = this.labels[current_tok.getValue()];      // Get k for label
+                    let relative_k = k - 1 - line_num;                  // the k for relative jumping instructions
+
+                    // Replace it in the line
+                    current_tok.setType('INT');
+                    current_tok.setValue(relative_k);
+                }
+                
             }
         }
 
@@ -1204,7 +1207,7 @@ class Parser {
 
             // CHECK IF IT'S GOT THE WRONG NUMBER OF ARGUMENTS
             if ((expected_args === null && given_args.length > 0) || (expected_args !== null && (given_args.length !== expected_args.length))) {
-                this.newError(`Wrong number of arguments given on line ${line_in_file}.`);
+                this.newError(`Wrong number of arguments given on line ${line_in_file} for the ${inst} instruction. Please refer to the instruction manual.`);
             }
 
             // CHECK THE ARGUMENTS
