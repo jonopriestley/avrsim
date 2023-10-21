@@ -221,7 +221,7 @@ class Instruction {
                 const arg = this.args[arg_num].getValue(); // the argument value
                 let var_value;
                 // If it's a 2's comp value then make it 2's comp
-                if (['RJMP'].concat(INST_LIST.slice(7, 27)).includes(this.inst.getValue())) {
+                if (['RJMP','RCALL'].concat(INST_LIST.slice(7, 27)).includes(this.inst.getValue())) {
                     var_value = this.twosComp(arg, digit_count);
                 }
                 else if (FUNCTIONS.includes(arg)) {
@@ -1106,7 +1106,7 @@ class Parser {
             this.newError(`Cannot find the global label \'${global_funct_name}\' to begin the program. Check spelling if unsure.`);
         }
 
-        const control_flow_instructions = ['CALL', 'JMP', 'RJMP'].concat(INST_LIST.slice(7, 27)); // all the branching instructions
+        const control_flow_instructions = ['CALL', 'JMP', 'IJMP', 'ICALL', 'RJMP', 'RCALL'].concat(INST_LIST.slice(7, 27)); // all the branching instructions
 
         // TURN ALL REFS INTO CORRECT FORM
         for (let line_num = 0; line_num < this.pmem.length; line_num++) {
@@ -1138,7 +1138,7 @@ class Parser {
                 }
 
                 // If it's a non relative control flow instruction and it's not a function
-                if (control_flow_instructions.slice(0, 2).includes(first_tok.getValue()) && !FUNCTIONS.includes(current_tok.getValue())) {
+                if (control_flow_instructions.slice(0, 4).includes(first_tok.getValue()) && !FUNCTIONS.includes(current_tok.getValue())) {
 
                     let k = this.labels[current_tok.getValue()];      // Get k for label
 
@@ -1148,7 +1148,7 @@ class Parser {
                 }
 
                 // If it's a relative control flow instruction
-                else if (control_flow_instructions.slice(2).includes(first_tok.getValue())) {
+                else if (control_flow_instructions.slice(4).includes(first_tok.getValue())) {
 
                     let k = this.labels[current_tok.getValue()];      // Get k for label
                     let relative_k = k - 1 - line_num;                  // the k for relative jumping instructions
@@ -1791,6 +1791,28 @@ class Interpreter {
                 N = this.getBit(R, 7);
                 this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), null);
                 break;
+            case 'ICALL':
+                this.incPC();
+
+                if (this.getSP() <= 0x101) {
+                    this.newError(`Bad stack pointer for CALL on line ${line_in_file}.`)
+                    return;
+                }
+
+                this.getDMEM()[this.getSP()] = this.pcl.getValue();              // push pcl in STACK
+                this.decSP();
+                this.getDMEM()[this.getSP()] = this.pch.getValue();              // push pch in STACK
+                this.decSP();
+
+                k = this.getZ();
+                this.setPC(k);
+                skip_inc = true;
+                break;
+            case 'IJMP':
+                k = this.getZ();
+                this.setPC(k);
+                skip_inc = true;
+                break;
             case 'IN':
                 Rd = this.getArgumentValue(line, 0);
                 A = this.getArgumentValue(line, 1);
@@ -1986,6 +2008,25 @@ class Interpreter {
                 Rr = this.getArgumentValue(line, 0);            // register held value
                 this.getDMEM()[this.getSP()] = Rr;              // set the value in DMEM
                 this.decSP();                                   // decrement the SP by 1
+                break;
+            case 'RCALL':
+                this.incPC();
+
+                if (this.getSP() <= 0x101) {
+                    this.newError(`Bad stack pointer for CALL on line ${line_in_file}.`)
+                    return;
+                }
+
+                this.getDMEM()[this.getSP()] = this.pcl.getValue();              // push pcl in STACK
+                this.decSP();
+                this.getDMEM()[this.getSP()] = this.pch.getValue();              // push pch in STACK
+                this.decSP();
+
+                this.decPC();
+
+                k = this.getArgumentValue(line, 0);
+                this.setPC(this.getPC() + k + 1);
+                skip_inc = true;
                 break;
             case 'RJMP':
                 k = this.getArgumentValue(line, 0);
@@ -2600,6 +2641,8 @@ INST_LIST = [
     'CPSE',
     'DEC',
     'EOR',
+    'ICALL',
+    'IJMP',
     'IN',
     'INC',
     'JMP',
@@ -2621,6 +2664,7 @@ INST_LIST = [
     'OUT',
     'POP',
     'PUSH',
+    'RCALL',
     'RJMP',
     'RET',
     'ROL',
@@ -2713,6 +2757,8 @@ INST_OPERANDS = {
     'CPSE': [reg_0_31, reg_0_31],
     'DEC': [reg_0_31],
     'EOR': [reg_0_31, reg_0_31],
+    'ICALL': null,
+    'IJMP': null,
     'IN': [reg_0_31, int_0_63],
     'INC': [reg_0_31],
     'JMP': [new Argument('INT', 0, 4194303)],
@@ -2735,6 +2781,7 @@ INST_OPERANDS = {
     'POP': [reg_0_31],
     'PUSH': [reg_0_31],
     'RET': null,
+    'RCALL': [new Argument('INT', -2048, 2047)],
     'RJMP': [new Argument('INT', -2048, 2047)],
     'ROL': [reg_0_31],
     'ROR': [reg_0_31],
@@ -2815,6 +2862,8 @@ INST_OPCODES = {
     'CPSE': ['d', 'r', '000100rdddddrrrr'],
     'DEC': ['d', '1001010ddddd1010'],
     'EOR': ['d', 'r', '001001rdddddrrrr'],
+    'ICALL': ['1001010100001001'],
+    'IJMP': ['1001010000001001'],
     'IN': ['d', 'A', '10110AAdddddAAAA'],
     'INC': ['d', '1001010ddddd0011'],
     'JMP': ['k', '1001010kkkkk110kkkkkkkkkkkkkkkkk'],
@@ -2837,6 +2886,7 @@ INST_OPCODES = {
     'POP': ['d', '1001000ddddd1111'],
     'PUSH': ['r', '1001001rrrrr1111'],
     'RET': ['1001010100001000'],
+    'RCALL': ['k', '1101kkkkkkkkkkkk'], // this one needs 2's comp too
     'RJMP': ['k', '1100kkkkkkkkkkkk'], // this one needs 2's comp too
     'ROL': null,
     'ROR': ['d', '1001010ddddd0111'],
@@ -4071,6 +4121,20 @@ class App {
 
                     Operation:
                     Rd = Rd ⊕ Rr`,
+            'ICALL': `Syntax:   ICALL
+                    Family:   Branch Instructions
+                    Function: Calls to a subroutine within the entire 4M (words) Program memory. The return address (to the instruction after the CALL) will be stored onto the Stack. See also RCALL. The Stack Pointer uses a post-decrement scheme during CALL. This instruction is not available in all devices. Refer to the device specific instruction set summary.
+
+                    Operations:
+                    PC = Z(15:0)
+                    SP = SP - 2
+                    STACK ← PC + 1`,
+            'IJMP': `Syntax:   IJMP
+                    Family:   Branch Instructions
+                    Function: Indirect jump to the address pointed to by the Z (16 bits) Pointer Register in the Register File. The Zpointer Register is 16 bits wide and allows jump within the lowest 64K words (128KB) section of Program memory. This instruction is not available in all devices. Refer to the device specific instruction set summary.
+
+                    Operation:
+                    PC = Z(15:0)`,
             'IN': `Syntax:   IN Rd, A
                     Family:   Data Transfer Instructions
                     Function: Loads data from the I/O space (ports, timers, configuration registers, etc.) into register Rd in the register file
@@ -4323,6 +4387,17 @@ class App {
 
                     Operation:
                     PC(15:0) ← STACK`,
+            'RCALL': `Syntax:   RCALL k
+                    Family:   Branch Instructions
+                    Function: Relative call to an address within PC - 2047 and PC + 2048 (words)
+
+                    Boundaries:
+                    k → [-2048 - 2047]
+
+                    Operation:
+                    PC = PC + k + 1
+                    SP = SP - 2
+                    STACK ← PC + 1`,
             'RJMP': `Syntax:   RJMP k
                     Family:   Branch Instructions
                     Function: Relative jump to an address within PC - 2047 and PC + 2048 (words)
