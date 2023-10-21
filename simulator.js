@@ -44,7 +44,7 @@ class Register {
     }
     setValue(new_value) {
         this.last_value = this.value;
-        this.value = ((new_value % 0x100) + 0x100) % 0x100;
+        this.value = new_value & 0xff;
         this.setChange();
     }
     getValue() {
@@ -775,11 +775,8 @@ class Parser {
                     if (current_tok.getType() !== 'INT') { // expecting integer
                         this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
-                    if (current_tok.getValue() < 0) {                               // JS has weird behaviour for -n % m so we need to correct for it
-                        this.dmem.push(0x100 + (current_tok.getValue() % 0x100));   // fix then add to data
-                    } else {
-                    this.dmem.push(current_tok.getValue() % 0x100); // add to data
-                    }
+
+                    this.dmem.push(current_tok.getValue() & 0xff);
                 }
 
                 // String, Ascii, Asciz directives
@@ -842,7 +839,7 @@ class Parser {
                         //    this.newError(`Bad character \'${char}\' on line ${line_in_file}.`);
                         //}
 
-                        this.dmem.push(char_ascii_value % 0x100);           // add to data
+                        this.dmem.push(char_ascii_value & 0xff);           // add to data
                     }
 
                     if (['.string', '.asciz'].includes(line_directive)) {   // add NULL if directive requires it
@@ -883,7 +880,7 @@ class Parser {
                         const space_value = current_tok.getValue();             // value of the spaces
                         const number_of_spaces = line[tok_num - 2].getValue();  // the number of spaces we're making
                         for (let i = 0; i < number_of_spaces; i++) {
-                            this.dmem.push(space_value % 0x100);                // add the value for as many spaces as needed
+                            this.dmem.push(space_value & 0xff);                // add the value for as many spaces as needed
                         }
                     }
 
@@ -990,8 +987,8 @@ class Parser {
                     
                     // Check the global function label when you get to it
                     if (label === global_funct_name) {
-                        this.dmem[0x5B].setValue(this.pmem.length % 0x100);
-                        this.dmem[0x5C].setValue(parseInt((this.pmem.length - (this.pmem.length % 0x100)) / 0x100)); 
+                        this.dmem[0x5B].setValue(this.pmem.length & 0xff);
+                        this.dmem[0x5C].setValue((this.pmem.length >> 8) & 0xff); 
                         }
 
                     has_label = true;
@@ -1344,7 +1341,7 @@ class Interpreter {
                 Rd = this.getArgumentValue(line, 0);
                 Rr = this.getArgumentValue(line, 1);
                 C = this.getSREG() & 1;
-                R = (((Rd + Rr + C) % 0x100) + 0x100) % 0x100;
+                R = this.mod256(Rd + Rr + C);
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd + Rr + C
 
@@ -1357,7 +1354,7 @@ class Interpreter {
             case 'ADD':
                 Rd = this.getArgumentValue(line, 0);
                 Rr = this.getArgumentValue(line, 1);
-                R = (((Rd + Rr) % 0x100) + 0x100) % 0x100;
+                R = this.mod256(Rd + Rr);
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd + Rr
 
@@ -1371,7 +1368,7 @@ class Interpreter {
                 Rd = this.getArgumentValue(line, 0);
                 K = this.getArgumentValue(line, 1);
                 if ((Rd + K) > 0xff) {
-                    R = (Rd + K) % 0x100;
+                    R = this.mod256(Rd + K);
                     this.getDMEM()[line.getArgs()[0].getValue() + 1].inc();
                 } else {
                     R = Rd + K;
@@ -1410,7 +1407,7 @@ class Interpreter {
             case 'ASR':
                 Rd = this.getArgumentValue(line, 0);
                 R = Rd;
-                R = (R >> 1) & 0xff;
+                R = this.mod256(R >> 1);
                 if ((R & 64) !== 0) {
                     R += 128
                 }
@@ -1642,8 +1639,8 @@ class Interpreter {
                         document.getElementById('console').innerHTML += char;           // add it to the console
                     }
 
-                    this.getDMEM()[24].setValue( W & 0xff );
-                    this.getDMEM()[25].setValue( (W >> 8) & 0xff );
+                    this.getDMEM()[24].setValue(this.mod256(W));
+                    this.getDMEM()[25].setValue(this.mod256(W >> 8));
 
                     //document.getElementById('console').innerHTML += '\n';               // add a new line after a print
 
@@ -1724,7 +1721,7 @@ class Interpreter {
             case 'CP':
                 Rd = this.getArgumentValue(line, 0);
                 Rr = this.getArgumentValue(line, 1);
-                R = (((Rd - Rr) % 0x100) + 0x100) % 0x100;
+                R = this.mod256(Rd - Rr);
 
                 H = (this.getBit(R, 3) & this.getBit(Rr, 3)) | (this.getBit(Rr, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(R, 3) & (1 - this.getBit(Rd, 3)));
                 V = (this.getBit(R, 7) & this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | ((1 - this.getBit(R, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(Rd, 7));
@@ -1736,7 +1733,7 @@ class Interpreter {
                 Rd = this.getArgumentValue(line, 0);
                 Rr = this.getArgumentValue(line, 1);
                 C = this.getSREG() & 1;
-                R = (((Rd - Rr - C) % 0x100) + 0x100) % 0x100;
+                R = this.mod256(Rd - Rr - C);
 
                 H = (this.getBit(R, 3) & this.getBit(Rr, 3)) | (this.getBit(Rr, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(R, 3) & (1 - this.getBit(Rd, 3)));
                 V = (this.getBit(R, 7) & this.getBit(Rr, 7) & (1 - this.getBit(Rd, 7))) | ((1 - this.getBit(R, 7)) & (1 - this.getBit(Rr, 7)) & this.getBit(Rd, 7));
@@ -1748,7 +1745,7 @@ class Interpreter {
             case 'CPI':
                 Rd = this.getArgumentValue(line, 0);
                 K = this.getArgumentValue(line, 1);
-                R = (((Rd - K) % 0x100) + 0x100) % 0x100;
+                R = this.mod256(Rd - K);
 
                 H = (this.getBit(R, 3) & this.getBit(K, 3)) | (this.getBit(K, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(R, 3) & (1 - this.getBit(Rd, 3)));
                 V = (this.getBit(R, 7) & this.getBit(K, 7) & (1 - this.getBit(Rd, 7))) | ((1 - this.getBit(R, 7)) & (1 - this.getBit(K, 7)) & this.getBit(Rd, 7));
@@ -1775,7 +1772,7 @@ class Interpreter {
                 break;
             case 'DEC':
                 Rd = this.getArgumentValue(line, 0);
-                R = (((Rd - 1) % 0x100) + 0x100) % 0x100;
+                R = this.mod256(Rd - 1);
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd - 1
 
@@ -1803,7 +1800,7 @@ class Interpreter {
                 break;
             case 'INC':
                 Rd = this.getArgumentValue(line, 0);
-                R = (((Rd + 1) % 0x100) + 0x100) % 0x100;
+                R = this.mod256(Rd + 1);
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd + 1
 
@@ -1871,7 +1868,7 @@ class Interpreter {
                 break;
             case 'LSL':
                 Rd = this.getArgumentValue(line, 0);
-                R = (((Rd + Rd) % 0x100) + 0x100) % 0x100;
+                R = this.mod256(Rd + Rd);
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd + Rd
 
@@ -1883,7 +1880,7 @@ class Interpreter {
                 break;
             case 'LSR':
                 Rd = this.getArgumentValue(line, 0);
-                R = (Rd >> 1) & 0xff;
+                R = this.mod256(Rd >> 1);
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
 
                 N = 0;
@@ -1906,8 +1903,8 @@ class Interpreter {
                 Rr = this.getArgumentValue(line, 1);
                 R = Rd * Rr;
 
-                this.getDMEM()[0].setValue(R % 256);
-                this.getDMEM()[1].setValue((R - (R % 256)) / 256);
+                this.getDMEM()[0].setValue(this.mod256(R));
+                this.getDMEM()[1].setValue(this.mod256(R >> 8));
 
                 this.updateSREG(null, null, null, null, null, null, (R === 0), (R >> 15) & 1);
                 break;
@@ -1916,8 +1913,8 @@ class Interpreter {
                 Rr = this.getArgumentValue(line, 1);
                 R = Rd * Rr;
                 
-                this.getDMEM()[0].setValue(R % 256);
-                this.getDMEM()[1].setValue((R - (R % 256)) / 256);
+                this.getDMEM()[0].setValue(this.mod256(R));
+                this.getDMEM()[1].setValue(this.mod256(R >> 8));
 
                 this.updateSREG(null, null, null, null, null, null, (R === 0), (R >> 15) & 1);
                 break;
@@ -1926,14 +1923,14 @@ class Interpreter {
                 Rr = this.getArgumentValue(line, 1);
                 R = Rd * Rr;
                 
-                this.getDMEM()[0].setValue(R % 256);
-                this.getDMEM()[1].setValue((R - (R % 256)) / 256);
+                this.getDMEM()[0].setValue(this.mod256(R));
+                this.getDMEM()[1].setValue(this.mod256(R >> 8));
 
                 this.updateSREG(null, null, null, null, null, null, (R === 0), (R >> 15) & 1);
                 break;
             case 'NEG':
                 Rd = this.getArgumentValue(line, 0);
-                R = (((0 - Rd) % 0x100) + 0x100) % 0x100;
+                R = this.mod256(0 - Rd);
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- 0 - Rd
 
@@ -2018,7 +2015,7 @@ class Interpreter {
             case 'ROL':
                 Rd = this.getArgumentValue(line, 0);
                 C = this.getSREG() & 1;
-                R = ((Rd << 1) & 0xff) + C;
+                R = this.mod256(Rd << 1) + C;
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
 
@@ -2031,7 +2028,7 @@ class Interpreter {
             case 'ROR':
                 Rd = this.getArgumentValue(line, 0);
                 C = this.getSREG() & 1;
-                R = ((Rd >> 1) & 0xff) + (128 * C);
+                R = this.mod256(Rd >> 1) + (C << 7);
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
 
@@ -2044,7 +2041,7 @@ class Interpreter {
                 Rd = this.getArgumentValue(line, 0);
                 Rr = this.getArgumentValue(line, 1);
                 C = this.getSREG() & 1;
-                R = (((Rd - Rr - C) % 0x100) + 0x100) % 0x100;
+                R = this.mod256(Rd - Rr - C);
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd - Rr - C
 
@@ -2059,7 +2056,7 @@ class Interpreter {
                 Rd = this.getArgumentValue(line, 0);
                 K = this.getArgumentValue(line, 1);
                 C = this.getSREG() & 1;
-                R = (((Rd - K - C) % 0x100) + 0x100) % 0x100;
+                R = this.mod256(Rd - K - C);
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd - K - C
 
@@ -2227,7 +2224,7 @@ class Interpreter {
             case 'SUB':
                 Rd = this.getArgumentValue(line, 0);
                 Rr = this.getArgumentValue(line, 1);
-                R = (((Rd - Rr) % 0x100) + 0x100) % 0x100;
+                R = this.mod256(Rd - Rr);
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd - Rr
 
@@ -2240,7 +2237,7 @@ class Interpreter {
             case 'SUBI':
                 Rd = this.getArgumentValue(line, 0);
                 K = this.getArgumentValue(line, 1);
-                R = (((Rd - K) % 0x100) + 0x100) % 0x100;
+                R = this.mod256(Rd - K);
 
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);   // Rd <-- Rd - K
 
@@ -2306,8 +2303,8 @@ class Interpreter {
     }
 
     setPC(new_value) {
-        this.pch.setValue((new_value >> 8) & 0xff);
-        this.pcl.setValue(new_value & 0xff);
+        this.pch.setValue(this.mod256(new_value >> 8));
+        this.pcl.setValue(this.mod256(new_value));
     }
 
     getSP() {
@@ -2315,8 +2312,8 @@ class Interpreter {
     }
 
     setSP(new_value) {
-        this.sph.setValue((new_value >> 8) & 0xff);
-        this.spl.setValue(new_value & 0xff);
+        this.sph.setValue(this.mod256(new_value >> 8));
+        this.spl.setValue(this.mod256(new_value));
     }
 
     incSP() {
@@ -2445,8 +2442,8 @@ class Interpreter {
 
     incW() {
         const W = this.getW() + 1;
-        this.getDMEM()[25].setValue((W>>8) & 0xff);
-        this.getDMEM()[24].setValue(W & 0xff);
+        this.getDMEM()[25].setValue(this.mod256(W >> 8));
+        this.getDMEM()[24].setValue(this.mod256(W));
     }
 
     decW() {
@@ -2533,6 +2530,10 @@ class Interpreter {
         else if (arg.getType() === 'REG') {
             return this.getDMEM()[arg.getValue()].getValue();
         }
+    }
+
+    mod256(val) {
+        return val & 0xff;
     }
 
     newError(text) {
