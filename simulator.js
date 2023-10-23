@@ -412,27 +412,35 @@ class Lexer {
 
         // Define regular expressions for each token type
         const patterns = [
-            [/^;.*/, null],                     // comments
+            [/^;.*$/, null],                     // comments
             [/^\s+/, null],                     // whitespace
             [/^[\w_]{1}[^;]*:/, 'LABEL'],       // labels
-            [/^lo8(?=[(])|^LO8(?=[(])/, 'LO8'],               // lo8
-            [/^hi8(?=[(])|^HI8(?=[(])/, 'HI8'],               // hi8
-            [/^[rR]\d+(?=[,;\s])/, 'REG'],                // registers
-            [/^-{0,1}0x[\dABCDEFabcdef]+|^-{0,1}\$[\dABCDEFabcdef]+|^-{0,1}0b[01]+/, 'INT'], // numbers
+            [/^lo8(?=[(])/, 'LO8'],             // lo8
+            [/^LO8(?=[(])/, 'LO8'],             // lo8
+            [/^hi8(?=[(])/, 'HI8'],             // hi8
+            [/^HI8(?=[(])/, 'HI8'],             // hi8
+            [/^[rR]\d+(?=[,;\s])/, 'REG'],      // registers
+            [/^-{0,1}0[xX][\dA-Fa-f]+/, 'INT'], // numbers
+            [/^-{0,1}\$[\dA-Fa-f]+/, 'INT'],    // numbers
+            [/^-{0,1}0[oO][0-7]+/, 'INT'],      // numbers
+            [/^-{0,1}0[bB][01]+/, 'INT'],       // numbers
             [/^-{0,1}\d+/, 'INT'],              // numbers
             [/^[a-zA-Z]{2,6}/, 'INST'],         // instructions → CAN TURN LABELS USED IN AN INSTRUCTION INTO INST TYPE
-            [/^\".*?\"|^\'.*?\'/, 'STR'],       // string
-            [/^\.[^\.\s]+/, 'DIR'],             // directives
-            [/^[YZ][ \t]*\+[ \t]*\d{1,2}/, 'WORDPLUSQ'],    // word+q
-            [/^[X][ \t]*\+[ \t]*\d{1,2}/, 'XPLUSQ'],    // X+q
+            [/^\".*?\"/, 'STR'],                // string
+            [/^\'.*?\'/, 'STR'],                // string
+            // [/^\.[^\.\s]+/, 'DIR'],             // directives
+            [/\.(section|text|data|global|end)/, 'DIR'],        // directives
+            [/\.(byte|word|string|ascii|asciz|space|def)/, 'DIR'],   // directives
+            [/^[YZ][ \t]*\+[ \t]*\d{1,2}/, 'WORDPLUSQ'],        // word+q
+            [/^[X][ \t]*\+[ \t]*\d{1,2}/, 'XPLUSQ'],            // X+q
             [/^[XYZ]\+/, 'WORDPLUS'],           // word+
             [/^-[XYZ]/, 'MINUSWORD'],           // -word
             [/^[XYZ]/, 'WORD'],                 // word
             [/^,/, 'COMMA'],                    // comma
-            [/^[^\w\s;]+/, 'SYMBOL'],            // symbols
+            [/^[^\w\s;]+/, 'SYMBOL'],           // symbols
             [/^[^\s\d]{1}[\w\d_]*/, 'REF']      // references (like labels used in an instruction)
         ];
-
+        
         const tokens = [];
         const line_nums = [];
 
@@ -677,7 +685,7 @@ class Parser {
                     let int_value = 0;
 
                     // this line is technically irrelevant since parseInt deals with 0x already
-                    if (current_tok.getValue().includes('x')) {
+                    if (current_tok.getValue().includes('x') || current_tok.getValue().includes('X')) {
                         int_value = parseInt(current_tok.getValue().slice(2), 16);
                     }
 
@@ -685,7 +693,11 @@ class Parser {
                         int_value = parseInt(current_tok.getValue().slice(1), 16);
                     }
 
-                    else if (current_tok.getValue().includes('b')) {
+                    else if (current_tok.getValue().includes('o') || current_tok.getValue().includes('O')) {
+                        int_value = parseInt(current_tok.getValue().slice(2), 8);
+                    }
+
+                    else if (current_tok.getValue().includes('b') || current_tok.getValue().includes('B')) {
                         int_value = parseInt(current_tok.getValue().slice(2), 2);
                     }
 
@@ -724,7 +736,7 @@ class Parser {
         for (let [key, value] of Object.entries(reg_defs)) {
             definitions[key] = value;
         }
-
+ 
         // GO THROUGH LINES IN DATA SECTION
         while (data_section_exists && (line_num < text_section_start)) {
 
@@ -770,13 +782,17 @@ class Parser {
                 ///// EXECUTE THE DIRECTIVES /////
 
                 // Byte directive
-                if (parity_of_tokens_left === 0 && line_directive === '.byte') {
+                if (parity_of_tokens_left === 0 && ['.byte','.word'].includes(line_directive)) {
 
                     if (current_tok.getType() !== 'INT') { // expecting integer
                         this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
 
                     this.dmem.push(current_tok.getValue() & 0xff);
+
+                    if (line_directive === '.word') {
+                        this.dmem.push((current_tok.getValue() >> 8) & 0xff);
+                    }
                 }
 
                 // String, Ascii, Asciz directives
@@ -949,7 +965,7 @@ class Parser {
         }
 
         // Some variables for later
-        const global_funct_name = line[1].getValue();           // the name of the global function for later
+        const global_funct_names = [line[1].getValue()];           // the name of the global function for later
         line_num += 1;                                          // move to instructions part of text section
         const data_labels = Object.keys(this.labels);           // to be used for replacing data labels in instructions
         const definition_keys = Object.keys(definitions);
@@ -986,10 +1002,10 @@ class Parser {
                     this.labels[label] = this.pmem.length; //  add it to the labels dictionary
                     
                     // Check the global function label when you get to it
-                    if (label === global_funct_name) {
+                    if (label === global_funct_names[0]) {
                         this.dmem[0x5B].setValue(this.pmem.length & 0xff);
                         this.dmem[0x5C].setValue((this.pmem.length >> 8) & 0xff); 
-                        }
+                    }
 
                     has_label = true;
                 }
@@ -1079,6 +1095,29 @@ class Parser {
             // Add the line to the program memory
             if ((!has_label) || (has_label && (line_length > 1))) {
 
+                if (line[0].getType() == 'DIR' && line[0].getValue() == '.global') {
+                    if (this.getPMEM().length > 0) {
+                        this.newError(`Illegal .global directive on line ${line_in_file}.`);
+                    }
+
+                    if (has_label) {
+                        this.newError(`Cannot have label on .global directive on line ${line_in_file}.`);
+                    }
+
+                    if (line.length !== 2) {
+                        this.newError(`Incorrect number of arguments for .global directive on line ${line_in_file}.`);
+                    }
+
+                    if (line[1].getType() !== 'REF') {
+                        this.newError(`Illegal token type ${line[1].getType()} for the argument ${line[1].getValue()} on line ${line_in_file}.`);
+                    }
+
+                    global_funct_names.push(line[1].getValue());
+                    line_num += 1;
+                    continue;
+
+                }
+
                 // If theyre not instructions, it's illegal
                 if (line[0].getType() !== 'INST') {
                     this.newError(`Illegal token \'${line[0].getValue()}\' on line ${line_in_file}.`);
@@ -1101,9 +1140,13 @@ class Parser {
 
         }
 
+        let global_funct_name;
         // Check you've found the global function name
-        if (this.labels[global_funct_name] === undefined) {
-            this.newError(`Cannot find the global label \'${global_funct_name}\' to begin the program. Check spelling if unsure.`);
+        for (let i = 0; i < global_funct_names.length; i++) {
+            global_funct_name = global_funct_names[i];
+            if (this.labels[global_funct_name] === undefined) {
+                this.newError(`Cannot find the global label \'${global_funct_name}\' in the program. Check spelling if unsure.`);
+            }
         }
 
         const control_flow_instructions = ['CALL', 'JMP', 'IJMP', 'ICALL', 'RJMP', 'RCALL'].concat(INST_LIST.slice(7, 27)); // all the branching instructions
@@ -1150,8 +1193,8 @@ class Parser {
                 // If it's a relative control flow instruction
                 else if (control_flow_instructions.slice(4).includes(first_tok.getValue())) {
 
-                    let k = this.labels[current_tok.getValue()];      // Get k for label
-                    let relative_k = k - 1 - line_num;                  // the k for relative jumping instructions
+                    let k = this.labels[current_tok.getValue()];    // Get k for label
+                    let relative_k = k - 1 - line_num;              // the k for relative jumping instructions
 
                     // Replace it in the line
                     current_tok.setType('INT');
@@ -1173,7 +1216,7 @@ class Parser {
             let line = this.pmem[line_num];                     // the line up to
 
             if (line === null) {                               // skip over none lines
-                continue
+                continue;
             }
 
             let line_length = line.length;                      // calculate number of tokens in the line
@@ -2923,6 +2966,7 @@ DIRECTIVES = [
     '.data',
     '.global',
     '.byte',
+    '.word',
     '.string',
     '.ascii',
     '.asciz',
