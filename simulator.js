@@ -684,6 +684,13 @@ class Parser {
 
                     let int_value = 0;
 
+                    // Remove negative and store as multiplier for down the bottom of the function
+                    let neg = 1;
+                    if (current_tok.getValue().includes('-')) {
+                        neg = -1;
+                        current_tok.setValue( (current_tok.getValue().slice(1)) );
+                    }
+
                     // this line is technically irrelevant since parseInt deals with 0x already
                     if (current_tok.getValue().includes('x') || current_tok.getValue().includes('X')) {
                         int_value = parseInt(current_tok.getValue().slice(2), 16);
@@ -705,7 +712,7 @@ class Parser {
                         int_value = parseInt(current_tok.getValue());
                     }
 
-                    current_tok.setValue(int_value);
+                    current_tok.setValue(neg * int_value);
 
                 }
 
