@@ -429,8 +429,8 @@ class Lexer {
             [/^\".*?\"/, 'STR'],                // string
             [/^\'.*?\'/, 'STR'],                // string
             // [/^\.[^\.\s]+/, 'DIR'],             // directives
-            [/\.(section|text|data|global|end)/, 'DIR'],        // directives
-            [/\.(byte|word|string|ascii|asciz|space|def)/, 'DIR'],   // directives
+            [/\.(section|SECTION|text|TEXT|data|DATA|global|GLOBAL|end|END)/, 'DIR'],        // directives
+            [/\.(byte|BYTE|word|WORD|string|STRING|ascii|ASCII|asciz|ASCIZ|space|SPACE|def|DEF)/, 'DIR'],   // directives
             [/^[YZ][ \t]*\+[ \t]*\d{1,2}/, 'WORDPLUSQ'],        // word+q
             [/^[X][ \t]*\+[ \t]*\d{1,2}/, 'XPLUSQ'],            // X+q
             [/^[XYZ]\+/, 'WORDPLUS'],           // word+
@@ -493,6 +493,10 @@ class Lexer {
                     current_tok.setType('REF');
                 }
 
+                if (current_tok.getType() === 'DIR') {
+                    current_tok.setValue(current_tok.getValue().toUpperCase());
+                }
+
                 // If both the current and previous tokens should be 1 REF token combine them
                 if (i > 0 && !['COMMA', 'SYMBOL'].includes(current_tok.getType()) && line_toks[i - 1].getType() === 'REF') {
                     line_toks[i - 1].setValue(line_toks[i - 1].getValue() + current_tok.getValue());
@@ -513,7 +517,6 @@ class Lexer {
         }
 
         return [tokens, line_nums];
-
     }
 
     getText() {
@@ -559,7 +562,8 @@ class Parser {
         this.txt = txt;
         this.lines = this.txt.split('\n');
 
-        this.labels = Object.create(null);
+        this.dmem_labels = Object.create(null);
+        this.pmem_labels = Object.create(null);
 
         this.dmem = [];
         // Add registers to dmem
@@ -598,37 +602,37 @@ class Parser {
 
         const first_line = this.token_lines[0];
 
-        // Check if first line is a .section directive
-        if (first_line[0].getType() !== "DIR" || first_line[0].getValue() !== ".section") {
+        // Check if first line is a .SECTION directive
+        if (first_line[0].getType() !== 'DIR' || first_line[0].getValue() !== '.SECTION') {
             this.newError("First line must be a '.section' directive");
         }
 
         // Check if the first line is correct length and directives
-        if (first_line.length !== 2 || first_line[1].getType() !== "DIR" || ![".data", ".text"].includes(first_line[1].getValue())) {
+        if (first_line.length !== 2 || first_line[1].getType() !== 'DIR' || !['.DATA', '.TEXT'].includes(first_line[1].getValue())) {
             this.newError("First line must be '.section .data' or '.section .text'");
         }
 
         // Check if last line is .end
         const final_line = this.token_lines[this.token_lines.length - 1];
-        if (final_line.length > 1 || final_line[0].getType() !== "DIR" || final_line[0].getValue() !== ".end") {
+        if (final_line.length > 1 || final_line[0].getType() !== 'DIR' || final_line[0].getValue() !== '.END') {
             this.newError("Final line must be '.end'");
         }
 
-        // Find .section .text start
+        // Find .SECTION .text start
         let text_section_start = null;
         for (let line_num = 0; line_num < this.token_lines.length; line_num++) {
             const line = this.token_lines[line_num];
             const line_in_file = this.line_numbers[line_num];
 
-            // If you find a .section directive check it
-            if (line[0].getValue() === ".section" && line[0].getType() === "DIR") {
+            // If you find a .SECTION directive check it
+            if (line[0].getValue() === '.SECTION' && line[0].getType() === 'DIR') {
                 
-                if (line.length !== 2 || line[1].getType() !== "DIR" || ![".data", ".text"].includes(line[1].getValue())) {
+                if (line.length !== 2 || line[1].getType() !== 'DIR' || !['.DATA', '.TEXT'].includes(line[1].getValue())) {
                     this.newError(`Invalid '.section' directive on line ${line_in_file}.`);
                 }
 
                 // If you find the text section then stop looking
-                if (line[1].getValue() === ".text") {
+                if (line[1].getValue() === '.TEXT') {
                     text_section_start = line_num;
                     break;
                 }
@@ -658,7 +662,7 @@ class Parser {
 
                 // Check INST and make upper case
                 if (current_tok.getType() === 'INST') {
-                    current_tok.setValue(current_tok.getValue().toUpperCase()); // make all instructions upper case
+                    current_tok.setValue(current_tok.getValue().toUpperCase()); // make all directives upper case
 
                     if (!INST_LIST.includes(current_tok.getValue())) { // check if the token is a valid instruction
                         this.newError(`Invalid instruction \'${current_tok.getValue()}\' on line ${line_in_file}.`);
@@ -672,11 +676,6 @@ class Parser {
                     if (reg_number > 31) {
                         this.newError(`Illegal register \'R${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
-                }
-
-                // Check DIR are valid directives
-                else if (current_tok.getType() === 'DIR' && !DIRECTIVES.includes(current_tok.getValue())) {
-                    this.newError(`Invalid directive \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                 }
 
                 // Convert integers to base 10
@@ -727,7 +726,7 @@ class Parser {
         // Check data section exists
         const data_section_exists = (text_section_start !== 0);
 
-        let line_num = 0;
+        let line_num = text_section_start;
 
         const definitions = Object.create(null);
 
@@ -743,11 +742,156 @@ class Parser {
         for (let [key, value] of Object.entries(reg_defs)) {
             definitions[key] = value;
         }
- 
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // Fill in text section info and nulls, etc
+
+        // Assumes line_num == text_section_start
+
+        // Check .global line
+        line_num += 1;                                          // move to the .global line
+        let line = this.token_lines[line_num];                  // current line
+
+        if (line.length !== 2 || line[0].getValue() !== '.GLOBAL') {
+            const line_in_file = this.line_numbers[line_num];   // the current line used for raising an error
+            this.newError(`Must begin text section with a valid .global directive: line ${line_in_file}.`);
+        }
+
+        // Some variables for later
+        const global_funct_names = [line[1].getValue()];        // the name of the global function for later
+        line_num += 1;                                          // move to instructions part of text section
+        const def_keys = Object.keys(definitions);
+        const pmem_file_lines = [];                             // where in the text file each pmem line is 
+
+        // CREATE PMEM AND GET THE LABEL LOCATIONS
+        while (line_num < (this.token_lines.length - 1)) {
+
+            let line = this.token_lines[line_num]; // current line
+            const line_length = line.length; // calculate number of tokens in the line
+            const line_in_file = this.line_numbers[line_num]; // the current line if there's an error
+
+            let tok_num = 0;
+            let has_label = false; // bool for if the line has a label
+
+            // While loop does:
+            // Check for labels and remove them
+            // Change HI8 LO8 to integers
+            // Change REF type (data labels) to integers
+            while (tok_num < line_length) {
+
+                const current_tok = line[tok_num]; // current token
+
+                // Check for labels and remove them
+                if (current_tok.getType() === 'LABEL') {
+
+                    // Label can only be at the start
+                    if (tok_num !== 0) {
+                        this.newError(`Illegal label location on line ${line_in_file}.`);
+                    }
+
+                    const label = current_tok.getValue().slice(0, (current_tok.getValue().length - 1)).trim(); // remove the colon from the end
+                    this.pmem_labels[label] = this.pmem.length; //  add it to the labels dictionary
+                    
+                    // Check the global function label when you get to it
+                    if (label === global_funct_names[0]) {
+                        this.dmem[0x5B].setValue(this.pmem.length & 0xff);
+                        this.dmem[0x5C].setValue((this.pmem.length >> 8) & 0xff); 
+                    }
+
+                    has_label = true;
+                }
+
+                // Change REF type to correct form from reference
+                else if (current_tok.getType() === 'REF') {
+
+                    // If it's a REG definition
+                    if (def_keys.includes(current_tok.getValue())) {
+                        current_tok.setType('REG');
+                        current_tok.setValue(definitions[current_tok.getValue()]);
+                    }
+
+                    // Check if it's a function call?
+
+                    // It may be a pmem label so don't raise an error yet
+                }
+
+                tok_num += 1;
+            }
+
+            // If the line has a label AND instruction remove the label
+            if (has_label && (line_length > 1)) {
+                line = line.slice(1);
+            }
+
+            // Add the line to the program memory
+            if ((!has_label) || (has_label && (line_length > 1))) {
+
+                if (line[0].getType() == 'DIR' && line[0].getValue() == '.GLOBAL') {
+                    if (this.getPMEM().length > 0) {
+                        this.newError(`Illegal .global directive on line ${line_in_file}.`);
+                    }
+
+                    if (has_label) {
+                        this.newError(`Cannot have label on .global directive on line ${line_in_file}.`);
+                    }
+
+                    if (line.length !== 2) {
+                        this.newError(`Incorrect number of arguments for .global directive on line ${line_in_file}.`);
+                    }
+
+                    if (line[1].getType() !== 'REF') {
+                        this.newError(`Illegal token type ${line[1].getType()} for the argument ${line[1].getValue()} on line ${line_in_file}.`);
+                    }
+
+                    global_funct_names.push(line[1].getValue());
+                    line_num += 1;
+                    continue;
+
+                }
+
+                // If theyre not instructions, it's illegal
+                if (line[0].getType() !== 'INST') {
+                    this.newError(`Illegal token \'${line[0].getValue()}\' on line ${line_in_file}.`);
+                }
+
+                this.pmem.push(line); // set the line to the line without the label
+                this.pmem_line_numbers.push(line_in_file);
+                pmem_file_lines.push(line_in_file);
+                const inst = line[0].getValue();
+
+                // Add None as next line if it's a 32 bit opcode
+                if (['CALL', 'JMP', 'LDS', 'STS'].includes(inst)) {
+                    this.pmem.push(null);
+                    this.pmem_line_numbers.push(null);
+                    pmem_file_lines.push(line_in_file);
+                }
+            }
+
+            line_num += 1;
+
+        }
+
+        if (this.pmem.length > this.flashend) {
+            this.newError(`Too many lines of code to put into the program memory in the .text section.`);
+        }
+
+        let global_funct_name;
+        // Check you've found the global function name
+        for (let i = 0; i < global_funct_names.length; i++) {
+            global_funct_name = global_funct_names[i];
+            if (this.pmem_labels[global_funct_name] === undefined) {
+                this.newError(`Cannot find the global label \'${global_funct_name}\' in the program. Check spelling if unsure.`);
+            }
+        }
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        line_num = 0;
+
         // GO THROUGH LINES IN DATA SECTION
         while (data_section_exists && (line_num < text_section_start)) {
 
-            if (line_num === 0) {                               // skip if it's the .section .data line
+            if (line_num === 0) {                               // skip if it's the .SECTION .data line
                 line_num += 1;
                 continue
             }
@@ -762,7 +906,7 @@ class Parser {
             if (line[tok_num].getType() === 'LABEL') {
                 let label = line[0].getValue();                 // get label with the colon at the end
                 label = label.slice(0, (label.length - 1)).trim();
-                this.labels[label] = this.dmem.length;          // add location of the data label
+                this.dmem_labels[label] = this.dmem.length;          // add location of the data label
                 tok_num += 1;
                 if (tok_num >= line_length) {
                     line_num += 1;
@@ -789,21 +933,37 @@ class Parser {
                 ///// EXECUTE THE DIRECTIVES /////
 
                 // Byte directive
-                if (parity_of_tokens_left === 0 && ['.byte','.word'].includes(line_directive)) {
+                if (parity_of_tokens_left === 0 && ['.BYTE','.WORD'].includes(line_directive)) {
 
-                    if (current_tok.getType() !== 'INT') { // expecting integer
+                    if (current_tok.getType() === 'INT') {
+                        this.dmem.push(current_tok.getValue() & 0xff);
+
+                        if (line_directive === '.WORD') {
+                            this.dmem.push((current_tok.getValue() >> 8) & 0xff);
+                        }
+                    }
+
+                    else if (current_tok.getType() === 'REF') {
+                        if (this.pmem_labels[current_tok.getValue()] === undefined) {
+                            this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
+                        }
+
+                        this.dmem.push(this.pmem_labels[current_tok.getValue()] & 0xff);
+
+                        if (line_directive === '.WORD') {
+                            this.dmem.push((this.pmem_labels[current_tok.getValue()] >> 8) & 0xff);
+                        }
+                    }
+
+                    else {
                         this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
 
-                    this.dmem.push(current_tok.getValue() & 0xff);
-
-                    if (line_directive === '.word') {
-                        this.dmem.push((current_tok.getValue() >> 8) & 0xff);
-                    }
+                    
                 }
 
                 // String, Ascii, Asciz directives
-                else if (parity_of_tokens_left === 0 && ['.string', '.ascii', '.asciz'].includes(line_directive)) {
+                else if (parity_of_tokens_left === 0 && ['.STRING', '.ASCII', '.ASCIZ'].includes(line_directive)) {
 
                     if (current_tok.getType() !== 'STR') {
                         this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
@@ -865,14 +1025,14 @@ class Parser {
                         this.dmem.push(char_ascii_value & 0xff);           // add to data
                     }
 
-                    if (['.string', '.asciz'].includes(line_directive)) {   // add NULL if directive requires it
+                    if (['.STRING', '.ASCIZ'].includes(line_directive)) {   // add NULL if directive requires it
                         this.dmem.push(0);                                  // add NULL to data
                     }
 
                 }
 
                 // Space directive
-                else if (parity_of_tokens_left === 0 && line_directive === '.space') {
+                else if (parity_of_tokens_left === 0 && line_directive === '.SPACE') {
 
                     if (current_tok.getType() !== 'INT') { // expecting integer
                         this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
@@ -911,7 +1071,7 @@ class Parser {
                 }
 
                 // Def directive
-                else if (line_directive === '.def') {
+                else if (line_directive === '.DEF') {
 
                     // Check the number of arguments
                     if ((line_length - tok_num) > 3) { // if there's too many arguments
@@ -952,69 +1112,79 @@ class Parser {
             }
 
             line_num += 1;
-
-
         }
 
-        // Should be at .section .text line now
+        // Cannot hold more data than 0x8ff
+        if (this.dmem.length > this.ramend) {
+            this.newError(`Too much data to put into the data memory in the .data section.`);
+        }
+
+        // Should be at .SECTION .text line now
 
         //////////////////////////////////////////////
         //////////////// TEXT SECTION ////////////////
         //////////////////////////////////////////////
 
-        // Check .global line
-        line_num += 1;                                          // move to the .global line
-        let line = this.token_lines[line_num];                  // current line
+        const control_flow_instructions = ['CALL', 'JMP', 'IJMP', 'ICALL', 'RJMP', 'RCALL'].concat(INST_LIST.slice(7, 27)); // all the branching instructions
 
-        if (line.length !== 2 || line[0].getValue() !== '.global') {
-            const line_in_file = this.line_numbers[line_num];   // the current line used for raising an error
-            this.newError(`Must begin text section with a valid \'.global\' directive: line ${line_in_file}.`);
-        }
+        // TURN ALL REFS INTO CORRECT FORM
+        for (let line_num = 0; line_num < this.pmem.length; line_num++) {
 
-        // Some variables for later
-        const global_funct_names = [line[1].getValue()];           // the name of the global function for later
-        line_num += 1;                                          // move to instructions part of text section
-        const data_labels = Object.keys(this.labels);           // to be used for replacing data labels in instructions
-        const definition_keys = Object.keys(definitions);
-        const pmem_file_lines = [];                             // where in the text file each pmem line is 
-        const opcode_32_bit = ['CALL', 'JMP', 'LDS', 'STS'];    // instructions with 32 bit opcode
+            const line = this.pmem[line_num]; // current line
 
-        // CREATE PMEM AND GET THE LABEL LOCATIONS
-        while (line_num < (this.token_lines.length - 1)) {
+            if (line === null) {
+                continue
+            }
 
-            let line = this.token_lines[line_num]; // current line
-            const line_length = line.length; // calculate number of tokens in the line
-            const line_in_file = this.line_numbers[line_num]; // the current line if there's an error
+            const line_length = line.length;                    // calculate number of tokens in the line
+            const line_in_file = pmem_file_lines[line_num];     // the current line if there's an error
 
-            let tok_num = 0;
-            let has_label = false; // bool for if the line has a label
+            const first_tok = line[0];                          // first token in the line
 
-            // While loop does:
-            // Check for labels and remove them
-            // Change HI8 LO8 to integers
-            // Change REF type (data labels) to integers 
-            while (tok_num < line_length) {
+            // Go through the token lines
+            for (let tok_num = 0; tok_num < line_length; tok_num++) {
 
-                const current_tok = line[tok_num]; // current token
+                const current_tok = line[tok_num];
 
-                // Check for labels and remove them
-                if (current_tok.getType() === 'LABEL') {
+                // Replace REF with integer for branching
+                if (current_tok.getType() === 'REF') {
+               
 
-                    // Label can only be at the start
-                    if (tok_num !== 0) {
-                        this.newError(`Illegal label location on line ${line_in_file}.`);
+                    // Check the label reference is a real label or function
+                    if (this.dmem_labels[current_tok.getValue()] === undefined && this.pmem_labels[current_tok.getValue()] === undefined && !FUNCTIONS.includes(current_tok.getValue())) {
+                        this.newError(`Illegal token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
 
-                    const label = current_tok.getValue().slice(0, (current_tok.getValue().length - 1)).trim(); // remove the colon from the end
-                    this.labels[label] = this.pmem.length; //  add it to the labels dictionary
-                    
-                    // Check the global function label when you get to it
-                    if (label === global_funct_names[0]) {
-                        this.dmem[0x5B].setValue(this.pmem.length & 0xff);
-                        this.dmem[0x5C].setValue((this.pmem.length >> 8) & 0xff); 
+                    // If it's a non relative control flow instruction and it's not a function
+                    if (control_flow_instructions.slice(0, 4).includes(first_tok.getValue()) && !FUNCTIONS.includes(current_tok.getValue())) {
+
+                        let k = this.pmem_labels[current_tok.getValue()];      // Get k for label
+
+                        // Replace it in the line
+                        current_tok.setType('INT');
+                        current_tok.setValue(k);
                     }
 
-                    has_label = true;
+                    // If it's a relative control flow instruction
+                    else if (control_flow_instructions.slice(4).includes(first_tok.getValue())) {
+
+                        let k = this.pmem_labels[current_tok.getValue()];    // Get k for label
+                        let relative_k = k - 1 - line_num;              // the k for relative jumping instructions
+
+                        // Replace it in the line
+                        current_tok.setType('INT');
+                        current_tok.setValue(relative_k);
+                    }
+
+                    // If it's in data labels
+                    else if (this.dmem_labels[current_tok.getValue()] !== undefined) {
+                        current_tok.setType('INT');
+                        current_tok.setValue(this.dmem_labels[current_tok.getValue()]);
+                    }
+
+                    else if (!FUNCTIONS.includes(current_tok.getValue())) {
+                        this.newError(`Bad reference ${current_tok.getValue()} on line ${line_in_file}.`);
+                    }
                 }
 
                 // Change HI8 LO8 to integers
@@ -1040,7 +1210,7 @@ class Parser {
                     }
 
                     // Check the variable is defined or is an int
-                    if (( this.labels[variable.getValue()] === undefined && variable.getType() !== 'INT') || !['REF', 'INT'].includes(variable.getType()) ) {
+                    if (( this.dmem_labels[variable.getValue()] === undefined && variable.getType() !== 'INT') || !['REF', 'INT'].includes(variable.getType()) ) {
                         this.newError(`Illegal ${current_tok.getValue()} variable on line ${line_in_file}.`);
                     }
 
@@ -1049,7 +1219,7 @@ class Parser {
                     // Convert the value to the hi8/lo8 value
                     if (current_tok.getType() === 'HI8') {
                         if ( variable.getType() !== 'INT' ) {
-                        int_value = this.hi8(this.labels[variable.getValue()]);
+                            int_value = this.hi8(this.dmem_labels[variable.getValue()]);
                         } else {
                             int_value = (variable.getValue() >> 8) & 0xff;
                         }
@@ -1057,7 +1227,7 @@ class Parser {
 
                     else {
                         if ( variable.getType() !== 'INT' ) {
-                        int_value = this.lo8(this.labels[variable.getValue()]);
+                            int_value = this.lo8(this.dmem_labels[variable.getValue()]);
                         } else {
                             int_value = variable.getValue() & 0xff;
                         }
@@ -1065,149 +1235,10 @@ class Parser {
 
                     line[tok_num] = new Token('INT', int_value);
 
-                    line = line.slice(0, (line.length - 3)); // remove the rest of the line
+                    this.pmem[line_num] = line.slice(0, (line.length - 3)); // remove the rest of the line
 
                     tok_num += 3;
                 }
-
-                // Change REF type to correct form from reference
-                else if (current_tok.getType() === 'REF') {
-
-                    // If it's in data labels
-                    if (data_labels.includes(current_tok.getValue())) {
-                        current_tok.setType('INT');
-                        current_tok.setValue(this.labels[current_tok.getValue()]);
-                    }
-
-                    // If it's a REG definition
-                    else if (definition_keys.includes(current_tok.getValue())) {
-                        current_tok.setType('REG');
-                        current_tok.setValue(definitions[current_tok.getValue()]);
-                    }
-
-
-                    // Check if it's a function call?
-
-                    // It may be a pmem label so don't raise an error yet
-                }
-
-                tok_num += 1;
-            }
-
-            // If the line has a label AND instruction remove the label
-            if (has_label && (line_length > 1)) {
-                line = line.slice(1);
-            }
-
-            // Add the line to the program memory
-            if ((!has_label) || (has_label && (line_length > 1))) {
-
-                if (line[0].getType() == 'DIR' && line[0].getValue() == '.global') {
-                    if (this.getPMEM().length > 0) {
-                        this.newError(`Illegal .global directive on line ${line_in_file}.`);
-                    }
-
-                    if (has_label) {
-                        this.newError(`Cannot have label on .global directive on line ${line_in_file}.`);
-                    }
-
-                    if (line.length !== 2) {
-                        this.newError(`Incorrect number of arguments for .global directive on line ${line_in_file}.`);
-                    }
-
-                    if (line[1].getType() !== 'REF') {
-                        this.newError(`Illegal token type ${line[1].getType()} for the argument ${line[1].getValue()} on line ${line_in_file}.`);
-                    }
-
-                    global_funct_names.push(line[1].getValue());
-                    line_num += 1;
-                    continue;
-
-                }
-
-                // If theyre not instructions, it's illegal
-                if (line[0].getType() !== 'INST') {
-                    this.newError(`Illegal token \'${line[0].getValue()}\' on line ${line_in_file}.`);
-                }
-
-                this.pmem.push(line); // set the line to the line without the label
-                this.pmem_line_numbers.push(line_in_file);
-                pmem_file_lines.push(line_in_file);
-                const inst = line[0].getValue();
-
-                // Add None as next line if it's a 32 bit opcode
-                if (opcode_32_bit.includes(inst)) {
-                    this.pmem.push(null);
-                    this.pmem_line_numbers.push(null);
-                    pmem_file_lines.push(line_in_file);
-                }
-            }
-
-            line_num += 1;
-
-        }
-
-        let global_funct_name;
-        // Check you've found the global function name
-        for (let i = 0; i < global_funct_names.length; i++) {
-            global_funct_name = global_funct_names[i];
-            if (this.labels[global_funct_name] === undefined) {
-                this.newError(`Cannot find the global label \'${global_funct_name}\' in the program. Check spelling if unsure.`);
-            }
-        }
-
-        const control_flow_instructions = ['CALL', 'JMP', 'IJMP', 'ICALL', 'RJMP', 'RCALL'].concat(INST_LIST.slice(7, 27)); // all the branching instructions
-
-        // TURN ALL REFS INTO CORRECT FORM
-        for (let line_num = 0; line_num < this.pmem.length; line_num++) {
-
-            const line = this.pmem[line_num]; // current line
-
-            if (line === null) {
-                continue
-            }
-
-            const line_length = line.length;                    // calculate number of tokens in the line
-            const line_in_file = pmem_file_lines[line_num];     // the current line if there's an error
-
-            const first_tok = line[0];                          // first token in the line
-
-            // Go through the token lines
-            for (let tok_num = 0; tok_num < line_length; tok_num++) {
-
-                const current_tok = line[tok_num];
-
-                // Replace REF with integer for branching
-                if (current_tok.getType() !== 'REF') {
-                    continue
-                }
-
-                // Check the label reference is a real label or function
-                if (this.labels[current_tok.getValue()] === undefined && !FUNCTIONS.includes(current_tok.getValue())) {
-                    this.newError(`Illegal token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
-                }
-
-                // If it's a non relative control flow instruction and it's not a function
-                if (control_flow_instructions.slice(0, 4).includes(first_tok.getValue()) && !FUNCTIONS.includes(current_tok.getValue())) {
-
-                    let k = this.labels[current_tok.getValue()];      // Get k for label
-
-                    // Replace it in the line
-                    current_tok.setType('INT');
-                    current_tok.setValue(k);
-                }
-
-                // If it's a relative control flow instruction
-                else if (control_flow_instructions.slice(4).includes(first_tok.getValue())) {
-
-                    let k = this.labels[current_tok.getValue()];    // Get k for label
-                    let relative_k = k - 1 - line_num;              // the k for relative jumping instructions
-
-                    // Replace it in the line
-                    current_tok.setType('INT');
-                    current_tok.setValue(relative_k);
-                }
-                
             }
         }
 
@@ -2967,18 +2998,18 @@ INST_OPCODES = {
 }
 
 DIRECTIVES = [
-    '.section',
-    '.end',
-    '.text',
-    '.data',
-    '.global',
-    '.byte',
-    '.word',
-    '.string',
-    '.ascii',
-    '.asciz',
-    '.space',
-    '.def'
+    '.SECTION',
+    '.END',
+    '.TEXT',
+    '.DATA',
+    '.GLOBAL',
+    '.BYTE',
+    '.WORD',
+    '.STRING',
+    '.ASCII',
+    '.ASCIZ',
+    '.SPACE',
+    '.DEF'
 ];
 
 
