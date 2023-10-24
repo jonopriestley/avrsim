@@ -430,7 +430,7 @@ class Lexer {
             [/^\'.*?\'/, 'STR'],                // string
             // [/^\.[^\.\s]+/, 'DIR'],             // directives
             [/\.(section|SECTION|text|TEXT|data|DATA|global|GLOBAL|end|END)/, 'DIR'],        // directives
-            [/\.(byte|BYTE|word|WORD|string|STRING|ascii|ASCII|asciz|ASCIZ|space|SPACE|def|DEF)/, 'DIR'],   // directives
+            [/\.(byte|BYTE|word|WORD|string|STRING|ascii|ASCII|asciz|ASCIZ|space|SPACE|def|DEF|equ|EQU)/, 'DIR'],   // directives
             [/^[YZ][ \t]*\+[ \t]*\d{1,2}/, 'WORDPLUSQ'],        // word+q
             [/^[X][ \t]*\+[ \t]*\d{1,2}/, 'XPLUSQ'],            // X+q
             [/^[XYZ]\+/, 'WORDPLUS'],           // word+
@@ -726,12 +726,11 @@ class Parser {
         // Check data section exists
         const data_section_exists = (text_section_start !== 0);
 
-        let line_num = text_section_start;
-
-        const definitions = Object.create(null);
+        const defs = Object.create(null);
+        const equs = Object.create(null);
 
         // Create pre-existing definitions
-        const reg_defs = {
+        const existing_defs = {
             'ZH': 31,
             'ZL': 30,
             'YH': 29,
@@ -739,9 +738,59 @@ class Parser {
             'XH': 27,
             'XL': 26
         };
-        for (let [key, value] of Object.entries(reg_defs)) {
-            definitions[key] = value;
+
+        for (let [key, value] of Object.entries(existing_defs)) {
+            defs[key] = value;
         }
+
+        // Create pre-existing equs
+        const existing_equs = {
+            'SREG': 0x3f,
+            'SPL': 0x3d,
+            'SPH': 0x3e,
+            'SPMCSR': 0x37,
+            'MCUCR': 0x35,
+            'MCUSR': 0x34,
+            'SMCR': 0x33,
+            'ACSR': 0x30,
+            'SPDR': 0x2e,
+            'SPSR': 0x2d,
+            'SPCR': 0x2c,
+            'GPIOR2': 0x2b,
+            'GPIOR1': 0x2a,
+            'OCR0B': 0x28,
+            'OCR0A': 0x27,
+            'TCNT0': 0x26,
+            'TCCR0B': 0x25,
+            'TCCR0A': 0x24,
+            'GTCCR': 0x23,
+            'EEARH': 0x22,
+            'EEARL': 0x21,
+            'EEDR': 0x20,
+            'EECR': 0x1f,
+            'GPIOR0': 0x1e,
+            'EIMSK': 0x1d,
+            'EIFR': 0x1c,
+            'PCIFR': 0x1b,
+            'TIFR2': 0x17,
+            'TIFR1': 0x16,
+            'TIFR0': 0x15,
+            'PORTD': 0x0b,
+            'DDRD': 0x0a,
+            'PIND': 0x09,
+            'PORTC': 0x08,
+            'DDRC': 0x07,
+            'PINC': 0x06,
+            'PORTB': 0x05,
+            'DDRB': 0x04,
+            'PINB': 0x03,
+        };
+
+        for (let [key, value] of Object.entries(existing_equs)) {
+            equs[key] = value;
+        }
+
+        let line_num = text_section_start;
 
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Fill in text section info and nulls, etc
@@ -760,7 +809,6 @@ class Parser {
         // Some variables for later
         const global_funct_names = [line[1].getValue()];        // the name of the global function for later
         line_num += 1;                                          // move to instructions part of text section
-        const def_keys = Object.keys(definitions);
         const pmem_file_lines = [];                             // where in the text file each pmem line is 
 
         // CREATE PMEM AND GET THE LABEL LOCATIONS
@@ -799,20 +847,6 @@ class Parser {
                     }
 
                     has_label = true;
-                }
-
-                // Change REF type to correct form from reference
-                else if (current_tok.getType() === 'REF') {
-
-                    // If it's a REG definition
-                    if (def_keys.includes(current_tok.getValue())) {
-                        current_tok.setType('REG');
-                        current_tok.setValue(definitions[current_tok.getValue()]);
-                    }
-
-                    // Check if it's a function call?
-
-                    // It may be a pmem label so don't raise an error yet
                 }
 
                 tok_num += 1;
@@ -897,17 +931,21 @@ class Parser {
             }
 
             const line = this.token_lines[line_num];
-            const line_length = line.length;                    // calculate number of tokens in the line
+            let line_length = line.length;                      // calculate number of tokens in the line
             const line_in_file = this.line_numbers[line_num];   // the current line if there's an error
 
             let tok_num = 0;
 
             // DEAL WITH LABELS AT THE START OF THE LINE
             if (line[tok_num].getType() === 'LABEL') {
-                let label = line[0].getValue();                 // get label with the colon at the end
+                let label = line[0].getValue();                     // get label with the colon at the end
                 label = label.slice(0, (label.length - 1)).trim();
-                this.dmem_labels[label] = this.dmem.length;          // add location of the data label
-                tok_num += 1;
+                this.dmem_labels[label] = this.dmem.length;         // add location of the data label
+                
+                line.shift();                                       // remove the first element
+                line_length -= 1;                                   // correct the line length
+                
+                // Skip the line if you've reached the end
                 if (tok_num >= line_length) {
                     line_num += 1;
                     continue;
@@ -926,9 +964,9 @@ class Parser {
             // EXECUTE THE DIRECTIVE
             while (tok_num < line_length) {
 
-                const current_tok = line[tok_num];
+                let current_tok = line[tok_num];
 
-                const parity_of_tokens_left = (line_length - 1 - tok_num) % 2; // used for calculating comma placement
+                const parity_of_tokens_left = (line_length - 1 - tok_num) & 1; // used for calculating comma placement
 
                 ///// EXECUTE THE DIRECTIVES /////
 
@@ -1074,31 +1112,68 @@ class Parser {
                 else if (line_directive === '.DEF') {
 
                     // Check the number of arguments
-                    if ((line_length - tok_num) > 3) { // if there's too many arguments
-                        this.newError(`Too many arguments given for .def on line ${line_in_file}.`);
+                    if ((line_length - tok_num) != 3) { // if there's too many arguments
+                        this.newError(`Wrong number of arguments given for .def on line ${line_in_file}.`);
                     }
 
                     // if it's the 3rd last argument (expecting REF)
-                    if ((tok_num + 3) === line_length && current_tok.getType() !== 'REF') {
+                    if (current_tok.getType() !== 'REF') {
                         this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`)
                     }
 
+                    // Move to next token
+                    tok_num += 1;
+                    current_tok = line[tok_num];
+
                     // Raise error if 2nd last token is not '='
-                    else if ((tok_num + 2) === line_length && current_tok.getType() !== 'SYMBOL' && current_tok.getValue() !== '=') {
+                    if (current_tok.getType() !== 'SYMBOL' && current_tok.getValue() !== '=') {
                         this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
 
-                    // If it's the last token (expecting REG)
-                    else if ((tok_num + 1) === line_length) {
+                    // Move to next token
+                    tok_num += 1;
+                    current_tok = line[tok_num];
 
-                        if (current_tok.getType() !== 'REG') {
-                            this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`);
-                        }
-
-                        const def_word = line[tok_num - 2].getValue();  // get the definition name for the labels list
-
-                        definitions[def_word] = current_tok.getValue(); // add the def word to the labels list
+                    if (current_tok.getType() !== 'REG') {
+                        this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
+
+                    const def_word = line[tok_num - 2].getValue();  // get the definition name for the labels list
+                    defs[def_word] = current_tok.getValue();        // add the def word to the labels list
+
+                }
+
+                else if (line_directive === '.EQU') {
+
+                    // Check the number of arguments
+                    if ((line_length - tok_num) != 3) { // if there's too many arguments
+                        this.newError(`Wrong number of arguments given for .equ on line ${line_in_file}.`);
+                    }
+
+                    // if it's the 3rd last argument (expecting REF)
+                    if (current_tok.getType() !== 'REF') {
+                        this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`)
+                    }
+
+                    // Move to next token
+                    tok_num += 1;
+                    current_tok = line[tok_num];
+
+                    // Raise error if 2nd last token is not '='
+                    if (current_tok.getType() !== 'SYMBOL' && current_tok.getValue() !== '=') {
+                        this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`);
+                    }
+
+                    // Move to next token
+                    tok_num += 1;
+                    current_tok = line[tok_num];
+
+                    if (current_tok.getType() !== 'INT') {
+                        this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`);
+                    }
+
+                    const equ_word = line[tok_num - 2].getValue();  // get the equ name for the labels list
+                    equs[equ_word] = current_tok.getValue();        // add the equ word to the labels list
 
                 }
 
@@ -1125,6 +1200,8 @@ class Parser {
         //////////////// TEXT SECTION ////////////////
         //////////////////////////////////////////////
 
+        const def_keys = Object.keys(defs);
+        const equ_keys = Object.keys(equs);
         const control_flow_instructions = ['CALL', 'JMP', 'IJMP', 'ICALL', 'RJMP', 'RCALL'].concat(INST_LIST.slice(7, 27)); // all the branching instructions
 
         // TURN ALL REFS INTO CORRECT FORM
@@ -1146,14 +1223,8 @@ class Parser {
 
                 const current_tok = line[tok_num];
 
-                // Replace REF with integer for branching
+                // Replace REF with valid type and value
                 if (current_tok.getType() === 'REF') {
-               
-
-                    // Check the label reference is a real label or function
-                    if (this.dmem_labels[current_tok.getValue()] === undefined && this.pmem_labels[current_tok.getValue()] === undefined && !FUNCTIONS.includes(current_tok.getValue())) {
-                        this.newError(`Illegal token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
-                    }
 
                     // If it's a non relative control flow instruction and it's not a function
                     if (control_flow_instructions.slice(0, 4).includes(first_tok.getValue()) && !FUNCTIONS.includes(current_tok.getValue())) {
@@ -1182,9 +1253,25 @@ class Parser {
                         current_tok.setValue(this.dmem_labels[current_tok.getValue()]);
                     }
 
+                    // If it's a REG definition
+                    else if (def_keys.includes(current_tok.getValue())) {
+                        current_tok.setType('REG');
+                        current_tok.setValue(defs[current_tok.getValue()]);
+                    }
+
+                    // If it's a REG definition
+                    else if (equ_keys.includes(current_tok.getValue())) {
+                        current_tok.setType('INT');
+                        current_tok.setValue(equs[current_tok.getValue()]);
+                    }
+
+                    // Check if it's a function call?
+
+                    // If it's none of these and not a function, raise an error
                     else if (!FUNCTIONS.includes(current_tok.getValue())) {
                         this.newError(`Bad reference ${current_tok.getValue()} on line ${line_in_file}.`);
                     }
+
                 }
 
                 // Change HI8 LO8 to integers
@@ -1210,31 +1297,30 @@ class Parser {
                     }
 
                     // Check the variable is defined or is an int
-                    if (( this.dmem_labels[variable.getValue()] === undefined && variable.getType() !== 'INT') || !['REF', 'INT'].includes(variable.getType()) ) {
+                    if ( this.dmem_labels[variable.getValue()] === undefined && !equ_keys.includes(variable.getValue()) && variable.getType() !== 'INT' ) {
+                        console.log([equ_keys, variable.getValue(), equ_keys['sd']]);
                         this.newError(`Illegal ${current_tok.getValue()} variable on line ${line_in_file}.`);
                     }
 
                     let int_value = 0;
+                    let val;
+                    
+                    if ( variable.getType() == 'INT' ) {
+                        val = variable.getValue();
+                    } else if (this.dmem_labels[variable.getValue()] != undefined) {
+                        val = this.dmem_labels[variable.getValue()];
+                    } else { // if its a .equ variable
+                        val = equs[variable.getValue()];
+                    }
 
                     // Convert the value to the hi8/lo8 value
                     if (current_tok.getType() === 'HI8') {
-                        if ( variable.getType() !== 'INT' ) {
-                            int_value = this.hi8(this.dmem_labels[variable.getValue()]);
-                        } else {
-                            int_value = (variable.getValue() >> 8) & 0xff;
-                        }
-                    }
-
-                    else {
-                        if ( variable.getType() !== 'INT' ) {
-                            int_value = this.lo8(this.dmem_labels[variable.getValue()]);
-                        } else {
-                            int_value = variable.getValue() & 0xff;
-                        }
+                        int_value = this.hi8(val);
+                    } else {
+                        int_value = this.lo8(val);
                     }
 
                     line[tok_num] = new Token('INT', int_value);
-
                     this.pmem[line_num] = line.slice(0, (line.length - 3)); // remove the rest of the line
 
                     tok_num += 3;
@@ -3009,7 +3095,8 @@ DIRECTIVES = [
     '.ASCII',
     '.ASCIZ',
     '.SPACE',
-    '.DEF'
+    '.DEF',
+    '.EQU'
 ];
 
 
