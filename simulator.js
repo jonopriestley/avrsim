@@ -287,6 +287,17 @@ class Instruction {
             } else if (w === 'Z') {
                 return `10${q.slice(0, 1)}0${q.slice(1, 3)}0${d}0${q.slice(3)}`;
             }
+        } else if (inst === 'LPM') {
+            if (this.getArgs().length === 0) {
+                return '1001010111001000';
+            }
+            w = this.args[1].getValue();
+            d = this.binLenDigits(this.args[0].getValue(), 5);
+            if (w === 'Z') {
+                return `1001000${d}0100`;
+            } else if (w === 'Z+') {
+                return `1001000${d}0101`;
+            }
         } else if (inst === 'LSL') {
             d = this.binLenDigits(this.args[0].getValue(), 5);
             return `000011${d.slice(0, 1)}${d}${d.slice(1)}`
@@ -337,6 +348,7 @@ class Instruction {
             return `001000${d.slice(0, 1)}${d}${d.slice(1)}`
         }
     }
+
 
     toString(base) {
         // Always display numbers in base 10
@@ -420,7 +432,7 @@ class Lexer {
             [/^hi8(?=[(])/, 'HI8'],             // hi8
             [/^HI8(?=[(])/, 'HI8'],             // hi8
             [/^[rR]\d+(?=[,;\s])/, 'REG'],      // registers
-            [/^-{0,1}0[xX][\dA-Fa-f]+/, 'INT'], // numbers
+            [/^-{0,1}0[xX][\dA-Fa-f]+/, 'INT'], // numbers CAN BE EXPRESSIONS?
             [/^-{0,1}\$[\dA-Fa-f]+/, 'INT'],    // numbers
             [/^-{0,1}0[oO][0-7]+/, 'INT'],      // numbers
             [/^-{0,1}0[bB][01]+/, 'INT'],       // numbers
@@ -428,9 +440,9 @@ class Lexer {
             [/^[a-zA-Z]{2,6}/, 'INST'],         // instructions → CAN TURN LABELS USED IN AN INSTRUCTION INTO INST TYPE
             [/^\".*?\"/, 'STR'],                // string
             [/^\'.*?\'/, 'STR'],                // string
-            // [/^\.[^\.\s]+/, 'DIR'],             // directives
-            [/\.(section|SECTION|text|TEXT|data|DATA|global|GLOBAL|end|END)/, 'DIR'],        // directives
-            [/\.(byte|BYTE|word|WORD|string|STRING|ascii|ASCII|asciz|ASCIZ|space|SPACE|def|DEF|equ|EQU)/, 'DIR'],   // directives
+            // [/^\.[^\.\s]+/, 'DIR'],             // directives. REQUIRE SPACE AFTER THEM UNLESS FOLLOWED BY A '.'?. DOES .ORG WORK? WHAT OTHER DIRECTIVES
+            [/\.(section|SECTION|text|TEXT|data|DATA|global|GLOBAL|end|END)(?=[;\s])/, 'DIR'],        // directives
+            [/\.(byte|BYTE|word|WORD|string|STRING|ascii|ASCII|asciz|ASCIZ|space|SPACE|def|DEF|equ|EQU)(?=[;\s])/, 'DIR'],   // directives
             [/^[YZ][ \t]*\+[ \t]*\d{1,2}/, 'WORDPLUSQ'],        // word+q
             [/^[X][ \t]*\+[ \t]*\d{1,2}/, 'XPLUSQ'],            // X+q
             [/^[XYZ]\+/, 'WORDPLUS'],           // word+
@@ -1173,8 +1185,12 @@ class Parser {
                     }
 
                     const equ_word = line[tok_num - 2].getValue();  // get the equ name for the labels list
-                    equs[equ_word] = current_tok.getValue();        // add the equ word to the labels list
 
+                    if (equs[equ_word] !== undefined) {
+                        this.newError(`Illegal .equ value \'${equ_word}\' on line ${line_in_file}. The constant \'${equ_word}\' has already been assigned a value.`);
+                    }
+
+                    equs[equ_word] = current_tok.getValue();        // add the equ word to the labels list
                 }
 
                 // Should be comma if there are even number of tokens left. Raise error.
@@ -1368,6 +1384,12 @@ class Parser {
             // GET GIVEN AND EXPECTED ARGUMENTS
             const expected_args = INST_OPERANDS[inst];  // the arguments we expect
             const given_args = line.slice(1);           // the arguments we have
+
+            if (inst === 'LPM' && given_args.length === 0) {
+                // SET THE LINE TO AN INSTRUCTION
+                this.pmem[line_num] = new Instruction(line);
+                continue;
+            }
 
             // CHECK IF IT'S GOT THE WRONG NUMBER OF ARGUMENTS
             if ((expected_args === null && given_args.length > 0) || (expected_args !== null && (given_args.length !== expected_args.length))) {
@@ -2054,6 +2076,18 @@ class Interpreter {
                 k = this.getArgumentValue(line, 1);
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 this.incPC(); // increment once now cause total needs to be + 2
+                break;
+            case 'LPM':
+                k = this.getZ();
+                if (line.getArgs().length === 0) {
+                    this.getDMEM()[0].setValue( parseInt( this.getPMEM()[(k - (k & 1)) >> 1].getOpcode().slice(8 * (k & 1), 8 + 8 * (k & 1)), 2) );
+                }
+                else {
+                    this.getDMEM()[line.getArgs()[0].getValue()].setValue( parseInt( this.getPMEM()[(k - (k & 1)) >> 1].getOpcode().slice(8 * (k & 1), 8 + 8 * (k & 1)), 2) );
+                    if (line.getArgs()[1].getValue().includes('+')) {
+                        this.incZ();
+                    }
+                }
                 break;
             case 'LSL':
                 Rd = this.getArgumentValue(line, 0);
@@ -2817,6 +2851,7 @@ INST_LIST = [
     'LDD',
     'LDI',
     'LDS',
+    'LPM',
     'LSL',
     'LSR',
     'MOV',
@@ -2933,6 +2968,7 @@ INST_OPERANDS = {
     'LDD': [reg_0_31, word_plus_q_0_63],
     'LDI': [reg_16_31, int_0_255],
     'LDS': [reg_0_31, new Argument('INT', 256, 65535)],
+    'LPM': [reg_0_31, new Argument(['WORD', 'WORDPLUS'])],
     'LSL': [reg_0_31],
     'LSR': [reg_0_31],
     'MOV': [reg_0_31, reg_0_31],
@@ -3038,6 +3074,7 @@ INST_OPCODES = {
     'LDD': null,
     'LDI': ['d', 'K', '1110KKKKddddKKKK'],
     'LDS': ['d', 'k', '1001000ddddd0000kkkkkkkkkkkkkkkk'],
+    'LPM': null,
     'LSL': null,
     'LSR': ['d', '1001010ddddd0110'],
     'MOV': ['d', 'r', '001011rdddddrrrr'],
@@ -4403,6 +4440,19 @@ class App {
 
                     Operation:
                     Rd ← (k)`,
+            'LPM': `Syntax: (i) LPM
+                    &emsp;&emsp;&emsp;&ensp;(ii) LPM Rd, Z
+                    &emsp;&emsp;&emsp;&nbsp;(iii) LPM Rd, Z+
+                    Family:   Data Transfer Instructions
+                    Function: Loads one byte pointed to by the Z-register into the destination register Rd. Can post-increment Z with the Z+ variant.
+
+                    Boundaries:
+                    Rd → [R0 - R31]
+
+                    Operation Options:
+                    (i) &ensp;R0 ← (Z)
+                    (ii) &ensp;Rd ← (Z)
+                    (iii)&ensp;Rd ← (Z), Z = Z + 1`,
             'LSL': `Syntax:   LSL Rd
                     Family:   Bit & Bit Test Instructions
                     Function: Shifts all bits in Rd one place to the left. Bit 0 is cleared. Bit 7 is loaded into the C flag of the SREG. This operation effectively multiplies signed and unsigned values by two.
