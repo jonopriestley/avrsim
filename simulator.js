@@ -440,7 +440,7 @@ class Lexer {
             [/^[a-zA-Z]{2,6}/, 'INST'],         // instructions → CAN TURN REFS USED IN AN INSTRUCTION INTO INST TYPE
             [/^\".*?\"/, 'STR'],                // string
             [/^\'.*?\'/, 'STR'],                // string
-            // [/^\.[^\.\s]+/, 'DIR'],          // directives. .ORG WORKS WHAT OTHER DIRECTIVES. NO DEF no UNDEF
+            // [/^\.[^\.\s]+/, 'DIR'],          // directives. .ORG WORKS WHAT OTHER DIRECTIVES? NO DEF no UNDEF
             [/^\.[\w\.]+(?=[;\s])/, 'DIR'],      // directives
             [/^[YZ][ \t]*\+[ \t]*\d{1,2}/, 'WORDPLUSQ'],        // word+q
             [/^[X][ \t]*\+[ \t]*\d{1,2}/, 'XPLUSQ'],            // X+q
@@ -624,7 +624,7 @@ class Parser {
     }
 
     parse() {
-        /**
+        /*
         * Parses the tokens given in the initialization of
         * the parser. The parser raises an error if there
         * is invalid syntax, otherwise it prepares the tokens
@@ -835,8 +835,9 @@ class Parser {
         // Assumes line_num == text_section_start
 
         // Add 83 NOPs to pmem, since that's where the file starts
-        for (let i = 0; i < 83; i++) {
-            this.pmem.push([new Token('INST', 'NOP')]);
+        const pmem_initial_value = 83;
+        for (let i = 0; i < pmem_initial_value; i++) {
+            this.pmem.push(new Instruction([new Token('INST', 'NOP')]));
         }
 
         // Check .global line
@@ -1342,7 +1343,7 @@ class Parser {
         // Check number of args given is correct
         // Check if the types for each token are correct and their values are acceptable
 
-        for (let line_num = 0; line_num < this.pmem.length; line_num++) {
+        for (let line_num = pmem_initial_value; line_num < this.pmem.length; line_num++) {
 
             let line = this.pmem[line_num];                     // the line up to
 
@@ -1350,8 +1351,8 @@ class Parser {
                 continue;
             }
 
-            let line_length = line.length;                      // calculate number of tokens in the line
-            const line_in_file = pmem_file_lines[line_num];     // the current line if there's an error
+            let line_length = line.length;                                          // calculate number of tokens in the line
+            const line_in_file = pmem_file_lines[line_num - pmem_initial_value];    // the current line if there's an error
 
             // CHECK FOR COMMA AND REMOVE THEM IF THEYRE CORRECTLY PLACED
             if (line_length > 2) {
