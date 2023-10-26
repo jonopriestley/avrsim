@@ -437,18 +437,38 @@ class Lexer {
             [/^-{0,1}0[oO][0-7]+/, 'INT'],      // numbers
             [/^-{0,1}0[bB][01]+/, 'INT'],       // numbers
             [/^-{0,1}\d+/, 'INT'],              // numbers
-            [/^[a-zA-Z]{2,6}/, 'INST'],         // instructions → CAN TURN LABELS USED IN AN INSTRUCTION INTO INST TYPE
+            [/^[a-zA-Z]{2,6}/, 'INST'],         // instructions → CAN TURN REFS USED IN AN INSTRUCTION INTO INST TYPE
             [/^\".*?\"/, 'STR'],                // string
             [/^\'.*?\'/, 'STR'],                // string
-            // [/^\.[^\.\s]+/, 'DIR'],             // directives. REQUIRE SPACE AFTER THEM UNLESS FOLLOWED BY A '.'?. DOES .ORG WORK? WHAT OTHER DIRECTIVES
-            [/\.(section|SECTION|text|TEXT|data|DATA|global|GLOBAL|end|END)(?=[;\s])/, 'DIR'],        // directives
-            [/\.(byte|BYTE|word|WORD|string|STRING|ascii|ASCII|asciz|ASCIZ|space|SPACE|def|DEF|equ|EQU)(?=[;\s])/, 'DIR'],   // directives
+            // [/^\.[^\.\s]+/, 'DIR'],          // directives. .ORG WORKS WHAT OTHER DIRECTIVES. NO DEF no UNDEF
+            [/^\.[\w\.]+(?=[;\s])/, 'DIR'],      // directives
             [/^[YZ][ \t]*\+[ \t]*\d{1,2}/, 'WORDPLUSQ'],        // word+q
             [/^[X][ \t]*\+[ \t]*\d{1,2}/, 'XPLUSQ'],            // X+q
             [/^[XYZ]\+/, 'WORDPLUS'],           // word+
             [/^-[XYZ]/, 'MINUSWORD'],           // -word
             [/^[XYZ]/, 'WORD'],                 // word
             [/^,/, 'COMMA'],                    // comma
+            [/^\(/, 'LPAR'],                    // left parenthesis
+            [/^\)/, 'RPAR'],                    // right parenthesis
+            [/^\+/, 'PLUS'],                    // plus
+            [/^-/, 'MINUS'],                    // minus
+            [/^\*/, 'TIMES'],                   // times
+            [/^\//, 'DIV'],                     // div
+            [/^\&{2}/, 'LOGAND'],               // logical and
+            [/^\&{1}/, 'BITAND'],               // bitwise and
+            [/^\|{2}/, 'LOGOR'],                // logical or
+            [/^\|{1}/, 'BITOR'],                // bitwise or
+            [/^\^/, 'BITXOR'],                  // bitwise xor
+            [/^~/, 'BITNOT'],                   // bitwise not
+            [/^!=/, 'NEQ'],                     // not equal
+            [/^!/, 'LOGNOT'],                   // logical not
+            [/^>=/, 'GEQ'],                     // greater than or equal to
+            [/^<=/, 'LEQ'],                     // greater than or equal to
+            [/^==/, 'DEQ'],                     // double equals
+            [/^>{2}/, 'RSHIFT'],                // right shift
+            [/^<{2}/, 'LSHIFT'],                // left shift
+            [/^>{1}/, 'GT'],                    // greater than
+            [/^<{1}/, 'LT'],                    // less than
             [/^[^\w\s;]+/, 'SYMBOL'],           // symbols
             [/^[^\s\d]{1}[\w\d_]*/, 'REF']      // references (like labels used in an instruction)
         ];
@@ -506,11 +526,14 @@ class Lexer {
                 }
 
                 if (current_tok.getType() === 'DIR') {
+                    if (!DIRECTIVES.includes(current_tok.getValue().toUpperCase())) {
+                        this.newError(`Invalid directive \'${current_tok.getValue()}\'.`);
+                    }
                     current_tok.setValue(current_tok.getValue().toUpperCase());
                 }
 
                 // If both the current and previous tokens should be 1 REF token combine them
-                if (i > 0 && !['COMMA', 'SYMBOL'].includes(current_tok.getType()) && line_toks[i - 1].getType() === 'REF') {
+                if (i > 0 && !['COMMA', 'SYMBOL'].includes(current_tok.getType()) && !MATH.includes(current_tok.getType()) && line_toks[i - 1].getType() === 'REF') {
                     line_toks[i - 1].setValue(line_toks[i - 1].getValue() + current_tok.getValue());
                     line_toks.splice(i, 1); // Virtually advancing
                 }
@@ -756,7 +779,7 @@ class Parser {
         }
 
         // Create pre-existing equs
-        const existing_equs = {
+        /*const existing_equs = {
             'SREG': 0x3f,
             'SPL': 0x3d,
             'SPH': 0x3e,
@@ -796,7 +819,9 @@ class Parser {
             'PORTB': 0x05,
             'DDRB': 0x04,
             'PINB': 0x03,
-        };
+        }; */
+
+        const existing_equs = {};
 
         for (let [key, value] of Object.entries(existing_equs)) {
             equs[key] = value;
@@ -808,6 +833,11 @@ class Parser {
         // Fill in text section info and nulls, etc
 
         // Assumes line_num == text_section_start
+
+        // Add 83 NOPs to pmem, since that's where the file starts
+        for (let i = 0; i < 83; i++) {
+            this.pmem.push([new Token('INST', 'NOP')]);
+        }
 
         // Check .global line
         line_num += 1;                                          // move to the .global line
@@ -827,7 +857,7 @@ class Parser {
         while (line_num < (this.token_lines.length - 1)) {
 
             let line = this.token_lines[line_num]; // current line
-            const line_length = line.length; // calculate number of tokens in the line
+            let line_length = line.length; // calculate number of tokens in the line
             const line_in_file = this.line_numbers[line_num]; // the current line if there's an error
 
             let tok_num = 0;
@@ -835,8 +865,6 @@ class Parser {
 
             // While loop does:
             // Check for labels and remove them
-            // Change HI8 LO8 to integers
-            // Change REF type (data labels) to integers
             while (tok_num < line_length) {
 
                 const current_tok = line[tok_num]; // current token
@@ -858,64 +886,63 @@ class Parser {
                         this.dmem[0x5C].setValue((this.pmem.length >> 8) & 0xff); 
                     }
 
-                    has_label = true;
-                }
+                    // Remove the label
+                    line = line.slice(1);
+                    line_length -= 1;
 
-                tok_num += 1;
+                } else {
+                 tok_num += 1;
+                }
             }
 
-            // If the line has a label AND instruction remove the label
-            if (has_label && (line_length > 1)) {
-                line = line.slice(1);
+            if (line_length === 0) {
+                line_num += 1;
+                continue;
             }
 
             // Add the line to the program memory
-            if ((!has_label) || (has_label && (line_length > 1))) {
-
-                if (line[0].getType() == 'DIR' && line[0].getValue() == '.GLOBAL') {
-                    if (this.getPMEM().length > 0) {
-                        this.newError(`Illegal .global directive on line ${line_in_file}.`);
-                    }
-
-                    if (has_label) {
-                        this.newError(`Cannot have label on .global directive on line ${line_in_file}.`);
-                    }
-
-                    if (line.length !== 2) {
-                        this.newError(`Incorrect number of arguments for .global directive on line ${line_in_file}.`);
-                    }
-
-                    if (line[1].getType() !== 'REF') {
-                        this.newError(`Illegal token type ${line[1].getType()} for the argument ${line[1].getValue()} on line ${line_in_file}.`);
-                    }
-
-                    global_funct_names.push(line[1].getValue());
-                    line_num += 1;
-                    continue;
-
+            if (line[0].getType() == 'DIR' && line[0].getValue() == '.GLOBAL') {
+                if (this.getPMEM().length > 0) {
+                    this.newError(`Illegal .global directive on line ${line_in_file}.`);
                 }
 
-                // If theyre not instructions, it's illegal
-                if (line[0].getType() !== 'INST') {
-                    this.newError(`Illegal token \'${line[0].getValue()}\' on line ${line_in_file}.`);
+                if (has_label) {
+                    this.newError(`Cannot have label on .global directive on line ${line_in_file}.`);
                 }
 
-                this.pmem.push(line); // set the line to the line without the label
-                this.pmem_line_numbers.push(line_in_file);
-                pmem_file_lines.push(line_in_file);
-                const inst = line[0].getValue();
-
-                // Add None as next line if it's a 32 bit opcode
-                if (['CALL', 'JMP', 'LDS', 'STS'].includes(inst)) {
-                    this.pmem.push(null);
-                    this.pmem_line_numbers.push(null);
-                    pmem_file_lines.push(line_in_file);
+                if (line.length !== 2) {
+                    this.newError(`Incorrect number of arguments for .global directive on line ${line_in_file}.`);
                 }
+
+                if (line[1].getType() !== 'REF') {
+                    this.newError(`Illegal token type ${line[1].getType()} for the argument ${line[1].getValue()} on line ${line_in_file}.`);
+                }
+
+                global_funct_names.push(line[1].getValue());
+                line_num += 1;
+                continue;
+
             }
 
-            line_num += 1;
+            // If theyre not instructions, it's illegal
+            if (line[0].getType() !== 'INST') {
+                this.newError(`Illegal token \'${line[0].getValue()}\' on line ${line_in_file}.`);
+            }
 
-        }
+            this.pmem.push(line); // set the line to the line without the label
+            this.pmem_line_numbers.push(line_in_file);
+            pmem_file_lines.push(line_in_file);
+            const inst = line[0].getValue();
+
+            // Add None as next line if it's a 32 bit opcode
+            if (['CALL', 'JMP', 'LDS', 'STS'].includes(inst)) {
+                this.pmem.push(null);
+                this.pmem_line_numbers.push(null);
+                pmem_file_lines.push(line_in_file);
+            }
+            
+            line_num += 1;
+        }   
 
         if (this.pmem.length > this.flashend) {
             this.newError(`Too many lines of code to put into the program memory in the .text section.`);
@@ -981,6 +1008,8 @@ class Parser {
                 const parity_of_tokens_left = (line_length - 1 - tok_num) & 1; // used for calculating comma placement
 
                 ///// EXECUTE THE DIRECTIVES /////
+
+                
 
                 // Byte directive
                 if (parity_of_tokens_left === 0 && ['.BYTE','.WORD'].includes(line_directive)) {
@@ -1120,42 +1149,7 @@ class Parser {
 
                 }
 
-                // Def directive
-                else if (line_directive === '.DEF') {
-
-                    // Check the number of arguments
-                    if ((line_length - tok_num) != 3) { // if there's too many arguments
-                        this.newError(`Wrong number of arguments given for .def on line ${line_in_file}.`);
-                    }
-
-                    // if it's the 3rd last argument (expecting REF)
-                    if (current_tok.getType() !== 'REF') {
-                        this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`)
-                    }
-
-                    // Move to next token
-                    tok_num += 1;
-                    current_tok = line[tok_num];
-
-                    // Raise error if 2nd last token is not '='
-                    if (current_tok.getType() !== 'SYMBOL' && current_tok.getValue() !== '=') {
-                        this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`);
-                    }
-
-                    // Move to next token
-                    tok_num += 1;
-                    current_tok = line[tok_num];
-
-                    if (current_tok.getType() !== 'REG') {
-                        this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`);
-                    }
-
-                    const def_word = line[tok_num - 2].getValue();  // get the definition name for the labels list
-                    defs[def_word] = current_tok.getValue();        // add the def word to the labels list
-
-                }
-
-                else if (line_directive === '.EQU') {
+                else if (['.EQU','.SET'].includes(line_directive)) {
 
                     // Check the number of arguments
                     if ((line_length - tok_num) != 3) { // if there's too many arguments
@@ -1171,8 +1165,8 @@ class Parser {
                     tok_num += 1;
                     current_tok = line[tok_num];
 
-                    // Raise error if 2nd last token is not '='
-                    if (current_tok.getType() !== 'SYMBOL' && current_tok.getValue() !== '=') {
+                    // Raise error if 2nd last token is not a comma
+                    if (current_tok.getType() !== 'COMMA') {
                         this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
 
@@ -1185,11 +1179,6 @@ class Parser {
                     }
 
                     const equ_word = line[tok_num - 2].getValue();  // get the equ name for the labels list
-
-                    if (equs[equ_word] !== undefined) {
-                        this.newError(`Illegal .equ value \'${equ_word}\' on line ${line_in_file}. The constant \'${equ_word}\' has already been assigned a value.`);
-                    }
-
                     equs[equ_word] = current_tok.getValue();        // add the equ word to the labels list
                 }
 
@@ -1303,19 +1292,13 @@ class Parser {
                     const right_bracket = line[tok_num + 3];
 
                     // Check the token we expect to be the left bracket
-                    if (left_bracket.getType() !== 'SYMBOL' || left_bracket.getValue() !== '(') {
+                    if (left_bracket.getType() !== 'LPAR') {
                         this.newError(`Illegal ${current_tok.getValue()} left bracket on line ${line_in_file}.`);
                     }
 
                     // Check the token we expect to be the right bracket
-                    if (right_bracket.getType() !== 'SYMBOL' || right_bracket.getValue() !== ')') {
+                    if (right_bracket.getType() !== 'RPAR') {
                         this.newError(`Illegal ${current_tok.getValue()} right bracket on line ${line_in_file}.`);
-                    }
-
-                    // Check the variable is defined or is an int
-                    if ( this.dmem_labels[variable.getValue()] === undefined && !equ_keys.includes(variable.getValue()) && variable.getType() !== 'INT' ) {
-                        console.log([equ_keys, variable.getValue(), equ_keys['sd']]);
-                        this.newError(`Illegal ${current_tok.getValue()} variable on line ${line_in_file}.`);
                     }
 
                     let int_value = 0;
@@ -1325,8 +1308,16 @@ class Parser {
                         val = variable.getValue();
                     } else if (this.dmem_labels[variable.getValue()] != undefined) {
                         val = this.dmem_labels[variable.getValue()];
-                    } else { // if its a .equ variable
+                    } else if (this.pmem_labels[variable.getValue()] != undefined) {
+                        val = 2 * this.pmem_labels[variable.getValue()];    // loads the byte address not the flash memory word address
+                    } else if (equ_keys.includes(variable.getValue())) { // if its a .equ variable
                         val = equs[variable.getValue()];
+                    } else {
+                        this.newError(`Illegal ${current_tok.getValue()} variable on line ${line_in_file}.`);
+                    }
+
+                    if (val > 0xffffffff) {
+                        this.newError(`Error: bignum invalid on line ${line_in_file}. Cannot have a number >= 2^32.`);
                     }
 
                     // Convert the value to the hi8/lo8 value
@@ -1469,6 +1460,7 @@ class Interpreter {
         this.spl = new Token('REG', 0); // SP lo8
         this.sph = new Token('REG', 0); // SP hi8
 
+        this.step_count = 0;
         this.finished = false;
     }
 
@@ -3132,8 +3124,32 @@ DIRECTIVES = [
     '.ASCII',
     '.ASCIZ',
     '.SPACE',
-    '.DEF',
-    '.EQU'
+    '.EQU',
+    '.SET'
+];
+
+MATH = [
+    'PLUS',
+    'MINUS',
+    'TIMES',
+    'DIV',
+    'BITAND',
+    'BITOR',
+    'BITXOR',
+    'BITNOT',
+    'LSHIFT',
+    'RSHIFT',
+    'LT',
+    'GT',
+    'DEQ',
+    'LEQ',
+    'GEQ',
+    'NEQ',
+    'LOGAND',
+    'LOGOR',
+    'LOGNOT',
+    'LPAR',
+    'RPAR'
 ];
 
 
@@ -3273,6 +3289,7 @@ class App {
     }
 
     stepBackOne() {
+        this.hideOpenPopup(this.current_popup); // hide any open popup
         this.stepBack(-1);
         this.populateAll();
     }
@@ -3282,6 +3299,10 @@ class App {
         */
         const steps = this.interpreter.step_count + steps_back;       // the total number of steps to get to the point you want to go for
         
+        if (steps <= 0) {
+            return;
+        }
+
         let txt = document.getElementById('code_box').value;
         this.lexer.newData(txt);
         this.parser.newData(this.lexer.getTokenLines(), this.lexer.getLineNumbers(), txt);
