@@ -155,6 +155,7 @@ class Instruction {
         this.args = tokens.slice(1);
         this.opcode = this.makeOpcode();
     }
+
     twosComp(number, digits) {
 
         if (number >= 0) {
@@ -176,6 +177,7 @@ class Instruction {
         }
         return b;
     }
+
     binLenDigits(number, digits) {
         let b = number.toString(2);
         // Remove digits from the front if it's too long
@@ -190,6 +192,7 @@ class Instruction {
         }
         return b;
     }
+
     countElements(string, symbol) {
         let count = 0;
         for (let i = 0; i < string.length; i++) {
@@ -199,6 +202,7 @@ class Instruction {
         }
         return count;
     }
+
     makeOpcode() {
         const inst = this.inst.getValue();
         const opcode_requirements = INST_OPCODES[inst];
@@ -348,7 +352,6 @@ class Instruction {
             return `001000${d.slice(0, 1)}${d}${d.slice(1)}`
         }
     }
-
 
     toString(base) {
         // Always display numbers in base 10
@@ -835,7 +838,7 @@ class Parser {
         // Assumes line_num == text_section_start
 
         // Add 83 NOPs to pmem, since that's where the file starts
-        const pmem_initial_value = 83;
+        const pmem_initial_value = 0;
         for (let i = 0; i < pmem_initial_value; i++) {
             this.pmem.push(new Instruction([new Token('INST', 'NOP')]));
         }
@@ -1343,6 +1346,8 @@ class Parser {
         // Check number of args given is correct
         // Check if the types for each token are correct and their values are acceptable
 
+        console.log(this.pmem.slice(pmem_initial_value));
+
         for (let line_num = pmem_initial_value; line_num < this.pmem.length; line_num++) {
 
             let line = this.pmem[line_num];                     // the line up to
@@ -1549,11 +1554,10 @@ class Interpreter {
             case 'ADIW':
                 Rd = this.getArgumentValue(line, 0);
                 K = this.getArgumentValue(line, 1);
-                if ((Rd + K) > 0xff) {
-                    R = this.mod256(Rd + K);
+                R = Rd + K;
+                if (R > 0xff) {
+                    R = this.mod256(R);
                     this.getDMEM()[line.getArgs()[0].getValue() + 1].inc();
-                } else {
-                    R = Rd + K;
                 }
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
 
@@ -2311,11 +2315,10 @@ class Interpreter {
             case 'SBIW':
                 Rd = this.getArgumentValue(line, 0);
                 K = this.getArgumentValue(line, 1);
-                if ((Rd - K) < 0) {
-                    R = 0x100 + Rd - K;
+                R = Rd - K;
+                if (R < 0) {
+                    R += 0x100;
                     this.getDMEM()[line.getArgs()[0].getValue() + 1].dec();
-                } else {
-                    R = Rd - K;
                 }
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(R);
 
