@@ -600,8 +600,9 @@ class Parser {
         this.txt = txt;
         this.lines = this.txt.split('\n');
 
-        this.dmem_labels = Object.create(null);
-        this.pmem_labels = Object.create(null);
+        this.labels = Object.create(null);
+        this.defs = Object.create(null);
+        this.equs = Object.create(null);
 
         this.dmem = [];
         // Add registers to dmem
@@ -764,9 +765,6 @@ class Parser {
         // Check data section exists
         const data_section_exists = (text_section_start !== 0);
 
-        const defs = Object.create(null);
-        const equs = Object.create(null);
-
         // Create pre-existing definitions
         const existing_defs = {
             'ZH': 31,
@@ -778,7 +776,7 @@ class Parser {
         };
 
         for (let [key, value] of Object.entries(existing_defs)) {
-            defs[key] = value;
+            this.newDef(key, value, 0);
         }
 
         // Create pre-existing equs
@@ -827,7 +825,7 @@ class Parser {
         const existing_equs = {};
 
         for (let [key, value] of Object.entries(existing_equs)) {
-            equs[key] = value;
+            this.newEqu(key, value, 0);
         }
 
         let line_num = text_section_start;
@@ -882,8 +880,10 @@ class Parser {
                     }
 
                     const label = current_tok.getValue().slice(0, (current_tok.getValue().length - 1)).trim(); // remove the colon from the end
-                    this.pmem_labels[label] = this.pmem.length; //  add it to the labels dictionary
+                    //this.pmem_labels[label] = this.pmem.length; //  add it to the labels dictionary
                     
+                    this.newLabel(label, this.pmem.length, line_in_file);
+
                     // Check the global function label when you get to it
                     if (label === global_funct_names[0]) {
                         this.dmem[0x5B].setValue(this.pmem.length & 0xff);
@@ -956,7 +956,7 @@ class Parser {
         // Check you've found the global function name
         for (let i = 0; i < global_funct_names.length; i++) {
             global_funct_name = global_funct_names[i];
-            if (this.pmem_labels[global_funct_name] === undefined) {
+            if (this.labels[global_funct_name] === undefined) {
                 this.newError(`Cannot find the global label \'${global_funct_name}\' in the program. Check spelling if unsure.`);
             }
         }
@@ -983,7 +983,9 @@ class Parser {
             if (line[tok_num].getType() === 'LABEL') {
                 let label = line[0].getValue();                     // get label with the colon at the end
                 label = label.slice(0, (label.length - 1)).trim();
-                this.dmem_labels[label] = this.dmem.length;         // add location of the data label
+                //this.dmem_labels[label] = this.dmem.length;         // add location of the data label
+
+                this.newLabel(label, this.dmem.length, line_in_file)
                 
                 line.shift();                                       // remove the first element
                 line_length -= 1;                                   // correct the line length
@@ -1027,14 +1029,14 @@ class Parser {
                     }
 
                     else if (current_tok.getType() === 'REF') {
-                        if (this.pmem_labels[current_tok.getValue()] === undefined) {
+                        if (this.labels[current_tok.getValue()] === undefined) {
                             this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                         }
 
-                        this.dmem.push(this.pmem_labels[current_tok.getValue()] & 0xff);
+                        this.dmem.push(this.labels[current_tok.getValue()] & 0xff);
 
                         if (line_directive === '.WORD') {
-                            this.dmem.push((this.pmem_labels[current_tok.getValue()] >> 8) & 0xff);
+                            this.dmem.push((this.labels[current_tok.getValue()] >> 8) & 0xff);
                         }
                     }
 
@@ -1183,7 +1185,7 @@ class Parser {
                     }
 
                     const equ_word = line[tok_num - 2].getValue();  // get the equ name for the labels list
-                    equs[equ_word] = current_tok.getValue();        // add the equ word to the labels list
+                    this.newEqu(equ_word, current_tok.getValue(), line_in_file);
                 }
 
                 // Should be comma if there are even number of tokens left. Raise error.
@@ -1209,8 +1211,8 @@ class Parser {
         //////////////// TEXT SECTION ////////////////
         //////////////////////////////////////////////
 
-        const def_keys = Object.keys(defs);
-        const equ_keys = Object.keys(equs);
+        const def_keys = Object.keys(this.defs);
+        const equ_keys = Object.keys(this.equs);
         const control_flow_instructions = ['CALL', 'JMP', 'IJMP', 'ICALL', 'RJMP', 'RCALL'].concat(INST_LIST.slice(7, 27)); // all the branching instructions
 
         // TURN ALL REFS INTO CORRECT FORM
@@ -1238,7 +1240,7 @@ class Parser {
                     // If it's a non relative control flow instruction and it's not a function
                     if (control_flow_instructions.slice(0, 4).includes(first_tok.getValue()) && !FUNCTIONS.includes(current_tok.getValue())) {
 
-                        let k = this.pmem_labels[current_tok.getValue()];      // Get k for label
+                        let k = this.labels[current_tok.getValue()];      // Get k for label
 
                         // Replace it in the line
                         current_tok.setType('INT');
@@ -1248,7 +1250,7 @@ class Parser {
                     // If it's a relative control flow instruction
                     else if (control_flow_instructions.slice(4).includes(first_tok.getValue())) {
 
-                        let k = this.pmem_labels[current_tok.getValue()];    // Get k for label
+                        let k = this.labels[current_tok.getValue()];    // Get k for label
                         let relative_k = k - 1 - line_num;              // the k for relative jumping instructions
 
                         // Replace it in the line
@@ -1257,21 +1259,21 @@ class Parser {
                     }
 
                     // If it's in data labels
-                    else if (this.dmem_labels[current_tok.getValue()] !== undefined) {
+                    else if (this.labels[current_tok.getValue()] !== undefined) {
                         current_tok.setType('INT');
-                        current_tok.setValue(this.dmem_labels[current_tok.getValue()]);
+                        current_tok.setValue(this.labels[current_tok.getValue()]);
                     }
 
                     // If it's a REG definition
                     else if (def_keys.includes(current_tok.getValue())) {
                         current_tok.setType('REG');
-                        current_tok.setValue(defs[current_tok.getValue()]);
+                        current_tok.setValue(this.defs[current_tok.getValue()]);
                     }
 
                     // If it's a REG definition
                     else if (equ_keys.includes(current_tok.getValue())) {
                         current_tok.setType('INT');
-                        current_tok.setValue(equs[current_tok.getValue()]);
+                        current_tok.setValue(this.equs[current_tok.getValue()]);
                     }
 
                     // Check if it's a function call?
@@ -1310,12 +1312,10 @@ class Parser {
                     
                     if ( variable.getType() == 'INT' ) {
                         val = variable.getValue();
-                    } else if (this.dmem_labels[variable.getValue()] != undefined) {
-                        val = this.dmem_labels[variable.getValue()];
-                    } else if (this.pmem_labels[variable.getValue()] != undefined) {
-                        val = 2 * this.pmem_labels[variable.getValue()];    // loads the byte address not the flash memory word address
+                    } else if (this.labels[variable.getValue()] != undefined) {
+                        val = this.labels[variable.getValue()];
                     } else if (equ_keys.includes(variable.getValue())) { // if its a .equ variable
-                        val = equs[variable.getValue()];
+                        val = this.equs[variable.getValue()];
                     } else {
                         this.newError(`Illegal ${current_tok.getValue()} variable on line ${line_in_file}.`);
                     }
@@ -1407,6 +1407,58 @@ class Parser {
             this.pmem[line_num] = new Instruction(line);
         }
 
+    }
+
+    newLabel(label, value, line_in_file) {
+        if ( this.labels[label] !== undefined ) {
+            this.newError(`Previous definition of \'${label}\'. Duplicate label \'${label}\' on line ${line_in_file}.`);
+        }
+
+        if ( this.equs[label] !== undefined ) {
+            this.newError(`Previous definition of \'${label}\'. Illegal attempt to re-use \'${label}\' as label on line ${line_in_file}.`);
+        }
+
+        if ( this.defs[label] !== undefined ) {
+            this.newError(`Previous definition of \'${label}\'. Illegal use of register \'${label}\' as label on line ${line_in_file}.`);
+        }
+
+        if ( INST_LIST.includes(this.labels[label]) ) {
+            this.newError(`Illegal re-use of instruction \'${label}\' as label on line ${line_in_file}.`);
+        }
+
+        this.labels[label] = value;
+    }
+
+    newEqu(label, value, line_in_file) {
+        if ( this.labels[label] !== undefined ) {
+            this.newError(`Previous definition of \'${label}\'. Invalid redefinition of label \'${label}\' as variable on line ${line_in_file}.`);
+        }
+
+        // Allow redefinition of variables already in this.equs
+
+        if ( this.defs[label] !== undefined ) {
+            this.newError(`Previous definition of \'${label}\'. Illegal use of register \'${label}\' as variable on line ${line_in_file}.`);
+        }
+
+        if ( INST_LIST.includes(this.labels[label]) ) {
+            this.newError(`Attempt to redefine keyword \'${label}\' on line ${line_in_file}.`);
+        }
+
+        this.equs[label] = value;
+    }
+
+    newDef(label, value, line_in_file) {
+        if ( this.labels[label] !== undefined || this.equs[label] !== undefined ) {
+            this.newError(`Previous definition of \'${label}\'. Cannot use .def: ${label} redefinition on line ${line_in_file}.`);
+        }
+
+        // Allow redefinition of defs already in this.defs
+
+        if ( INST_LIST.includes(this.labels[label]) ) {
+            this.newError(`Illegal re-use of instruction \'${label}\' as definition on line ${line_in_file}.`);
+        }
+
+        this.defs[label] = value;
     }
 
     getTokenLines() {
