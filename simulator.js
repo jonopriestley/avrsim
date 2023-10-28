@@ -836,7 +836,7 @@ class Parser {
         // Assumes line_num == text_section_start
 
         // Add 83 NOPs to pmem, since that's where the file starts
-        const pmem_initial_value = 0;
+        const pmem_initial_value = 0; // set to 83 for realistic location
         for (let i = 0; i < pmem_initial_value; i++) {
             this.pmem.push(new Instruction([new Token('INST', 'NOP')]));
         }
@@ -999,23 +999,32 @@ class Parser {
 
             // CHECK THE DIRECTIVE
             if (line[tok_num].getType() !== 'DIR') {
-                this.newError(`Illegal syntax \'${line[tok_num].getValue()}\' on line ${line_in_file}.`);
+                this.newError(`Illegal syntax \'${this.lines[line_in_file - 1]}\' for the data section. Expecting a directive on line ${line_in_file}.`);
             }
 
             const line_directive = line[tok_num].getValue();    // get the directive for this line to use below
 
+            if (['.BYTE','.WORD', '.SPACE'].includes(line_directive)) {
+                // Replace the references in the line and evaluate any expressions
+                this.replaceRefs(line, line_in_file);
+                this.evaluateExpression(line, line_in_file);
+            } else if (['.SET','.EQU'].includes(line_directive)) {
+                this.replaceRefs(line.slice(2));
+                this.evaluateExpression(line, line_in_file);
+            }
+
+            line_length = line.length; 
             tok_num += 1;                                       // Move to the next token in the line
+            let current_tok;
 
             // EXECUTE THE DIRECTIVE
-            while (tok_num < line_length) {
+            while (tok_num < line.length) {
 
-                let current_tok = line[tok_num];
+                current_tok = line[tok_num];
 
                 const parity_of_tokens_left = (line_length - 1 - tok_num) & 1; // used for calculating comma placement
 
                 ///// EXECUTE THE DIRECTIVES /////
-
-                
 
                 // Byte directive
                 if (parity_of_tokens_left === 0 && ['.BYTE','.WORD'].includes(line_directive)) {
@@ -1027,24 +1036,9 @@ class Parser {
                             this.dmem.push((current_tok.getValue() >> 8) & 0xff);
                         }
                     }
-
-                    else if (current_tok.getType() === 'REF') {
-                        if (this.labels[current_tok.getValue()] === undefined) {
-                            this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
-                        }
-
-                        this.dmem.push(this.labels[current_tok.getValue()] & 0xff);
-
-                        if (line_directive === '.WORD') {
-                            this.dmem.push((this.labels[current_tok.getValue()] >> 8) & 0xff);
-                        }
-                    }
-
                     else {
                         this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
-
-                    
                 }
 
                 // String, Ascii, Asciz directives
@@ -1211,11 +1205,9 @@ class Parser {
         //////////////// TEXT SECTION ////////////////
         //////////////////////////////////////////////
 
-        const def_keys = Object.keys(this.defs);
-        const equ_keys = Object.keys(this.equs);
         const control_flow_instructions = ['CALL', 'JMP', 'IJMP', 'ICALL', 'RJMP', 'RCALL'].concat(INST_LIST.slice(7, 27)); // all the branching instructions
 
-        // TURN ALL REFS INTO CORRECT FORM
+        // Evaluate all refs, hi8()/lo8(), and expressions
         for (let line_num = 0; line_num < this.pmem.length; line_num++) {
 
             const line = this.pmem[line_num]; // current line
@@ -1224,56 +1216,122 @@ class Parser {
                 continue
             }
 
-            const line_length = line.length;                    // calculate number of tokens in the line
+            let line_length = line.length;                    // calculate number of tokens in the line
             const line_in_file = pmem_file_lines[line_num];     // the current line if there's an error
-
             const first_tok = line[0];                          // first token in the line
 
-            // Go through the token lines
-            for (let tok_num = 0; tok_num < line_length; tok_num++) {
+            // Evaluate hi8()/lo8()
+            let tok_num = 0;
+            let current_tok;
+            while (tok_num < line.length) {
 
+                current_tok = line[tok_num];
+
+                // Change HI8 LO8 to integers
+                if (['HI8', 'LO8'].includes(current_tok.getType())) {
+
+                    const fnct = current_tok.getType();
+                    
+                    // Check there's enough room
+                    if (line.length <= tok_num + 3) {
+                        this.newError(`Bad syntax on line ${line_in_file}. Not enough tokens given for a valid ${current_tok.getType()} function.`); 
+                    }
+
+                    tok_num += 1;
+
+                    const left_bracket = line[tok_num];
+                    // Check the token we expect to be the left bracket
+                    if (left_bracket.getType() !== 'LPAR') {
+                        this.newError(`Illegal ${current_tok.getValue()} left bracket on line ${line_in_file}.`);
+                    }
+
+                    tok_num += 1;
+
+                    const expr_start = tok_num;
+                    let bracket_level = 1;
+                    // Find closing right bracket
+                    while (tok_num < line.length) {
+                        if (bracket_level === 0) {
+                            break;
+                        }
+                        current_tok = line[tok_num];
+                        if (current_tok.getType() === 'LPAR') {
+                            bracket_level += 1;
+                        } else if (current_tok.getType() === 'RPAR') {
+                            bracket_level -= 1;
+                        }
+                        tok_num += 1;
+                    }
+
+                    if (bracket_level !== 0) {
+                        this.newError(`Missing ')' on line ${line_in_file}.`);
+                    }
+
+                    this.replaceRefs(line.slice(expr_start, tok_num - 1));
+                    let eval_section = line.slice(expr_start, tok_num - 1);
+                    this.evaluateExpression(eval_section, line_in_file);
+                    line.splice(expr_start, tok_num - expr_start - 1, eval_section[0]);
+
+                    // Should now be up to whatever is after the RPAR.
+
+                    const val = eval_section[0].getValue();
+
+                    if (val > 0xffffffff) {
+                        this.newError(`Error: bignum invalid on line ${line_in_file}. Cannot have a number >= 2^32.`);
+                    }
+
+                    let int_value;
+                    // Convert the value to the hi8/lo8 value
+                    if (fnct === 'HI8') {
+                        int_value = this.hi8(val);
+                    } else {
+                        int_value = this.lo8(val);
+                    }
+
+                    line.splice(expr_start - 2, 4, new Token('INT', int_value));
+                    tok_num = expr_start - 2;
+
+                }
+
+                tok_num += 1;
+            }
+            
+
+            line_length = line.length;
+            // Replace refs according to the instruction
+            for (let tok_num = 0; tok_num < line_length; tok_num++) {
                 const current_tok = line[tok_num];
 
                 // Replace REF with valid type and value
                 if (current_tok.getType() === 'REF') {
 
+                    let tok_type = 'INT';
+                    let tok_val;
+
                     // If it's a non relative control flow instruction and it's not a function
                     if (control_flow_instructions.slice(0, 4).includes(first_tok.getValue()) && !FUNCTIONS.includes(current_tok.getValue())) {
-
-                        let k = this.labels[current_tok.getValue()];      // Get k for label
-
-                        // Replace it in the line
-                        current_tok.setType('INT');
-                        current_tok.setValue(k);
+                        tok_val = this.labels[current_tok.getValue()];      // Get k for label
                     }
 
                     // If it's a relative control flow instruction
                     else if (control_flow_instructions.slice(4).includes(first_tok.getValue())) {
-
-                        let k = this.labels[current_tok.getValue()];    // Get k for label
-                        let relative_k = k - 1 - line_num;              // the k for relative jumping instructions
-
-                        // Replace it in the line
-                        current_tok.setType('INT');
-                        current_tok.setValue(relative_k);
+                        tok_val = this.labels[current_tok.getValue()] - 1 - line_num;
                     }
 
                     // If it's in data labels
                     else if (this.labels[current_tok.getValue()] !== undefined) {
-                        current_tok.setType('INT');
-                        current_tok.setValue(this.labels[current_tok.getValue()]);
+                        tok_val = this.labels[current_tok.getValue()];
                     }
 
                     // If it's a REG definition
-                    else if (def_keys.includes(current_tok.getValue())) {
-                        current_tok.setType('REG');
-                        current_tok.setValue(this.defs[current_tok.getValue()]);
+                    else if (this.defs[current_tok.getValue()] !== undefined) {
+                        tok_type = 'REG';
+                        tok_val = this.defs[current_tok.getValue()];
                     }
 
                     // If it's a REG definition
-                    else if (equ_keys.includes(current_tok.getValue())) {
-                        current_tok.setType('INT');
-                        current_tok.setValue(this.equs[current_tok.getValue()]);
+                    else if (this.equs[current_tok.getValue()] !== undefined) {
+                        tok_val = this.equs[current_tok.getValue()];
                     }
 
                     // Check if it's a function call?
@@ -1283,60 +1341,14 @@ class Parser {
                         this.newError(`Bad reference ${current_tok.getValue()} on line ${line_in_file}.`);
                     }
 
+                    current_tok.setType(tok_type);
+                    current_tok.setValue(tok_val);
                 }
 
-                // Change HI8 LO8 to integers
-                else if (['HI8', 'LO8'].includes(current_tok.getType())) {
-
-                    // Must have 3 left, a bracket, a value, and a bracket
-                    if ((line_length - 1 - tok_num) !== 3) {
-                        this.newError(`Illegal ${current_tok.getValue()} on line ${line_in_file}.`);
-                    }
-
-                    const left_bracket = line[tok_num + 1];
-                    const variable = line[tok_num + 2];
-                    const right_bracket = line[tok_num + 3];
-
-                    // Check the token we expect to be the left bracket
-                    if (left_bracket.getType() !== 'LPAR') {
-                        this.newError(`Illegal ${current_tok.getValue()} left bracket on line ${line_in_file}.`);
-                    }
-
-                    // Check the token we expect to be the right bracket
-                    if (right_bracket.getType() !== 'RPAR') {
-                        this.newError(`Illegal ${current_tok.getValue()} right bracket on line ${line_in_file}.`);
-                    }
-
-                    let int_value = 0;
-                    let val;
-                    
-                    if ( variable.getType() == 'INT' ) {
-                        val = variable.getValue();
-                    } else if (this.labels[variable.getValue()] != undefined) {
-                        val = this.labels[variable.getValue()];
-                    } else if (equ_keys.includes(variable.getValue())) { // if its a .equ variable
-                        val = this.equs[variable.getValue()];
-                    } else {
-                        this.newError(`Illegal ${current_tok.getValue()} variable on line ${line_in_file}.`);
-                    }
-
-                    if (val > 0xffffffff) {
-                        this.newError(`Error: bignum invalid on line ${line_in_file}. Cannot have a number >= 2^32.`);
-                    }
-
-                    // Convert the value to the hi8/lo8 value
-                    if (current_tok.getType() === 'HI8') {
-                        int_value = this.hi8(val);
-                    } else {
-                        int_value = this.lo8(val);
-                    }
-
-                    line[tok_num] = new Token('INT', int_value);
-                    this.pmem[line_num] = line.slice(0, (line.length - 3)); // remove the rest of the line
-
-                    tok_num += 3;
-                }
             }
+
+            this.evaluateExpression(line, line_in_file);
+
         }
 
         ////////// CHECK INSTRUCTION SYNTAX
@@ -1345,9 +1357,6 @@ class Parser {
         // Check for real instruction
         // Check number of args given is correct
         // Check if the types for each token are correct and their values are acceptable
-
-        console.log(this.pmem.slice(pmem_initial_value));
-
         for (let line_num = pmem_initial_value; line_num < this.pmem.length; line_num++) {
 
             let line = this.pmem[line_num];                     // the line up to
@@ -1459,6 +1468,77 @@ class Parser {
         }
 
         this.defs[label] = value;
+    }
+
+    replaceRefs(line, line_in_file) {
+        let current_tok;
+        // Go through the tokens once first and replace refs with ints
+        for (let i = 0; i < line.length; i++) {
+            current_tok = line[i];
+            if (current_tok.getType() === 'REF') {
+                // Replace it in the line
+                if (this.labels[current_tok.getValue()] !== undefined) {
+                    current_tok.setValue(this.labels[current_tok.getValue()]);
+                } else if (this.equs[current_tok.getValue()] !== undefined) {
+                    current_tok.setValue(this.equs[current_tok.getValue()]);
+                } else{
+                    this.newError(`Invalid reference \'${current_tok.getValue()}\' on line ${line_in_file}.`);
+                }
+                current_tok.setType('INT');
+            }
+        }
+    }
+
+    evaluateExpression(line, line_in_file) {
+        let current_tok;
+        // Evaluate all expressions in the line
+        let expression = '';
+        let expression_start, evaluation;
+        let i = 0;
+        while (i < line.length) {
+            current_tok = line[i];
+
+             // Begin expression
+             if (MATH.includes(current_tok.getType())) {
+                if (expression.length === 0) {
+                    expression_start = i;
+                }
+                expression += current_tok.getValue();
+            }
+
+            // Evaluate then reset expression to empty
+            else if (expression.length > 0 && !MATH.includes(current_tok.getType())) {
+                try {
+                    evaluation = eval(expression);                                  // evaluate
+                } catch (error) {
+                    this.newError(`${error.message} on line ${line_in_file}`);
+                }
+                if (evaluation === true) {
+                    evaluation = 1;
+                }
+                const new_tok = new Token('INT', evaluation);                   // make new token
+                line.splice(expression_start, i - expression_start, new_tok);   // replace the expression with the token
+                expression = '';                                                // reset the expression
+                i = expression_start;
+            }
+
+            i += 1;
+        }
+
+        // Evaluate after the 
+        if (expression.length > 0) {
+            try {
+                evaluation = eval(expression);                                  // evaluate
+            } catch (error) {
+                this.newError(`${error.message} on line ${line_in_file}`);
+            }
+            if (evaluation === true) {
+                evaluation = 1;
+            }
+            const new_tok = new Token('INT', evaluation);                   // make new token
+            line.splice(expression_start, line.length - expression_start, new_tok);   // replace the expression with the token
+        }
+
     }
 
     getTokenLines() {
@@ -3185,6 +3265,7 @@ DIRECTIVES = [
 ];
 
 MATH = [
+    'INT',
     'PLUS',
     'MINUS',
     'TIMES',
