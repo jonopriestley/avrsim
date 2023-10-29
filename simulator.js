@@ -1516,6 +1516,7 @@ class Parser {
                 if (evaluation === true) {
                     evaluation = 1;
                 }
+                evaluation = Math.floor(evaluation);
                 const new_tok = new Token('INT', evaluation);                   // make new token
                 line.splice(expression_start, i - expression_start, new_tok);   // replace the expression with the token
                 expression = '';                                                // reset the expression
@@ -1535,6 +1536,7 @@ class Parser {
             if (evaluation === true) {
                 evaluation = 1;
             }
+            evaluation = Math.floor(evaluation);
             const new_tok = new Token('INT', evaluation);                   // make new token
             line.splice(expression_start, line.length - expression_start, new_tok);   // replace the expression with the token
         }
