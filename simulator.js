@@ -358,13 +358,15 @@ class Instruction {
         const inst = this.inst.getValue();
         const argsLen = this.args.length;
 
+        
         if (argsLen === 0) {
             return inst;
         }
 
+        
         let arg1 = this.args[0].getValue();
 
-        if (this.args[0].getType() === 'REG') {
+        if (INST_OPERANDS[inst][0].getTokenType().includes('REG')) {
             arg1 = `R${arg1}`;
         }
 
@@ -373,14 +375,12 @@ class Instruction {
         }
 
         if (argsLen === 1) {
-
             return `${inst} ${arg1}`;
         }
 
-
         let arg2 = this.args[1].getValue();
 
-        if (this.args[1].getType() === 'REG') {
+        if (INST_OPERANDS[inst][1].getTokenType().includes('REG')) {
             arg2 = `R${arg2}`;
         }
 
@@ -467,15 +467,19 @@ class Lexer {
             [/^!/, 'LOGNOT'],                   // logical not
             [/^>=/, 'GEQ'],                     // greater than or equal to
             [/^<=/, 'LEQ'],                     // greater than or equal to
-            [/^==/, 'DEQ'],                     // double equals
+            [/^==/, 'DEQ'],                     // double equal
             [/^>{2}/, 'RSHIFT'],                // right shift
             [/^<{2}/, 'LSHIFT'],                // left shift
             [/^>{1}/, 'GT'],                    // greater than
             [/^<{1}/, 'LT'],                    // less than
+            [/^=/, 'EQ'],                       // equal (assignment)
             [/^[^\w\s;]+/, 'SYMBOL'],           // symbols
             [/^[^\s\d]{1}[\w\d_]*/, 'REF']      // references (like labels used in an instruction)
         ];
         
+        // TODO: = does the same as .equ
+        // TODO: can use variables as int or reg
+
         const tokens = [];
         const line_nums = [];
 
@@ -1332,6 +1336,7 @@ class Parser {
                     // If it's a REG definition
                     else if (this.equs[current_tok.getValue()] !== undefined) {
                         tok_val = this.equs[current_tok.getValue()];
+
                     }
 
                     // Check if it's a function call?
@@ -3027,16 +3032,16 @@ INST_LIST = [
     'XCH'
 ];
 
-const reg_0_31 = new Argument('REG', 0, 31);
-const reg_16_31 = new Argument('REG', 16, 31);
-const reg_word_low = new Argument('REG', null, null, [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]);
+const reg_0_31 = new Argument(['REG','INT'], 0, 31);
+const reg_16_31 = new Argument(['REG','INT'], 16, 31);
+const reg_word_low = new Argument(['REG','INT'], null, null, [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]);
 const int_0_7 = new Argument('INT', 0, 7);
 const int_0_31 = new Argument('INT', 0, 31);
 const int_0_63 = new Argument('INT', 0, 63);
 const int_0_255 = new Argument('INT', 0, 255);
 const int_n64_63 = new Argument('INT', -64, 63);
 const word_plus_q_0_63 = new Argument('WORDPLUSQ', 0, 63);
-const word_wxyz = new Argument('REG', null, null, [24, 26, 28, 30]);
+const word_wxyz = new Argument(['REG','INT'], null, null, [24, 26, 28, 30]);
 
 // Allows ranges for each inst
 INST_OPERANDS = {
@@ -3105,7 +3110,7 @@ INST_OPERANDS = {
     'MOVW': [reg_word_low, reg_word_low],
     'MUL': [reg_0_31, reg_0_31],
     'MULS': [reg_16_31, reg_16_31],
-    'MULSU': [new Argument('REG', 16, 23), new Argument('REG', 16, 23)],
+    'MULSU': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
     'NEG': [reg_0_31],
     'NOP': null,
     'OR': [reg_0_31, reg_0_31],
