@@ -536,7 +536,7 @@ class Lexer {
                 }
 
                 // If both the current and previous tokens should be 1 REF token combine them
-                if (i > 0 && !['COMMA', 'SYMBOL'].includes(current_tok.getType()) && !MATH.includes(current_tok.getType()) && line_toks[i - 1].getType() === 'REF') {
+                if (i > 0 && !['COMMA', 'SYMBOL'].includes(current_tok.getType()) && !MATH.slice(1).includes(current_tok.getType()) && line_toks[i - 1].getType() === 'REF') {
                     line_toks[i - 1].setValue(line_toks[i - 1].getValue() + current_tok.getValue());
                     line_toks.splice(i, 1); // Virtually advancing
                 }
