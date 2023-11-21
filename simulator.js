@@ -1,7 +1,8 @@
 class Token {
-    constructor(type_, value = null) {
+    constructor(type_, value = null, location = null) {
         this.type = type_;
         this.value = value;
+        this.location = location;
     }
     getType() {
         return this.type;
@@ -15,8 +16,14 @@ class Token {
     setValue(value) {
         this.value = value;
     }
+    getLocation() {
+        return this.location;
+    }
+    setLocation(location) {
+        this.location = location;
+    }
     toString() {
-        return `${this.type}:${this.value}`;
+        return `${this.type.toLowerCase()}\t\'${this.value}\'\tLoc=<${this.location}>`;
     }
 }
 
@@ -501,7 +508,7 @@ class Lexer {
 
                     if (match) {
                         if (tag) {
-                            const token = new Token(tag, match[0]);
+                            const token = new Token(tag, match[0], `${line_number + 1}:${pos + 1}`);
                             line_toks.push(token);
                         }
                         break;
@@ -567,6 +574,18 @@ class Lexer {
 
     getTokenLines() {
         return this.token_lines;
+    }
+
+    toString() {
+        let s = '';
+        let line;
+        for (let l = 0; l < this.token_lines.length; l++) {
+            line = this.token_lines[l];
+            for (let tok = 0; tok < line.length; tok++) {
+                s += line[tok].toString() + '\n';
+            }
+        }
+        return s;
     }
 
     getLineNumbers() {
@@ -1230,6 +1249,7 @@ class Parser {
             while (tok_num < line.length) {
 
                 current_tok = line[tok_num];
+                const start_pos = current_tok.getLocation();
 
                 // Change HI8 LO8 to integers
                 if (['HI8', 'LO8'].includes(current_tok.getType())) {
@@ -1292,7 +1312,7 @@ class Parser {
                         int_value = this.lo8(val);
                     }
 
-                    line.splice(expr_start - 2, 4, new Token('INT', int_value));
+                    line.splice(expr_start - 2, 4, new Token('INT', int_value, start_pos));
                     tok_num = expr_start - 2;
 
                 }
@@ -1340,6 +1360,10 @@ class Parser {
                     }
 
                     // Check if it's a function call?
+                    else if (FUNCTIONS.includes(current_tok.getValue())) {
+                        continue;
+                    }
+                    
 
                     // If it's none of these and not a function, raise an error
                     else if (!FUNCTIONS.includes(current_tok.getValue())) {
@@ -3366,7 +3390,8 @@ class App {
 
         // Tokenizing
         this.lexer.newData(txt);
-        console.log(this.lexer.getTokenLines());
+        //console.log(this.lexer.getTokenLines());
+        console.log(this.lexer.toString());
 
         // Parsing
         this.parser.newData(this.lexer.getTokenLines(), this.lexer.getLineNumbers(), txt);
