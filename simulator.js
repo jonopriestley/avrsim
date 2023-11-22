@@ -22,6 +22,12 @@ class Token {
     setLocation(location) {
         this.location = location;
     }
+    getLine() {
+        return this.location.split(':')[0]
+    }
+    getStart() {
+        return this.location.split(':')[1]
+    }
     toString() {
         return `${this.type.toLowerCase()}\t\'${this.value}\'\tLoc=<${this.location}>`;
     }
@@ -418,12 +424,7 @@ class Lexer {
 
     newData(text) {
         this.text = text;
-
-        const toks_info = this.tokenize(this.text);
-
-        this.token_lines = toks_info[0];
-        this.line_numbers = toks_info[1]; // text file line number for each token line
-
+        this.token_lines = this.tokenize(this.text);
     }
 
     tokenize(code) {
@@ -434,9 +435,9 @@ class Lexer {
 
         // Define regular expressions for each token type
         const patterns = [
-            [/^;.*$/, null],                     // comments
+            [/^;.*$/, null],                    // comments
             [/^\s+/, null],                     // whitespace
-            [/^[\w_]{1}[^;]*:/, 'LABEL'],       // labels
+            [/^[\w_]{1}[^;\s,]*:/, 'LABEL'],    // labels
             [/^lo8(?=[(])/, 'LO8'],             // lo8
             [/^LO8(?=[(])/, 'LO8'],             // lo8
             [/^hi8(?=[(])/, 'HI8'],             // hi8
@@ -488,7 +489,6 @@ class Lexer {
         // TODO: can use variables as int or reg
 
         const tokens = [];
-        const line_nums = [];
 
         const codeArr = code.split('\n');
 
@@ -520,7 +520,6 @@ class Lexer {
                 }
 
                 pos += match[0].length;
-
             }
 
             // Fixing any bad tokens (like REFs being INST tokens)
@@ -560,12 +559,11 @@ class Lexer {
 
             if (line_toks.length !== 0) {           // Add to the tokens list if the line isnt empty
                 tokens.push(line_toks);
-                line_nums.push(line_number + 1);    // Add the line numbers of each line for later
             }
 
         }
 
-        return [tokens, line_nums];
+        return tokens;
     }
 
     getText() {
@@ -588,10 +586,6 @@ class Lexer {
         return s;
     }
 
-    getLineNumbers() {
-        return this.line_numbers;
-    }
-
     newError(text) {
         document.getElementById('error').innerHTML = text;
         document.getElementById('output').innerHTML = null;
@@ -605,8 +599,6 @@ class Parser {
     
     constructor() {
         this.token_lines = [];
-        this.line_numbers = [];
-        this.pmem_line_numbers = [];
         this.pmem = [];
         this.dmem = [];
 
@@ -616,10 +608,8 @@ class Parser {
 
     }
 
-    newData(token_lines, line_numbers, txt) {
+    newData(token_lines, txt) {
         this.token_lines = token_lines;
-        this.line_numbers = line_numbers;
-        this.pmem_line_numbers = [];
         this.txt = txt;
         this.lines = this.txt.split('\n');
 
@@ -684,7 +674,7 @@ class Parser {
         let text_section_start = null;
         for (let line_num = 0; line_num < this.token_lines.length; line_num++) {
             const line = this.token_lines[line_num];
-            const line_in_file = this.line_numbers[line_num];
+            const line_in_file = line[0].getLine();
 
             // If you find a .SECTION directive check it
             if (line[0].getValue() === '.SECTION' && line[0].getType() === 'DIR') {
@@ -713,9 +703,9 @@ class Parser {
         // Go through each line
         for (let line_num = 0; line_num < this.token_lines.length; line_num++) {
 
-            const line = this.token_lines[line_num];             // tokens in the current line
-            const line_length = line.length;                     // number of tokens in the line
-            const line_in_file = this.line_numbers[line_num];    // the current line if there's an error
+            const line = this.token_lines[line_num];    // tokens in the current line
+            const line_length = line.length;            // number of tokens in the line
+            const line_in_file = line[0].getLine();     // the current line if there's an error
 
             // Go through each token and make them the correct format
             for (let tok_num = 0; tok_num < line_length; tok_num++) {
@@ -869,21 +859,19 @@ class Parser {
         let line = this.token_lines[line_num];                  // current line
 
         if (line.length !== 2 || line[0].getValue() !== '.GLOBAL') {
-            const line_in_file = this.line_numbers[line_num];   // the current line used for raising an error
-            this.newError(`Must begin text section with a valid .global directive: line ${line_in_file}.`);
+            this.newError(`Must begin text section with a valid .global directive: line ${line[0].getLine()}.`);
         }
 
         // Some variables for later
         const global_funct_names = [line[1].getValue()];        // the name of the global function for later
         line_num += 1;                                          // move to instructions part of text section
-        const pmem_file_lines = [];                             // where in the text file each pmem line is 
 
         // CREATE PMEM AND GET THE LABEL LOCATIONS
         while (line_num < (this.token_lines.length - 1)) {
 
             let line = this.token_lines[line_num]; // current line
             let line_length = line.length; // calculate number of tokens in the line
-            const line_in_file = this.line_numbers[line_num]; // the current line if there's an error
+            const line_in_file = line[0].getLine(); // the current line if there's an error
 
             let tok_num = 0;
             let has_label = false; // bool for if the line has a label
@@ -957,15 +945,11 @@ class Parser {
             }
 
             this.pmem.push(line); // set the line to the line without the label
-            this.pmem_line_numbers.push(line_in_file);
-            pmem_file_lines.push(line_in_file);
             const inst = line[0].getValue();
 
             // Add None as next line if it's a 32 bit opcode
             if (['CALL', 'JMP', 'LDS', 'STS'].includes(inst)) {
                 this.pmem.push(null);
-                this.pmem_line_numbers.push(null);
-                pmem_file_lines.push(line_in_file);
             }
             
             line_num += 1;
@@ -998,7 +982,7 @@ class Parser {
 
             const line = this.token_lines[line_num];
             let line_length = line.length;                      // calculate number of tokens in the line
-            const line_in_file = this.line_numbers[line_num];   // the current line if there's an error
+            const line_in_file = line[0].getLine();   // the current line if there's an error
 
             let tok_num = 0;
 
@@ -1030,10 +1014,10 @@ class Parser {
             if (['.BYTE','.WORD', '.SPACE'].includes(line_directive)) {
                 // Replace the references in the line and evaluate any expressions
                 this.replaceRefs(line, line_in_file);
-                this.evaluateExpression(line, line_in_file);
+                this.evaluateExpression(line);
             } else if (['.SET','.EQU'].includes(line_directive)) {
                 this.replaceRefs(line.slice(2));
-                this.evaluateExpression(line, line_in_file);
+                this.evaluateExpression(line);
             }
 
             line_length = line.length; 
@@ -1045,12 +1029,13 @@ class Parser {
 
                 current_tok = line[tok_num];
 
-                const parity_of_tokens_left = (line_length - 1 - tok_num) & 1; // used for calculating comma placement
+                //const parity_of_tokens_left = (line_length - 1 - tok_num) & 1; // used for calculating comma placement
+                const parity_of_current_tok = tok_num & 1;
 
                 ///// EXECUTE THE DIRECTIVES /////
 
                 // Byte directive
-                if (parity_of_tokens_left === 0 && ['.BYTE','.WORD'].includes(line_directive)) {
+                if (parity_of_current_tok === 1 && ['.BYTE','.WORD'].includes(line_directive)) {
 
                     if (current_tok.getType() === 'INT') {
                         this.dmem.push(current_tok.getValue() & 0xff);
@@ -1060,12 +1045,12 @@ class Parser {
                         }
                     }
                     else {
-                        this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
+                        this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file} at position ${current_tok.getStart()}.`);
                     }
                 }
 
                 // String, Ascii, Asciz directives
-                else if (parity_of_tokens_left === 0 && ['.STRING', '.ASCII', '.ASCIZ'].includes(line_directive)) {
+                else if (parity_of_current_tok === 1 && ['.STRING', '.ASCII', '.ASCIZ'].includes(line_directive)) {
 
                     if (current_tok.getType() !== 'STR') {
                         this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
@@ -1134,7 +1119,7 @@ class Parser {
                 }
 
                 // Space directive
-                else if (parity_of_tokens_left === 0 && line_directive === '.SPACE') {
+                else if (parity_of_current_tok === 1 && line_directive === '.SPACE') {
 
                     if (current_tok.getType() !== 'INT') { // expecting integer
                         this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file}.`);
@@ -1206,10 +1191,13 @@ class Parser {
                 }
 
                 // Should be comma if there are even number of tokens left. Raise error.
-                else if (parity_of_tokens_left === 1 && current_tok.getType() !== 'COMMA') {
-                    this.newError(`Missing comma on line ${line_in_file}.`);
+                else if (parity_of_current_tok === 0 && current_tok.getType() !== 'COMMA') {
+                    this.newError(`Missing comma on line ${line_in_file} at position ${current_tok.getStart()}.`);
                 }
 
+                else if ((tok_num + 1 === line.length) && current_tok.getType() === 'COMMA') {
+                    this.newError(`Illegal comma on line ${line_in_file}  at position ${current_tok.getStart()}.`);
+                }
 
                 tok_num += 1;
             }
@@ -1239,9 +1227,9 @@ class Parser {
                 continue
             }
 
-            let line_length = line.length;                    // calculate number of tokens in the line
-            const line_in_file = pmem_file_lines[line_num];     // the current line if there's an error
+            let line_length = line.length;                      // calculate number of tokens in the line
             const first_tok = line[0];                          // first token in the line
+            const line_in_file = first_tok.getLine();           // the current line if there's an error
 
             // Evaluate hi8()/lo8()
             let tok_num = 0;
@@ -1250,7 +1238,7 @@ class Parser {
 
                 current_tok = line[tok_num];
                 const start_pos = current_tok.getLocation();
-
+                
                 // Change HI8 LO8 to integers
                 if (['HI8', 'LO8'].includes(current_tok.getType())) {
 
@@ -1293,7 +1281,7 @@ class Parser {
 
                     this.replaceRefs(line.slice(expr_start, tok_num - 1));
                     let eval_section = line.slice(expr_start, tok_num - 1);
-                    this.evaluateExpression(eval_section, line_in_file);
+                    this.evaluateExpression(eval_section);
                     line.splice(expr_start, tok_num - expr_start - 1, eval_section[0]);
 
                     // Should now be up to whatever is after the RPAR.
@@ -1376,8 +1364,7 @@ class Parser {
 
             }
 
-            this.evaluateExpression(line, line_in_file);
-
+            this.evaluateExpression(line);
         }
 
         ////////// CHECK INSTRUCTION SYNTAX
@@ -1395,7 +1382,7 @@ class Parser {
             }
 
             let line_length = line.length;                                          // calculate number of tokens in the line
-            const line_in_file = pmem_file_lines[line_num - pmem_initial_value];    // the current line if there's an error
+            const line_in_file = line[0].getLine();    // the current line if there's an error
 
             // CHECK FOR COMMA AND REMOVE THEM IF THEYRE CORRECTLY PLACED
             if (line_length > 2) {
@@ -1518,40 +1505,51 @@ class Parser {
         }
     }
 
-    evaluateExpression(line, line_in_file) {
+    evaluateExpression(line) {
         let current_tok;
         // Evaluate all expressions in the line
         let expression = '';
-        let expression_start, evaluation;
+        let expression_start = null;
+        let evaluation, last_tok;
         let i = 0;
         while (i < line.length) {
             current_tok = line[i];
 
-             // Begin expression
-             if (MATH.includes(current_tok.getType())) {
+            // Begin expression
+            if (MATH.includes(current_tok.getType())) {
                 if (expression.length === 0) {
                     expression_start = i;
                 }
+
+                else if (last_tok.getType() === 'INT' && current_tok.getType() === 'INT') {
+                    this.newError(`Cannot evaluate expression on line ${current_tok.getLine()} beginning at position ${line[expression_start].getStart()}`);
+                }
+
                 expression += current_tok.getValue();
             }
 
             // Evaluate then reset expression to empty
-            else if (expression.length > 0 && !MATH.includes(current_tok.getType())) {
+            else if (expression.length > 0) {
                 try {
                     evaluation = eval(expression);                                  // evaluate
                 } catch (error) {
-                    this.newError(`${error.message} on line ${line_in_file}`);
+                    this.newError(`${error.message} on line ${current_tok.getLine()} beginning at position ${line[expression_start].getStart()}`);
                 }
                 if (evaluation === true) {
                     evaluation = 1;
                 }
                 evaluation = Math.floor(evaluation);
-                const new_tok = new Token('INT', evaluation);                   // make new token
+                const new_tok = new Token('INT', evaluation, line[expression_start].getLocation());                   // make new token
                 line.splice(expression_start, i - expression_start, new_tok);   // replace the expression with the token
                 expression = '';                                                // reset the expression
                 i = expression_start;
             }
 
+            else if (expression_start !== null && current_tok.getType() !== 'COMMA') {
+                this.newError(`Bad token \'${current_tok.getValue()}\' on line ${current_tok.getLine()} beginning at position ${current_tok.getStart()}`);
+            }
+
+            last_tok = line[i];
             i += 1;
         }
 
@@ -1560,24 +1558,20 @@ class Parser {
             try {
                 evaluation = eval(expression);                                  // evaluate
             } catch (error) {
-                this.newError(`${error.message} on line ${line_in_file}`);
+                this.newError(`${error.message} on line ${current_tok.getLine()} beginning at position ${line[expression_start].getStart()}`);
             }
             if (evaluation === true) {
                 evaluation = 1;
             }
             evaluation = Math.floor(evaluation);
-            const new_tok = new Token('INT', evaluation);                   // make new token
-            line.splice(expression_start, line.length - expression_start, new_tok);   // replace the expression with the token
+            const new_tok = new Token('INT', evaluation, line[expression_start].getLocation());    // make new token
+            line.splice(expression_start, line.length - expression_start, new_tok);                     // replace the expression with the token
         }
 
     }
 
     getTokenLines() {
         return this.token_lines;
-    }
-
-    getLineNumbers() {
-        return this.line_numbers;
     }
 
     hi8(val) {
@@ -1596,10 +1590,6 @@ class Parser {
 
     getDMEM() {
         return this.dmem;
-    }
-
-    getPMEMLineNumbers() {
-        return this.pmem_line_numbers;
     }
 
     newError(text) {
@@ -1622,7 +1612,6 @@ class Interpreter {
     emptyData() {
         this.pmem = [];
         this.dmem = [];
-        this.line_numbers = [];
         this.sreg = new Token('REG', 0);
         this.pcl = new Token('REG', 0); // PC lo8
         this.pch = new Token('REG', 0); // PC hi8
@@ -1633,11 +1622,10 @@ class Interpreter {
         this.finished = false;
     }
 
-    newData(pmem, dmem, pmem_line_numbers, txt) {
+    newData(pmem, dmem, txt) {
         // DATA & PROGRAM MEMORY
         this.pmem = pmem;
         this.dmem = dmem;
-        this.line_numbers = pmem_line_numbers;
         this.txt = txt;
 
         this.lines = this.txt.split('\n');
@@ -1678,7 +1666,7 @@ class Interpreter {
 
         const line = this.pmem[this.getPC()];
         const inst = line.getInst().getValue();
-        const line_in_file = this.line_numbers[this.getPC()];
+        const line_in_file = line.getInst().getLine();
 
         let skip_inc = false;
 
@@ -3321,9 +3309,9 @@ MATH = [
 ];
 
 
-// ###################################################################################################################
-// # AN EASTER EGG - POEM                                                                                            #
-// ###################################################################################################################
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// # AN EASTER EGG - POEM                                                                                            /
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /*
 O that you would know my heart,
@@ -3394,10 +3382,10 @@ class App {
         console.log(this.lexer.toString());
 
         // Parsing
-        this.parser.newData(this.lexer.getTokenLines(), this.lexer.getLineNumbers(), txt);
+        this.parser.newData(this.lexer.getTokenLines(), txt);
 
         // Interpreter Initialisation
-        this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), this.parser.getPMEMLineNumbers(), txt);
+        this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), txt);
 
         // Success!
         this.success('Success! Your code can be run.');
@@ -3474,8 +3462,8 @@ class App {
 
         let txt = document.getElementById('code_box').value;
         this.lexer.newData(txt);
-        this.parser.newData(this.lexer.getTokenLines(), this.lexer.getLineNumbers(), txt);
-        this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), this.parser.getPMEMLineNumbers(), txt);
+        this.parser.newData(this.lexer.getTokenLines(), txt);
+        this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), txt);
 
         for (let i = 0; i < (steps - 1); i++) {
             this.interpreter.step();    // do enough steps to get to the point you expect to be at
