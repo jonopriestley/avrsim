@@ -1545,9 +1545,9 @@ class Parser {
                 i = expression_start;
             }
 
-            else if (expression_start !== null && current_tok.getType() !== 'COMMA') {
-                this.newError(`Bad token \'${current_tok.getValue()}\' on line ${current_tok.getLine()} beginning at position ${current_tok.getStart()}`);
-            }
+            //else if (expression_start !== null && current_tok.getType() !== 'COMMA') {
+            //    this.newError(`Bad token \'${current_tok.getValue()}\' on line ${current_tok.getLine()} beginning at position ${current_tok.getStart()}`);
+            //}
 
             last_tok = line[i];
             i += 1;
