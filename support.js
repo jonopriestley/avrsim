@@ -2,23 +2,65 @@
 /////// Add script support ///////
 
 const code_box = document.getElementById('code_box');
+const keys_down = [];
+
 
 // Let tab be '\t' instead of move to next element
 code_box.addEventListener('keydown', event => {
-    // allowing tab to work in a text section
-    if (event.key === 'Tab') {
-      const start = code_box.selectionStart;
-      const end = code_box.selectionEnd;
-  
-      code_box.value = code_box.value.substring(0, start) + '\t' + code_box.value.substring(end);
+  // Add key to list of key's down
+  if (!keys_down.includes(event.key)) {
+    keys_down.push(event.key);
+  }
+
+  // allowing tab to work in a text section
+  //if (keys_down.length === 1 && keys_down.includes('Tab')) {
+  if (event.key === 'Tab') {
+    event.preventDefault();
+    const start = code_box.selectionStart;
+    const end = code_box.selectionEnd;
+
+    if (code_box.value.substring(start, end).includes('\n')) { // multiline tab
+      // go back to the start OR to the previous \n
+      let i = start;
+      while (i > 0) {
+        if (code_box.value[i - 1] === '\n') {
+          break;
+        }
+        i = i - 1;
+      }
+
+      // add \t if you're at index 0 (since you can't go back any further)
+      if (i === 0) {
+        code_box.value = '\t' + code_box.value;
+        i = i + 1;
+      }
       
-      code_box.selectionEnd = end + 1;  // move the text caret to the cab point
-  
-      event.preventDefault();
+      // add \t after each \n
+      while (i < end) {
+        if (code_box.value[i - 1] === '\n') {
+          code_box.value = code_box.value.substring(0, i) + '\t' + code_box.value.substring(i);
+        }
+        i = i + 1;
+      }
+      
+    } else { // singleline tab
+      code_box.value = code_box.value.substring(0, start) + '\t' + code_box.value.substring(end);
     }
-    
+
+    code_box.selectionEnd = end + 1;  // move the text caret to the tab point
+  }
+
+  //else if (keys_down.length === 2 && keys_down.includes('Shift') && keys_down.includes('Tab')) {}
 }
 );
+
+document.addEventListener('keyup', event => {
+  // Remove key from list of key's down
+  const k = keys_down.indexOf(event.key);
+  if (k !== -1) {
+    keys_down.splice(k,1);
+  }
+});
 
 // Make the line numbers on keyup
 code_box.addEventListener('keyup', event => {
