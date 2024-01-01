@@ -2911,13 +2911,15 @@ class Interpreter {
     }
 
     getArgumentValue(line, arg_num) {
-        // For getting the value of a register of integer
+        // For getting the value of a register or integer
         const arg = line.getArgs()[arg_num];
-        if (arg.getType() === 'INT') {
-            return arg.getValue();
+        const inst = line.getInst().getValue();
+        const reqs = INST_OPERANDS[inst][arg_num].getTokenType();
+        if (reqs.includes('REG')) {
+            return this.getDMEM()[arg.getValue()].getValue();   
         }
-        else if (arg.getType() === 'REG') {
-            return this.getDMEM()[arg.getValue()].getValue();
+        else if (arg.getType() === 'INT') {
+            return arg.getValue();
         }
     }
 
