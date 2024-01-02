@@ -24,34 +24,29 @@ input_str: .string "++++++++[>++++[>++>+++>+++>+<<<<-]>+>+>->>+[<]<-]>>.>---.+++
 ; t = text, a = 30000 array, p = pointer/position, i = text pointer, l = list/stack for loop tracking, n = len(t)
 asm_function:
 
-;;; Y = i = @input_string
-ldi iL, lo8(input_str)
-ldi iH, hi8(input_str)
+ldi pL, lo8(input_str)
+ldi pH, hi8(input_str)
 
 ;;; get str_len
 get_strlen:
-ld strlenL, Y+          ; strlenL = DMEM[Y]
-cpi strlenL, 0          ; cpse strlenL, 0
+ld strlenL, Z+          ; strlenL = DMEM[Y]
+cpi strlenL, 0          ; cpse strlenL, \0
 breq after_get_strlen
 rjmp get_strlen     ; go to top of loop
 
 after_get_strlen:
-mov strlenH, iH        ; r25:r24 = strlen
-mov strlenL, iL
+mov strlenH, pH        ; r25:r24 = strlen
+mov strlenL, pL
 sbiw strlenL, 1 ; due to the \0 at the end of the string       
-
-;;; Z = p = array pointer
-mov pH, iH        
-mov pL, iL
-adiw pL, 2
-
 ; X = pointer for printing
-mov printH, iH
-mov printL, iL
+mov printH, pH
+mov printL, pL
+;;; Z = p = array pointer
+adiw pL, 2
 
 ; SP = l (list of "[" locations) pointer on the stack
 
-;;; reset to  Y = i = @input_string
+;;; Y = i = @input_string
 ldi iL, lo8(input_str)
 ldi iH, hi8(input_str)
 
@@ -66,17 +61,25 @@ cp iL, strlenL
 brsh after_loop
 
 loop:
-; c = t[i]
-ld char, Y
+ld char, Y ; c = t[i]
 
-; if c in '+-': a[p] = (a[p] + 44 - ord(c)) % 256
-; if char in [43, 45] --> cell = cell + 44 - c
-plus_minus_check:
-cpi char, 43
+cpi char, 43    ; +
 breq plus_minus
-cpi char, 45
-brne left_right_check
+cpi char, 62    ; >
+breq left_right
+cpi char, 60    ; <
+breq left_right
+cpi char, 93    ; ]
+breq rb
+cpi char, 45    ; -
+breq plus_minus
+cpi char, 91    ; [
+breq lb
+cpi char, 46    ; .
+breq dot
+rjmp after_ifs
 
+; "+-"
 plus_minus:
 
 ldi r18, 44
@@ -86,14 +89,7 @@ add r17, r18    ; r17 = cell + 44 - c
 st Z, r17       ; cell = cell + 44 - c
 rjmp after_ifs
 
-; elif c in '<>': p += ord(c) - 61
-; elif char in [60, 62]: r31:r30 += c - 61
-left_right_check:
-cpi char, 60
-breq left_right
-cpi char, 62
-brne dot_check
-
+; "<>"
 left_right:
 cpi char, 60
 brne 2
@@ -102,16 +98,12 @@ rjmp after_ifs
 adiw pL, 1
 rjmp after_ifs
 
-; elif c == '.': print(chr(a[p]), end='')
-dot_check:
-cpi char, 46
-brne lb_check
-
+; "."
 dot:
-; store r25:r24
+; store strlen
 push strlenL
 push strlenH
-; store r31:r30
+; store array pointer
 push pL
 push pH
 
@@ -128,39 +120,27 @@ call printf
 pop printL
 pop printH
 
-; restore r31:r30
+; restore the array pointer
 pop pH
 pop pL
-; restore r25:r24
+; restore strlen
 pop strlenH
 pop strlenL
 
 rjmp after_ifs
 
-
-; elif c == '[': l += [i]
-; elif c == 91: push Y
-lb_check:
-cpi char, 91
-brne rb_check
-
+; "["
 lb:
 push iH
 push iL
 rjmp after_ifs
 
-; elif c == ']':
-rb_check:
-cpi char, 93
-brne after_ifs
-
-;     if a[p]: i = l[-1]
-;     else: l.pop(-1)
+; "]"
 rb:
 ld r17, Z       ; r17 = a[p] = cell
 
 cpi r17, 0
-breq else
+breq rb_else
 
 ;; copy l[-1] into Y
 pop iL
@@ -171,7 +151,7 @@ push iH
 push iL
 rjmp after_ifs
 
-else:
+rb_else:
 ;; pop l[-1] into r1:r0 and clear them
 pop r0
 pop r1
@@ -182,12 +162,10 @@ pop r1
 after_ifs:
 ; i += 1
 adiw iL, 1
-
 ; go back to top
 rjmp loop_check
 
 after_loop:
-
 ret
 
 .end
