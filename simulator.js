@@ -1619,6 +1619,8 @@ class Interpreter {
         this.sph = new Token('REG', 0); // SP hi8
 
         this.step_count = 0;
+        this.cycles = 0;
+        this.branches_taken = 0;
         this.finished = false;
     }
 
@@ -1631,6 +1633,8 @@ class Interpreter {
         this.lines = this.txt.split('\n');
         this.finished = false;
         this.step_count = 0;
+        this.cycles = 0;
+        this.branches_taken = 0;
 
         // DEFINING PC, SP AND SREG
         this.pcl = new Register('PCL', this.dmem[0x5B].getValue(), 0);
@@ -1669,6 +1673,7 @@ class Interpreter {
         const line_in_file = line.getInst().getLine();
 
         let skip_inc = false;
+        let branch_taken = false;
 
         let Rd, Rr, R, K, k, b, s, A, q, w, T, H, V, N, Z, C;    // declaring all the variable names
 
@@ -1778,140 +1783,103 @@ class Interpreter {
                     k = this.getArgumentValue(line, 0);
                     this.setPC(this.getPC() + k + 1);
                     skip_inc = true;
+                    this.cycles += 1;
                 }
                 break;
             case 'BRBS':
                 s = this.getArgumentValue(line, 0);
                 if ((this.getSREG() >> s) & 1) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRCC':
                 if (1 - (this.getSREG() & 1)) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRCS':
                 if (this.getSREG() & 1) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BREQ':
                 if ((this.getSREG() >> 1) & 1) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRGE':
                 if (1 - ((this.getSREG() >> 4) & 1)) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRHC':
                 if (1 - ((this.getSREG() >> 5) & 1)) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRHS':
                 if ((this.getSREG() >> 5) & 1) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRID':
                 if (1 - ((this.getSREG() >> 7) & 1)) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRIE':
                 if ((this.getSREG() >> 7) & 1) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRLO':
                 if (this.getSREG() & 1) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRLT':
                 if ((this.getSREG() >> 4) & 1) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRMI':
                 if ((this.getSREG() >> 2) & 1) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRNE':
                 if (1 - ((this.getSREG() >> 1) & 1)) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRPL':
                 if (1 - ((this.getSREG() >> 2) & 1)) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRSH':
                 if (1 - (this.getSREG() & 1)) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRTC':
                 if (1 - ((this.getSREG() >> 6) & 1)) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRTS':
                 if ((this.getSREG() >> 6) & 1) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRVC':
                 if (1 - ((this.getSREG() >> 3) & 1)) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BRVS':
                 if ((this.getSREG() >> 3) & 1) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
+                    branch_taken = true;
                 }
                 break;
             case 'BSET':
@@ -1942,6 +1910,7 @@ class Interpreter {
                     k = this.getArgumentValue(line, 0);
                     this.setPC(k);
                     skip_inc = true;
+                    this.cycles += 5;
                     break;
                 }
 
@@ -1999,12 +1968,14 @@ class Interpreter {
                     // X is changed
                     // The string is printed
                     // Next instruction is after
+                this.cycles += 4;
                 break;
             case 'CBI':
                 A = this.getArgumentValue(line, 0);
                 b = this.getArgumentValue(line, 1);
                 R = this.getDMEM()[A + 0x20].getValue() & (0xff - (1 << b));
                 this.getDMEM()[A + 0x20].setValue(R);
+                this.cycles += 1;
                 break;
             case 'CBR':
                 Rd = this.getArgumentValue(line, 0);
@@ -2099,12 +2070,14 @@ class Interpreter {
                 }
 
                 this.incPC();
+                this.cycles += 1;
 
                 if ( this.pmem[this.getPC() + 1] !== null ) {
                     break;
                 }
 
                 this.incPC();
+                this.cycles += 1;
 
                 break;
             case 'DEC':
@@ -2144,11 +2117,13 @@ class Interpreter {
                 k = this.getZ();
                 this.setPC(k);
                 skip_inc = true;
+                this.cycles += 3;
                 break;
             case 'IJMP':
                 k = this.getZ();
                 this.setPC(k);
                 skip_inc = true;
+                this.cycles += 1;
                 break;
             case 'IN':
                 Rd = this.getArgumentValue(line, 0);
@@ -2171,6 +2146,7 @@ class Interpreter {
                 k = this.getArgumentValue(line, 0);
                 this.setPC(k);
                 skip_inc = true;
+                this.cycles += 2;
                 break;
             case 'LD':
                 w = line.getArgs()[1].getValue();
@@ -2186,6 +2162,7 @@ class Interpreter {
                         this.decZ();
                         w = 'Z';
                     }
+                    this.cycles += 2;
                 }
 
                 if (w[0] === 'X') {
@@ -2204,6 +2181,7 @@ class Interpreter {
                     } else if (w === 'Z+') {
                         this.incZ();
                     }
+                    this.cycles += 1;
                 }
                 break;
             case 'LDD':
@@ -2215,6 +2193,7 @@ class Interpreter {
                     k = this.getZ() + q;
                 }
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
+                this.cycles += 1;
                 break;
             case 'LDI':
                 K = this.getArgumentValue(line, 1);
@@ -2224,6 +2203,7 @@ class Interpreter {
                 k = this.getArgumentValue(line, 1);
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 this.incPC(); // increment once now cause total needs to be + 2
+                this.cycles += 1;
                 break;
             case 'LPM':
                 k = this.getZ();
@@ -2236,6 +2216,7 @@ class Interpreter {
                         this.incZ();
                     }
                 }
+                this.cycles += 2;
                 break;
             case 'LSL':
                 Rd = this.getArgumentValue(line, 0);
@@ -2298,6 +2279,7 @@ class Interpreter {
                 this.getDMEM()[1].setValue(this.mod256(R >> 8));
 
                 this.updateSREG(null, null, null, null, null, null, (R === 0), (R >> 15) & 1);
+                this.cycles += 1;
                 break;
             case 'NEG':
                 Rd = this.getArgumentValue(line, 0);
@@ -2348,6 +2330,7 @@ class Interpreter {
                 this.incSP();                                                       // increment the SP by 1
                 Rd = line.getArgs()[0].getValue();                                  // register number
                 this.getDMEM()[Rd].setValue(this.getDMEM()[this.getSP()]);          // set register value
+                this.cycles += 1;
                 break;
             case 'PUSH':
                 if (this.getSP() <= 0x100) {
@@ -2357,6 +2340,7 @@ class Interpreter {
                 Rr = this.getArgumentValue(line, 0);            // register held value
                 this.getDMEM()[this.getSP()] = Rr;              // set the value in DMEM
                 this.decSP();                                   // decrement the SP by 1
+                this.cycles += 1;
                 break;
             case 'RCALL':
                 this.incPC();
@@ -2376,16 +2360,14 @@ class Interpreter {
                 k = this.getArgumentValue(line, 0);
                 this.setPC(this.getPC() + k + 1);
                 skip_inc = true;
-                break;
-            case 'RJMP':
-                k = this.getArgumentValue(line, 0);
-                this.setPC(this.getPC() + k + 1);
-                skip_inc = true;
+                this.cycles += 3;
                 break;
             case 'RET':
                 if (this.getSP() === this.ramend) {
                     this.finished = true;
-                    console.log(`Number of steps taken: ${this.step_count + 1}`);
+                    this.step_count += 1;
+                    this.cycles += 5;
+                    console.log(`Number of steps taken: ${this.step_count}`);
                     return;
                 }
 
@@ -2401,7 +2383,14 @@ class Interpreter {
                 ret_line += this.getDMEM()[this.getSP()]; // add the ret low value to the ret high value
                 this.setPC(ret_line);
                 skip_inc = true;
+                this.cycles += 4;
                 break;
+            case 'RJMP':
+                    k = this.getArgumentValue(line, 0);
+                    this.setPC(this.getPC() + k + 1);
+                    skip_inc = true;
+                    this.cycles += 1;
+                    break;
             case 'ROL':
                 Rd = this.getArgumentValue(line, 0);
                 C = this.getSREG() & 1;
@@ -2462,6 +2451,7 @@ class Interpreter {
                 b = this.getArgumentValue(line, 1);
                 R = this.getDMEM()[A + 0x20].getValue() | (1 << b);
                 this.getDMEM()[A + 0x20].setValue(R);
+                this.cycles += 1;
                 break;
             case 'SBIW':
                 Rd = this.getArgumentValue(line, 0);
@@ -2479,6 +2469,7 @@ class Interpreter {
                 N = (R > 0x7fff);
                 C = V;
                 this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), C);
+                this.cycles += 1;
                 break;
             case 'SBR':
                 Rd = this.getArgumentValue(line, 0);
@@ -2502,12 +2493,14 @@ class Interpreter {
                 }
 
                 this.incPC();
+                this.cycles += 1;
 
                 if ( this.pmem[this.getPC() + 1] !== null ) {
                     break;
                 }
 
                 this.incPC();
+                this.cycles += 1;
 
                 break;
             case 'SBRS':
@@ -2521,12 +2514,14 @@ class Interpreter {
                 }
 
                 this.incPC();
+                this.cycles += 1;
 
                 if ( this.pmem[this.getPC() + 1] !== null ) {
                     break;
                 }
 
                 this.incPC();
+                this.cycles += 1;
 
                 break;
             case 'SEC':
@@ -2571,6 +2566,7 @@ class Interpreter {
                         this.decZ();
                         w = 'Z';
                     }
+                    this.cycles += 2;
                 }
 
                 if (w[0] === 'X') {
@@ -2591,6 +2587,7 @@ class Interpreter {
                     } else if (w === 'Z+') {
                         this.incZ();
                     }
+                    this.cycles += 1;
                 }
                 break;
             case 'STD':
@@ -2603,12 +2600,14 @@ class Interpreter {
                     k = this.getZ() + q;
                 }
                 this.getDMEM()[k] = Rd;   // (k) <-- Rd
+                this.cycles += 1;
                 break;
             case 'STS':
                 k = this.getArgumentValue(line, 0);
                 Rd = this.getArgumentValue(line, 1);
                 this.getDMEM()[k] = Rd;   // (k) <-- Rd
                 this.incPC(); // increment once now cause total needs to be + 2
+                this.cycles += 1;
                 break;
             case 'SUB':
                 Rd = this.getArgumentValue(line, 0);
@@ -2661,9 +2660,18 @@ class Interpreter {
 
                 this.getDMEM()[k] = vals[0];                                    // (Z) <-- Rd
                 this.getDMEM()[line.getArgs()[1].getValue()].setValue(vals[1]); // Rd <-- (Z)
+                this.cycles += 1;
                 break;
             default:
                 break;
+        }
+
+        if (branch_taken === true) {
+            k = this.getArgumentValue(line, 0);
+            this.setPC(this.getPC() + k + 1);
+            skip_inc = true;
+            this.cycles += 1;
+            this.branches_taken += 1;
         }
 
         if (skip_inc === false) { // almost every instruction does this, so its easier to counterract it if you don't want to do exactly that
@@ -2671,6 +2679,7 @@ class Interpreter {
         }
 
         this.step_count += 1 // count the number of steps to prevent infinite loops
+        this.cycles += 1 // count the number of clock cycles used
 
         // If the number of steps is too large, terminate running the code
         if (this.step_count > 1000000) {
@@ -3016,8 +3025,8 @@ INST_LIST = [
     'POP',
     'PUSH',
     'RCALL',
-    'RJMP',
     'RET',
+    'RJMP',
     'ROL',
     'ROR',
     'SBC',
@@ -3132,8 +3141,8 @@ INST_OPERANDS = {
     'OUT': [int_0_63, reg_0_31],
     'POP': [reg_0_31],
     'PUSH': [reg_0_31],
-    'RET': null,
     'RCALL': [new Argument('INT', -2048, 2047)],
+    'RET': null,
     'RJMP': [new Argument('INT', -2048, 2047)],
     'ROL': [reg_0_31],
     'ROR': [reg_0_31],
@@ -3238,8 +3247,8 @@ INST_OPCODES = {
     'OUT': ['A', 'r', '10111AArrrrrAAA'],
     'POP': ['d', '1001000ddddd1111'],
     'PUSH': ['r', '1001001rrrrr1111'],
-    'RET': ['1001010100001000'],
     'RCALL': ['k', '1101kkkkkkkkkkkk'], // this one needs 2's comp too
+    'RET': ['1001010100001000'],
     'RJMP': ['k', '1100kkkkkkkkkkkk'], // this one needs 2's comp too
     'ROL': null,
     'ROR': ['d', '1001010ddddd0111'],
@@ -3380,7 +3389,6 @@ class App {
 
         // Tokenizing
         this.lexer.newData(txt);
-        //console.log(this.lexer.getTokenLines());
         console.log(this.lexer.toString());
 
         // Parsing
@@ -3395,7 +3403,7 @@ class App {
         // Populating Display with Data
         this.pmem_top = this.interpreter.getPC() - ( this.interpreter.getPC() % 8 );
         this.populateAll();
-
+        
 
     }
 
@@ -3416,13 +3424,17 @@ class App {
         }
 
         else {
-            this.stepBack(stepsize);
+            this.stepBack(-1 * stepsize);
         }
 
         this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
 
         if (this.interpreter.finished) {
             this.success('The code has run and exited successfully!');
+        }
+
+        else {
+            this.emptyStatus();
         }
 
         this.populateAll();
@@ -3447,25 +3459,27 @@ class App {
         this.populateAll();
     }
 
-    stepBackOne() {
+    stepBackButton() {
         this.hideOpenPopup(this.current_popup); // hide any open popup
-        this.stepBack(-1);
+        const stepsize = this.getStepSize();
+        this.stepBack(stepsize);
         this.populateAll();
     }
 
     stepBack(steps_back) {
         /* Expecting the argument steps_back < 0
         */
-        const steps = this.interpreter.step_count + steps_back;       // the total number of steps to get to the point you want to go for
+        const steps = this.interpreter.step_count - steps_back;       // the total number of steps to get to the point you want to go for
         
         if (steps <= 0) {
+            // New error but doesnt stop code being run if you press enother button.
+            document.getElementById('error').innerHTML = `Cannot go back ${steps_back} steps.`;
+            document.getElementById('output').innerHTML = null;
+            document.getElementById('status').innerHTML = null;
             return;
         }
 
-        let txt = document.getElementById('code_box').value;
-        this.lexer.newData(txt);
-        this.parser.newData(this.lexer.getTokenLines(), txt);
-        this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), txt);
+        this.assemble();
 
         for (let i = 0; i < (steps - 1); i++) {
             this.interpreter.step();    // do enough steps to get to the point you expect to be at
@@ -3539,6 +3553,7 @@ class App {
         this.populatePointers();
         this.populatePMEM(this.pmem_top);
         this.populateDMEM(this.dmem_top);
+        this.populateStats();
         this.fillPopup();
     }
 
@@ -3782,11 +3797,27 @@ class App {
         
     }
 
+    populateStats() {
+        if (!this.assembled) {
+            return;
+        }
+
+        document.getElementById('stats-instructions-executed').innerHTML = this.interpreter.step_count;
+        document.getElementById('stats-clock-cycles').innerHTML = this.interpreter.cycles;
+        document.getElementById('stats-branches-taken').innerHTML = this.interpreter.branches_taken;
+    }
+
     success(text) {
         this.assembled = true;
         document.getElementById('output').innerHTML = text;
         document.getElementById('error').innerHTML = null;
         document.getElementById('status').innerHTML = null;
+    }
+
+    emptyStatus() {
+        document.getElementById('output').innerHTML = null;
+        document.getElementById('error').innerHTML = null;
+        document.getElementById('status').innerHTML = '---';
     }
 
     newError(text) {
@@ -3873,12 +3904,12 @@ class App {
 
         if (this.base === 16) {
             this.base = 10;
-            document.getElementById('button_base').innerHTML = 'Currently: Base 10';
+            document.getElementById('button_base').innerHTML = 'Current Base: 10';
         }
 
         else {
             this.base = 16;
-            document.getElementById('button_base').innerHTML = 'Currently: Base 16';
+            document.getElementById('button_base').innerHTML = 'Current Base: 16';
         }
 
         this.populateAll();
@@ -4780,12 +4811,6 @@ class App {
                     Operation:
                     STACK ← Rr (Rr onto the top of the stack)
                     SP = SP - 1`,
-            'RET': `Syntax:   RET
-                    Family:   Branch Instructions
-                    Function: Returns from subroutine. The return address is loaded from the STACK. The Stack Pointer uses a preincrement scheme during RET.
-
-                    Operation:
-                    PC(15:0) ← STACK`,
             'RCALL': `Syntax:   RCALL k
                     Family:   Branch Instructions
                     Function: Relative call to an address within PC - 2047 and PC + 2048 (words)
@@ -4797,6 +4822,12 @@ class App {
                     PC = PC + k + 1
                     SP = SP - 2
                     STACK ← PC + 1`,
+            'RET': `Syntax:   RET
+                    Family:   Branch Instructions
+                    Function: Returns from subroutine. The return address is loaded from the STACK. The Stack Pointer uses a preincrement scheme during RET.
+
+                    Operation:
+                    PC(15:0) ← STACK`,
             'RJMP': `Syntax:   RJMP k
                     Family:   Branch Instructions
                     Function: Relative jump to an address within PC - 2047 and PC + 2048 (words)

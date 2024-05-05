@@ -339,6 +339,28 @@ td {
     margin: auto;
 }
 
+.table-stats {
+    width: 100%;
+    margin-top: 10px;
+    table-layout: fixed;
+}
+
+.table-stats-small {
+    padding-left: 3%;
+    padding-right: 3%;
+    border-radius: 5px;
+}
+
+
+.table-stats-heading {
+    text-align: center;
+}
+
+.table-stats-body {
+    text-align: center;
+    margin: auto;
+}
+
 .table-other-values {
     width: 100%;
     margin-top: 10px;
