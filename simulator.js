@@ -1621,6 +1621,7 @@ class Interpreter {
         this.step_count = 0;
         this.cycles = 0;
         this.branches_taken = 0;
+        this.branches_seen = 0;
         this.finished = false;
     }
 
@@ -1635,6 +1636,7 @@ class Interpreter {
         this.step_count = 0;
         this.cycles = 0;
         this.branches_taken = 0;
+        this.branches_seen = 0;
 
         // DEFINING PC, SP AND SREG
         this.pcl = new Register('PCL', this.dmem[0x5B].getValue(), 0);
@@ -1780,107 +1782,124 @@ class Interpreter {
             case 'BRBC':
                 s = this.getArgumentValue(line, 0);
                 if (1 - ((this.getSREG() >> s) & 1)) {
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(this.getPC() + k + 1);
-                    skip_inc = true;
-                    this.cycles += 1;
+                    branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRBS':
                 s = this.getArgumentValue(line, 0);
                 if ((this.getSREG() >> s) & 1) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRCC':
                 if (1 - (this.getSREG() & 1)) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRCS':
                 if (this.getSREG() & 1) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BREQ':
                 if ((this.getSREG() >> 1) & 1) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRGE':
                 if (1 - ((this.getSREG() >> 4) & 1)) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRHC':
                 if (1 - ((this.getSREG() >> 5) & 1)) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRHS':
                 if ((this.getSREG() >> 5) & 1) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRID':
                 if (1 - ((this.getSREG() >> 7) & 1)) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRIE':
                 if ((this.getSREG() >> 7) & 1) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRLO':
                 if (this.getSREG() & 1) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRLT':
                 if ((this.getSREG() >> 4) & 1) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRMI':
                 if ((this.getSREG() >> 2) & 1) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRNE':
                 if (1 - ((this.getSREG() >> 1) & 1)) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRPL':
                 if (1 - ((this.getSREG() >> 2) & 1)) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRSH':
                 if (1 - (this.getSREG() & 1)) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRTC':
                 if (1 - ((this.getSREG() >> 6) & 1)) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRTS':
                 if ((this.getSREG() >> 6) & 1) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRVC':
                 if (1 - ((this.getSREG() >> 3) & 1)) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BRVS':
                 if ((this.getSREG() >> 3) & 1) {
                     branch_taken = true;
                 }
+                this.branches_seen += 1;
                 break;
             case 'BSET':
                 s = this.getArgumentValue(line, 0);
@@ -2064,6 +2083,7 @@ class Interpreter {
             case 'CPSE':
                 Rd = this.getArgumentValue(line, 0);
                 Rr = this.getArgumentValue(line, 1);
+                this.branches_seen += 1;
 
                 if ( Rd !== Rr ) {
                     break;
@@ -2071,6 +2091,7 @@ class Interpreter {
 
                 this.incPC();
                 this.cycles += 1;
+                this.branches_taken += 1;
 
                 if ( this.pmem[this.getPC() + 1] !== null ) {
                     break;
@@ -2487,6 +2508,7 @@ class Interpreter {
                 b = this.getArgumentValue(line, 1);
 
                 const is_set = ((Rd >> b) & 1);
+                this.branches_seen += 1;
 
                 if (is_set) {
                     break;
@@ -2494,6 +2516,7 @@ class Interpreter {
 
                 this.incPC();
                 this.cycles += 1;
+                this.branches_taken += 1;
 
                 if ( this.pmem[this.getPC() + 1] !== null ) {
                     break;
@@ -2508,6 +2531,7 @@ class Interpreter {
                 b = this.getArgumentValue(line, 1);
                 
                 const is_cleared = 1 - ((Rd >> b) & 1);
+                this.branches_seen += 1;
 
                 if (is_cleared) {
                     break;
@@ -2515,6 +2539,7 @@ class Interpreter {
 
                 this.incPC();
                 this.cycles += 1;
+                this.branches_taken += 1;
 
                 if ( this.pmem[this.getPC() + 1] !== null ) {
                     break;
@@ -3804,6 +3829,7 @@ class App {
 
         document.getElementById('stats-instructions-executed').innerHTML = this.interpreter.step_count;
         document.getElementById('stats-clock-cycles').innerHTML = this.interpreter.cycles;
+        document.getElementById('stats-branches-seen').innerHTML = this.interpreter.branches_seen;
         document.getElementById('stats-branches-taken').innerHTML = this.interpreter.branches_taken;
     }
 
