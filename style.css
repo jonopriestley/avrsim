@@ -332,6 +332,8 @@ td {
 
 .table-sreg-heading {
     text-align: center;
+    padding-top: 2px;
+    padding-bottom: 2px;
 }
 
 .table-sreg-body {
@@ -354,6 +356,8 @@ td {
 
 .table-stats-heading {
     text-align: center;
+    padding-top: 4px;
+    padding-bottom: 4px;
 }
 
 .table-stats-body {
