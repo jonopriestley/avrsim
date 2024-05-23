@@ -3801,25 +3801,28 @@ class App {
                     cell_value = this.convertValueToBase(cell_value, 2);
                 }
 
+                // Assume it's not being pointed to by SP, X, Y, or Z
                 document.getElementById(`dmem-line-${line}${row}`).innerHTML = cell_value;
-                document.getElementById(`dmem-line-${line}${row}`).style.color = pointer_text_colour;
+                document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = normal_background_colour;
+                document.getElementById(`dmem-line-${line}${row}`).style.color = normal_text_colour;
 
+                
                 // Check if it's SP, X, Y, Z
                 if (cell_number === sp) {
                     document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = sp_background_colour;
+                    document.getElementById(`dmem-line-${line}${row}`).style.color = pointer_text_colour;
                 } else if (cell_number === z) {
                     document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = z_background_colour;
+                    document.getElementById(`dmem-line-${line}${row}`).style.color = pointer_text_colour;
                 } else if (cell_number === y) {
                     document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = y_background_colour;
+                    document.getElementById(`dmem-line-${line}${row}`).style.color = pointer_text_colour;
                 } else if (cell_number === x) {
                     document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = x_background_colour;
-                } else {
-                    document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = normal_background_colour;
-                    document.getElementById(`dmem-line-${line}${row}`).style.color = normal_text_colour;
+                    document.getElementById(`dmem-line-${line}${row}`).style.color = pointer_text_colour;
                 }
             }
         }
-        
     }
 
     populateStats() {

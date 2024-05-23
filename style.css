@@ -11,10 +11,29 @@ h1 {
     font-weight: lighter;
 }
 
+/*
+.page-head {
+  background-color: var(--secondary-bg);
+  padding: 12px;
+  box-shadow: 0 1px 5px -1px black;
+  text-align: center;
+  transition: background-color 2s;
+}
+*/
+
 .page-header {
     background-color: #fb4;
-    padding: 10px;
+    padding: 15px;
+    padding-bottom: 17px;
     margin: 0;
+    box-shadow: 0 1px 5px -1px black;
+    text-align: center;
+    font-weight: bold;
+}
+
+.page-title {
+    display: inline-block;
+    margin-right: 10%;
 }
 
 .body {
@@ -79,6 +98,7 @@ h1 {
     background-color: #fff;
     border: 1px solid transparent;
     border-radius: 10px;
+    box-shadow: 0 1px 2px -1px black;
 
 }
 
@@ -188,12 +208,14 @@ textarea {
 .button-theme {
     padding: 8px 15px;
     float: right;
+    font-size: 14pt;
     margin-right: 5px;
 }
 
 .button-guide {
     padding: 8px 15px;
     float: right;
+    font-size: 14pt;
 }
 
 .button-manual {
