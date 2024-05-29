@@ -433,13 +433,14 @@ td {
     float:left;
     width: 40%;
     margin-top: 10px;
-    margin-bottom: 5px;
+    margin-bottom: 10px;
 }
 
 .table-pmem {
     width: 90%;
     overflow-y: scroll;
     table-layout: fixed;
+    margin-bottom: 3px;
 }
 
 .table-pmem-heading {
@@ -461,13 +462,14 @@ td {
     float:right;
     width: 60%;
     margin-top: 10px;
-    margin-bottom: 5px;
+    margin-bottom: 10px;
 }
 
 .table-dmem {
     width: 90%;
     overflow-y: scroll;
     table-layout: fixed;
+    margin-bottom: 3px;
 }
 
 .table-dmem-heading {
