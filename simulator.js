@@ -1473,12 +1473,14 @@ class Parser {
     }
 
     newDef(label, value, line_in_file) {
+        // If its already a label or .equ
         if ( this.labels[label] !== undefined || this.equs[label] !== undefined ) {
             this.newError(`Previous definition of \'${label}\'. Cannot use .def: ${label} redefinition on line ${line_in_file}.`);
         }
 
         // Allow redefinition of defs already in this.defs
 
+        // Dont allow definitions that are already instructions
         if ( INST_LIST.includes(this.labels[label]) ) {
             this.newError(`Illegal re-use of instruction \'${label}\' as definition on line ${line_in_file}.`);
         }
@@ -3269,7 +3271,7 @@ INST_OPCODES = {
     'NOP': ['0000000000000000'],
     'OR': ['d', 'r', '001010rdddddrrrr'],
     'ORI': ['d', 'K', '0110KKKKddddKKKK'],
-    'OUT': ['A', 'r', '10111AArrrrrAAA'],
+    'OUT': ['A', 'r', '10111AArrrrrAAAA'],
     'POP': ['d', '1001000ddddd1111'],
     'PUSH': ['r', '1001001rrrrr1111'],
     'RCALL': ['k', '1101kkkkkkkkkkkk'], // this one needs 2's comp too
