@@ -529,6 +529,13 @@ td {
     width: 90%;
 }
 
+.break-point {
+    font-size: 20px;
+    padding: 5px 5px;
+    margin-top: 5px;
+    width: 20%;
+}
+
 .reg-value {
     border-radius: 5px;
     padding-left: 3%;

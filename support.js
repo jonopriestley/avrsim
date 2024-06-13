@@ -12,6 +12,16 @@ code_box.addEventListener('keydown', event => {
     keys_down.push(event.key);
   }
 
+  // Update max value for break point
+  document.getElementById('break_point').max = `${code_box.value.split('\n').length + 1}`;
+
+  // When enter key is pressed update the line number of the breakpoint if it has changed
+  if (event.key === 'Enter') {
+    const value = parseInt(document.getElementById('break_point').value, 10);
+    const start_of_break_point_line = code_box.value.split('\n').slice(0, value - 1).toString().replaceAll(',', '').length + value - 1;
+    if (code_box.selectionStart <= start_of_break_point_line) document.getElementById('break_point').value = `${value + 1}`;
+  }
+
   // allowing tab to work in a text section
   //if (keys_down.length === 1 && keys_down.includes('Tab')) {
   if (event.key === 'Tab') {

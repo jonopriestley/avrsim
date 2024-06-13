@@ -617,6 +617,8 @@ class Parser {
         this.defs = Object.create(null);
         this.equs = Object.create(null);
 
+        this.break_point = null;    // for stopping the interpreter run() method at
+
         this.dmem = [];
         // Add registers to dmem
         for (let i = 0; i < 256; i++) {
@@ -627,6 +629,8 @@ class Parser {
         this.pmem = [];
 
         this.parse();
+
+        console.log(this.break_point);
 
         // FILLING IN DMEM WITH 0s
         for (let i = this.dmem.length; i < (this.ramend + 1); i++) {
@@ -944,6 +948,7 @@ class Parser {
                 this.newError(`Illegal token \'${line[0].getValue()}\' on line ${line_in_file}.`);
             }
 
+            if (line_in_file === document.getElementById('break_point').value) this.break_point = this.pmem.length; // set the break point to be the line equal about to be put in
             this.pmem.push(line); // set the line to the line without the label
             const inst = line[0].getValue();
 
@@ -1625,13 +1630,15 @@ class Interpreter {
         this.branches_taken = 0;
         this.branches_seen = 0;
         this.finished = false;
+        this.break_point = null;
     }
 
-    newData(pmem, dmem, txt) {
+    newData(pmem, dmem, txt, break_point) {
         // DATA & PROGRAM MEMORY
         this.pmem = pmem;
         this.dmem = dmem;
         this.txt = txt;
+        this.break_point = break_point;
 
         this.lines = this.txt.split('\n');
         this.finished = false;
@@ -1661,6 +1668,12 @@ class Interpreter {
 
         // Do nothing if it's finished running
         if (this.finished) {
+            return;
+        }
+        
+        // If breakpoint is reached
+        if (this.getPC() === this.break_point) {
+            this.finished = true;
             return;
         }
 
@@ -3422,7 +3435,7 @@ class App {
         this.parser.newData(this.lexer.getTokenLines(), txt);
 
         // Interpreter Initialisation
-        this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), txt);
+        this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), txt, this.parser.break_point);
 
         // Success!
         this.success('Success! Your code can be run.');
