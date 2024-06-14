@@ -1,7 +1,12 @@
-
+:root {
+    --fg: #444;
+    --bg: #fff;
+    --color-text-muted: #777;
+}
 
 body {
-    background-color: #fff;
+    color: var(--fg);
+    background-color: var(--bg);
     margin: 0;
 }
  
@@ -72,7 +77,7 @@ h1 {
 }
 
 .status {
-    color: #000;
+    color: var(--fg);
     background-color: #eee;
     font-family: Arial, Helvetica, sans-serif; 
     font-weight: 100;
@@ -87,7 +92,7 @@ h1 {
 }
 
 .text-muted {
-    color: #777;
+    color: var(--color-text-muted);
     font-size: 15px;
     font-family: Arial, Helvetica, sans-serif;
     font-weight: 100;
@@ -95,18 +100,13 @@ h1 {
 }
 
 .panel {
-    background-color: #fff;
+    background-color: var(--bg);
     border: 1px solid transparent;
     border-radius: 10px;
     box-shadow: 0 1px 2px -1px black;
-
-}
-
-.panel-default {
     border-color: #e0e0e0;
     margin-bottom: 10px;
 }
-
 
 .panel-heading {
     background-color: #ffe080;
@@ -143,8 +143,8 @@ h1 {
 }
 
 textarea {
-    color: #444;
-    background-color: #fff;
+    color: var(--fg);
+    background-color: var(--bg);
     font-size: 16px;
     font-family: 'Source Code Pro', 'Courier New', Courier, sans-serif;
     border: 1px solid #e0e0e0;
@@ -197,8 +197,8 @@ textarea {
 }
 
 .button {
-    color: #000;
-    background-color: #fff;
+    color: var(--fg);
+    background-color: var(--bg);
     font-family: sans-serif;
     border: 1px solid #e0e0e0;
     font-size: 16px;
@@ -277,15 +277,10 @@ textarea {
 }
 
 .select {
-    color: #000;
-    background-color: #fff;
+    color: var(--fg);
+    background-color: var(--bg);
     font-family: sans-serif;
     border: 1px solid #e0e0e0; 
-}
-
-.select:hover {
-    background-color: #ddd;
-    border: 1px solid #c0c0c0; 
 }
 
 .select-step {
@@ -303,7 +298,7 @@ tbody {
 }
 
 th {
-    color: #333;
+    color: var(--fg);
     font-size: 15px;
     font-family: Arial, Helvetica, sans-serif;
     font-weight: bold;
@@ -311,7 +306,7 @@ th {
 }
 
 td {
-    color: #444;
+    color: var(--fg);
     font-size: 18px;
     font-family: 'Source Code Pro', 'Courier New', Courier, monospace;
     background-color: #ddd;
@@ -331,6 +326,11 @@ td {
 .table-reg-body {
     text-align: center;
     margin: auto;
+}
+
+small {
+    background-color: transparent;
+    color: var(--fg);
 }
 
 .table-reg-small {
@@ -508,9 +508,9 @@ td {
     font-size: 13px;
 }
 
-.input {
-    color: #000;
-    background-color: #fff;
+input {
+    color: var(--fg);
+    background-color: var(--bg);
     font-family: sans-serif;
     border: 1px solid #e0e0e0; 
 }

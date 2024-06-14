@@ -5201,82 +5201,55 @@ class App {
 
         let bg, fg, table_heading_bg, table_body_bg, borderColor, borderStyle, borderThickness, status_background_colour, border_radius, muted_text_colour;
 
-        if (this.theme === 'light') {
-            this.theme = 'dark';
-            bg = '#2e2e2e';
-            fg = "#fff";
-            table_heading_bg = '#474747';
-            table_body_bg = '#7e7e7e';
-            borderColor = '#4e4e4e';
-            borderStyle = 'solid';
-            borderThickness = '1px';
-            status_background_colour = '#404040';
-            border_radius = '10px';
-            muted_text_colour = '#aaa';
+        this.theme = (this.theme === 'dark') ? 'light' : 'dark';
+        bg = (this.theme === 'dark') ? '#2e2e2e' : '#fff';
+        fg = (this.theme === 'dark') ? '#fff' : '#444';
+        table_heading_bg = (this.theme === 'dark') ? '#474747' : '#bbb';
+        table_body_bg = (this.theme === 'dark') ? '#7e7e7e' : '#ddd';
+        borderColor = (this.theme === 'dark') ? '#4e4e4e' : '#e0e0e0';
+        status_background_colour = (this.theme === 'dark') ? '#404040' : '#eee';
+        muted_text_colour = (this.theme === 'dark') ? '#aaa' : '#777';
+        
+        borderStyle = 'solid';
+        borderThickness = '1px';
+        border_radius = '10px';
 
-            document.getElementById('button_theme').innerHTML = 'Theme: Dark';
-        } else {
-            this.theme = 'light';
-            bg = '#fff';
-            fg = "#444";
-            table_heading_bg = '#bbb';
-            table_body_bg = '#ddd';
-            borderColor = '#e0e0e0';
-            borderStyle = 'solid';
-            borderThickness = '1px';
-            status_background_colour = '#eee';
-            border_radius = '10px';
-            muted_text_colour = '#777';
+        document.getElementById('button_theme').innerHTML = (this.theme === 'dark') ? 'Theme: Dark' : 'Theme: Light';
 
-            document.getElementById('button_theme').innerHTML = 'Theme: Light';
-        }
-
-        document.body.style.backgroundColor = bg;
-        document.body.style.color = fg;
+        document.querySelector(':root').style.setProperty('--bg', bg);
+        document.querySelector(':root').style.setProperty('--fg', fg);
+        document.querySelector(':root').style.setProperty('--color-text-muted', muted_text_colour);
 
         document.getElementById('status').style.backgroundColor = status_background_colour;
-        document.getElementById('status').style.color = fg;
         document.getElementById('status').style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
 
 
-        const panels = document.getElementsByClassName('panel-default');
+        const panels = document.getElementsByClassName('panel');
         for (let i = 0; i < panels.length; i++) {
-            panels[i].style.backgroundColor = bg;
-            panels[i].style.color = fg;
-            panels[i].style.borderRadius = border_radius;
             panels[i].style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
-        }
-
-        const muted_text = document.getElementsByClassName('text-muted');
-        for (let i = 0; i < muted_text.length; i++) {
-            muted_text[i].style.color = muted_text_colour;
         }
 
         // Include the ISA link button and download link button
         const buttons = document.getElementsByClassName('button');
         for (let i = 0; i < buttons.length; i++) {
-            buttons[i].style.backgroundColor = bg;
-            buttons[i].style.color = fg;
+            //buttons[i].style.color = bg;  // was acting weird before so I kept these two lines just in case. Will reuse them if it acts up again.
+            //buttons[i].style.color = fg;
             buttons[i].style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
         }
 
         const text_boxes = document.getElementsByTagName('textarea');
         for (let i = 0; i < text_boxes.length; i++) {
-            text_boxes[i].style.backgroundColor = bg;
-            text_boxes[i].style.color = fg;
             text_boxes[i].style.borderColor = borderColor;
         }
 
         const table_headings = document.getElementsByTagName('th');
         for (let i = 0; i < table_headings.length; i++) {
             table_headings[i].style.backgroundColor = table_heading_bg;
-            table_headings[i].style.color = fg;
         }
 
         const table_bodies = document.getElementsByTagName('td');
         for (let i = 0; i < table_bodies.length; i++) {
             table_bodies[i].style.backgroundColor = table_body_bg;
-            table_bodies[i].style.color = fg;
         }
 
         const smalls_body = [...document.getElementsByClassName('table-reg-small'),
@@ -5284,13 +5257,11 @@ class App {
         ...document.getElementsByClassName('table-dmem-body-small')];
         for (let i = 0; i < smalls_body.length; i++) {
             smalls_body[i].style.backgroundColor = table_body_bg;
-            smalls_body[i].style.color = fg;
         }
 
         const smalls_headings = document.getElementsByClassName('table-pmem-heading-small');
         for (let i = 0; i < smalls_headings.length; i++) {
             smalls_headings[i].style.backgroundColor = table_heading_bg;
-            smalls_headings[i].style.color = fg;
         }
 
         this.populateAll();

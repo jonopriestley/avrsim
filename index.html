@@ -21,7 +21,7 @@
 
     <h1 class="h1 page-header">
         <div class="page-title">AVR Simulator</div>
-        <button class="button button-theme" id="button_theme" type="button" onclick="app.toggleTheme()">Theme: Light</button>
+        <button class="button button-theme" id="button_theme" type="button" onmousedown="app.toggleTheme()">Theme: Light</button>
         <form style="float: left;">
             <input class="button button-guide" type="button"
             onclick=" window.open('AVR Simulator Guide.pdf','_blank', 'noopener noreferrer')" value="AVR Simulator Guide"
@@ -37,7 +37,7 @@
 
         <div class="content">
 
-            <div class="panel panel-default panel-code">
+            <div class="panel panel-code">
                 <div class="panel-heading">
                     <h4 class="panel-title">Code
                         <form style="float: right;">
@@ -76,7 +76,7 @@ ret
                     <button class="button button-assemble" type="button" onclick="app.assemble()">Assemble Code</button>
                     <button class="button button-run" type="button" onclick="app.run()">Run All</button>
                     <button class="button button-step" type="button" onclick="app.step()">Step</button>
-                    <select class="select select-step button" name="step_size" id="step_size">
+                    <select class="button select select-step" name="step_size" id="step_size">
                         <option value="1">1</option>
                         <option value="5">5</option>
                         <option value="25">25</option>
@@ -120,13 +120,13 @@ ret
                     <br>
                     <div>
                         <p class="text-muted">Break Point</p>
-                        <input class="input break-point" id="break_point" type="number" placeholder="Break line..." min="0" max="9">
+                        <input class="break-point" id="break_point" type="number" placeholder="Break line..." min="0" max="9">
                     </div>
                     <br>
                 </div>
             </div>
 
-            <div class="panel panel-default panel-cpu-and-memory">
+            <div class="panel panel-cpu-and-memory">
                 <div class="panel-heading">
                     <h4 class="panel-title">CPU & Memory</h4>
                 </div>
