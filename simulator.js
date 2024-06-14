@@ -618,6 +618,7 @@ class Parser {
         this.equs = Object.create(null);
 
         this.break_point = null;    // for stopping the interpreter run() method at
+        this.break_point_line = null;
 
         this.dmem = [];
         // Add registers to dmem
@@ -629,8 +630,6 @@ class Parser {
         this.pmem = [];
 
         this.parse();
-
-        console.log(this.break_point);
 
         // FILLING IN DMEM WITH 0s
         for (let i = this.dmem.length; i < (this.ramend + 1); i++) {
@@ -658,10 +657,10 @@ class Parser {
 
         const first_line = this.token_lines[0];
 
+        let line, line_in_file, line_length;
+
         // Check if first line is a .SECTION directive
-        if (first_line[0].getType() !== 'DIR' || first_line[0].getValue() !== '.SECTION') {
-            this.newError("First line must be a '.section' directive");
-        }
+        if (first_line[0].getType() !== 'DIR' || first_line[0].getValue() !== '.SECTION') this.newError("First line must be a '.section' directive");
 
         // Check if the first line is correct length and directives
         if (first_line.length !== 2 || first_line[1].getType() !== 'DIR' || !['.DATA', '.TEXT'].includes(first_line[1].getValue())) {
@@ -677,8 +676,8 @@ class Parser {
         // Find .SECTION .text start
         let text_section_start = null;
         for (let line_num = 0; line_num < this.token_lines.length; line_num++) {
-            const line = this.token_lines[line_num];
-            const line_in_file = line[0].getLine();
+            line = this.token_lines[line_num];
+            line_in_file = line[0].getLine();
 
             // If you find a .SECTION directive check it
             if (line[0].getValue() === '.SECTION' && line[0].getType() === 'DIR') {
@@ -707,9 +706,9 @@ class Parser {
         // Go through each line
         for (let line_num = 0; line_num < this.token_lines.length; line_num++) {
 
-            const line = this.token_lines[line_num];    // tokens in the current line
-            const line_length = line.length;            // number of tokens in the line
-            const line_in_file = line[0].getLine();     // the current line if there's an error
+            line = this.token_lines[line_num];    // tokens in the current line
+            line_length = line.length;            // number of tokens in the line
+            line_in_file = line[0].getLine();     // the current line if there's an error
 
             // Go through each token and make them the correct format
             for (let tok_num = 0; tok_num < line_length; tok_num++) {
@@ -860,7 +859,7 @@ class Parser {
 
         // Check .global line
         line_num += 1;                                          // move to the .global line
-        let line = this.token_lines[line_num];                  // current line
+        line = this.token_lines[line_num];                  // current line
 
         if (line.length !== 2 || line[0].getValue() !== '.GLOBAL') {
             this.newError(`Must begin text section with a valid .global directive: line ${line[0].getLine()}.`);
@@ -871,11 +870,12 @@ class Parser {
         line_num += 1;                                          // move to instructions part of text section
 
         // CREATE PMEM AND GET THE LABEL LOCATIONS
+        let lif, break_point_val;
         while (line_num < (this.token_lines.length - 1)) {
 
-            let line = this.token_lines[line_num]; // current line
-            let line_length = line.length; // calculate number of tokens in the line
-            const line_in_file = line[0].getLine(); // the current line if there's an error
+            line = this.token_lines[line_num]; // current line
+            line_length = line.length; // calculate number of tokens in the line
+            line_in_file = line[0].getLine(); // the current line if there's an error
 
             let tok_num = 0;
             let has_label = false; // bool for if the line has a label
@@ -944,33 +944,32 @@ class Parser {
             }
 
             // If theyre not instructions, it's illegal
-            if (line[0].getType() !== 'INST') {
-                this.newError(`Illegal token \'${line[0].getValue()}\' on line ${line_in_file}.`);
-            }
+            if (line[0].getType() !== 'INST') this.newError(`Illegal token \'${line[0].getValue()}\' on line ${line_in_file}.`);
 
-            if (line_in_file === document.getElementById('break_point').value) this.break_point = this.pmem.length; // set the break point to be the line equal about to be put in
+            // set the break point to be the line equal about to be put in
+            lif = parseInt(line_in_file);
+            break_point_val = parseInt(document.getElementById('break_point').value);
+            if (this.break_point === null && lif >= break_point_val) {
+                this.break_point = this.pmem.length;
+                this.break_point_line = break_point_val;
+            }
+            
             this.pmem.push(line); // set the line to the line without the label
             const inst = line[0].getValue();
 
             // Add None as next line if it's a 32 bit opcode
-            if (['CALL', 'JMP', 'LDS', 'STS'].includes(inst)) {
-                this.pmem.push(null);
-            }
+            if (['CALL', 'JMP', 'LDS', 'STS'].includes(inst)) this.pmem.push(null);
             
             line_num += 1;
         }   
 
-        if (this.pmem.length > this.flashend) {
-            this.newError(`Too many lines of code to put into the program memory in the .text section.`);
-        }
+        if (this.pmem.length > this.flashend) this.newError(`Too many lines of code to put into the program memory in the .text section.`);
 
         let global_funct_name;
         // Check you've found the global function name
         for (let i = 0; i < global_funct_names.length; i++) {
             global_funct_name = global_funct_names[i];
-            if (this.labels[global_funct_name] === undefined) {
-                this.newError(`Cannot find the global label \'${global_funct_name}\' in the program. Check spelling if unsure.`);
-            }
+            if (this.labels[global_funct_name] === undefined) this.newError(`Cannot find the global label \'${global_funct_name}\' in the program. Check spelling if unsure.`);    
         }
 
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -985,9 +984,9 @@ class Parser {
                 continue
             }
 
-            const line = this.token_lines[line_num];
-            let line_length = line.length;                      // calculate number of tokens in the line
-            const line_in_file = line[0].getLine();   // the current line if there's an error
+            line = this.token_lines[line_num];
+            line_length = line.length;                      // calculate number of tokens in the line
+            line_in_file = line[0].getLine();   // the current line if there's an error
 
             let tok_num = 0;
 
@@ -1010,9 +1009,7 @@ class Parser {
             }
 
             // CHECK THE DIRECTIVE
-            if (line[tok_num].getType() !== 'DIR') {
-                this.newError(`Illegal syntax \'${this.lines[line_in_file - 1]}\' for the data section. Expecting a directive on line ${line_in_file}.`);
-            }
+            if (line[tok_num].getType() !== 'DIR') this.newError(`Illegal syntax \'${this.lines[line_in_file - 1]}\' for the data section. Expecting a directive on line ${line_in_file}.`);
 
             const line_directive = line[tok_num].getValue();    // get the directive for this line to use below
 
@@ -1165,7 +1162,7 @@ class Parser {
                 else if (['.EQU','.SET'].includes(line_directive)) {
 
                     // Check the number of arguments
-                    if ((line_length - tok_num) != 3) { // if there's too many arguments
+                    if ((line_length - tok_num) !== 3) { // if there's too many arguments
                         this.newError(`Wrong number of arguments given for .equ on line ${line_in_file}.`);
                     }
 
@@ -1226,15 +1223,15 @@ class Parser {
         // Evaluate all refs, hi8()/lo8(), and expressions
         for (let line_num = 0; line_num < this.pmem.length; line_num++) {
 
-            const line = this.pmem[line_num]; // current line
+            line = this.pmem[line_num]; // current line
 
             if (line === null) {
                 continue
             }
 
-            let line_length = line.length;                      // calculate number of tokens in the line
+            line_length = line.length;                      // calculate number of tokens in the line
             const first_tok = line[0];                          // first token in the line
-            const line_in_file = first_tok.getLine();           // the current line if there's an error
+            line_in_file = first_tok.getLine();           // the current line if there's an error
 
             // Evaluate hi8()/lo8()
             let tok_num = 0;
@@ -1386,8 +1383,8 @@ class Parser {
                 continue;
             }
 
-            let line_length = line.length;                                          // calculate number of tokens in the line
-            const line_in_file = line[0].getLine();    // the current line if there's an error
+            line_length = line.length;                                          // calculate number of tokens in the line
+            line_in_file = line[0].getLine();    // the current line if there's an error
 
             // CHECK FOR COMMA AND REMOVE THEM IF THEYRE CORRECTLY PLACED
             if (line_length > 2) {
@@ -3470,7 +3467,8 @@ class App {
         this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
 
         if (this.interpreter.finished) {
-            this.success('The code has run and exited successfully!');
+            if (this.interpreter.break_point !== this.interpreter.getPC()) this.success('The code has run and exited successfully!');
+            else this.success(`The code has run and exited successfully at the breakpoint on line ${this.parser.break_point_line}!`);
         }
 
         else {
@@ -3491,7 +3489,8 @@ class App {
         this.interpreter.run();
 
         if (this.interpreter.finished) {
-            this.success('The code has run and exited successfully!');
+            if (this.interpreter.break_point !== this.interpreter.getPC()) this.success('The code has run and exited successfully!');
+            else this.success(`The code has run and exited successfully at the breakpoint on line ${this.parser.break_point_line}!`);
         }
 
         this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
