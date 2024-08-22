@@ -5233,6 +5233,8 @@ class App {
         for (let i = 0; i < buttons.length; i++) {
             //buttons[i].style.color = bg;  // was acting weird before so I kept these two lines just in case. Will reuse them if it acts up again.
             //buttons[i].style.color = fg;
+            buttons[i].style.backgroundColor = (this.theme === 'light') ? '#eee' : '#3e3e3e';
+            buttons[i].style.borderColor = (this.theme === 'light') ? '#d0d0d0' : '#5e5e5e';
             buttons[i].style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
         }
 
