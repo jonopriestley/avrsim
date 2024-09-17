@@ -2241,10 +2241,10 @@ class Interpreter {
             case 'LPM':
                 k = this.getZ();
                 if (line.getArgs().length === 0) {
-                    this.getDMEM()[0].setValue( parseInt( this.getPMEM()[(k - (k & 1)) >> 1].getOpcode().slice(8 * (k & 1), 8 + 8 * (k & 1)), 2) );
+                    this.getDMEM()[0].setValue( parseInt( this.getPMEM()[(k - (k & 1)) >> 1].getOpcode().slice(8 * (1 - k & 1), 8 + 8 * (1 - k & 1)), 2) );
                 }
                 else {
-                    this.getDMEM()[line.getArgs()[0].getValue()].setValue( parseInt( this.getPMEM()[(k - (k & 1)) >> 1].getOpcode().slice(8 * (k & 1), 8 + 8 * (k & 1)), 2) );
+                    this.getDMEM()[line.getArgs()[0].getValue()].setValue( parseInt( this.getPMEM()[(k - (k & 1)) >> 1].getOpcode().slice(8 * (1 - k & 1), 8 + 8 * (1 - k & 1)), 2) );
                     if (line.getArgs()[1].getValue().includes('+')) {
                         this.incZ();
                     }
