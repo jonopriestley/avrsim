@@ -3510,9 +3510,9 @@ class App {
         */
         const steps = this.interpreter.step_count - steps_back;       // the total number of steps to get to the point you want to go for
         
-        if (steps <= 0) {
+        if (steps < 0) {
             // New error but doesnt stop code being run if you press enother button.
-            document.getElementById('error').innerHTML = `Cannot go back ${steps_back} steps.`;
+            document.getElementById('error').innerHTML = (steps_back > 1) ? `Cannot go back ${steps_back} steps.` : `Cannot go back ${steps_back} step.`;
             document.getElementById('output').innerHTML = null;
             document.getElementById('status').innerHTML = null;
             return;
@@ -3521,7 +3521,7 @@ class App {
         this.assemble();
 
         for (let i = 0; i < (steps - 1); i++) {
-            this.interpreter.step();    // do enough steps to get to the point you expect to be at
+            this.step();    // do enough steps to get to the point you expect to be at
         }
         
         // Clear the change for all registers
@@ -3530,7 +3530,7 @@ class App {
         }
 
         if (steps > 0) {
-            this.interpreter.step();    // Take the step once the change has been cleared
+            this.step();    // Take the step once the change has been cleared
         }
     }
 
