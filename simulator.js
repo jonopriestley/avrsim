@@ -3454,14 +3454,8 @@ class App {
 
         const stepsize = this.getStepSize();
 
-        if (stepsize > 0) {
-            for (let i = 0; i < stepsize; i++) {
-                this.interpreter.step();
-            }
-        }
-
-        else {
-            this.stepBack(-1 * stepsize);
+        for (let i = 0; i < stepsize; i++) {
+            this.interpreter.step();
         }
 
         this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
@@ -3500,14 +3494,12 @@ class App {
 
     stepBackButton() {
         this.hideOpenPopup(this.current_popup); // hide any open popup
-        const stepsize = this.getStepSize();
-        this.stepBack(stepsize);
-        this.populateAll();
+        this.stepBack();
     }
 
-    stepBack(steps_back) {
-        /* Expecting the argument steps_back < 0
-        */
+    stepBack() {
+        
+        const steps_back = this.getStepSize();
         const steps = this.interpreter.step_count - steps_back;       // the total number of steps to get to the point you want to go for
         
         if (steps < 0) {
@@ -3519,9 +3511,11 @@ class App {
         }
 
         this.assemble();
+        this.emptyStatus();
+        this.hideOpenPopup(this.current_popup); // hide any open popup
 
         for (let i = 0; i < (steps - 1); i++) {
-            this.step();    // do enough steps to get to the point you expect to be at
+            this.interpreter.step();    // do enough steps to get to the point you expect to be at
         }
         
         // Clear the change for all registers
@@ -3530,8 +3524,12 @@ class App {
         }
 
         if (steps > 0) {
-            this.step();    // Take the step once the change has been cleared
+            this.interpreter.step();    // Take the step once the change has been cleared
         }
+
+        this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
+
+        this.populateAll();
     }
 
     resetAll() {
