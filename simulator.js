@@ -2207,11 +2207,11 @@ class Interpreter {
                 }
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 if (w.includes('+')) {
-                    if (w === 'X+') {
-                        this.incX();
-                    } else if (w === 'Y+') {
+                    if (w === 'X+' && ![26, 27].includes(line.getArgs()[0].getValue())) {   // dont increment afterwards if it's X being loaded into
+                        this.incX();                                                        // because of a weird quirk in how AVR works
+                    } else if (w === 'Y+' && ![28, 29].includes(line.getArgs()[0].getValue())) {
                         this.incY();
-                    } else if (w === 'Z+') {
+                    } else if (w === 'Z+' && ![30, 31].includes(line.getArgs()[0].getValue())) {
                         this.incZ();
                     }
                     this.cycles += 1;
