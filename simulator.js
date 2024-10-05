@@ -2197,7 +2197,6 @@ class Interpreter {
                     }
                     this.cycles += 2;
                 }
-
                 if (w[0] === 'X') {
                     k = this.getX();
                 } else if (w[0] === 'Y') {
@@ -2205,17 +2204,17 @@ class Interpreter {
                 } else if (w[0] === 'Z') {
                     k = this.getZ();
                 }
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 if (w.includes('+')) {
-                    if (w === 'X+' && ![26, 27].includes(line.getArgs()[0].getValue())) {   // dont increment afterwards if it's X being loaded into
-                        this.incX();                                                        // because of a weird quirk in how AVR works
-                    } else if (w === 'Y+' && ![28, 29].includes(line.getArgs()[0].getValue())) {
+                    if (w === 'X+') {
+                        this.incX();
+                    } else if (w === 'Y+') {
                         this.incY();
-                    } else if (w === 'Z+' && ![30, 31].includes(line.getArgs()[0].getValue())) {
+                    } else if (w === 'Z+') {
                         this.incZ();
                     }
                     this.cycles += 1;
                 }
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 break;
             case 'LDD':
                 w = line.getArgs()[1].getValue()[0];
