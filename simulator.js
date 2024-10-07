@@ -1967,11 +1967,9 @@ class Interpreter {
                     let W = 0;
                     while (true) {
                         K = this.getDMEM()[address];
-                        address = address + 1;
-                        W = W + 1;
-                        if (K === 0) {
-                            break;
-                        }
+                        if (K === 0) break;
+                        address += 1;
+                        W += 1;
                         char = String.fromCharCode(K);
                         document.getElementById('console').innerHTML += char;           // add it to the console
                     }
@@ -1990,13 +1988,12 @@ class Interpreter {
                     
                 }
                     // Printf takes the top two values from the stack
-                    // Puts them into X low byte then high byte
+                    // Puts them into X low byte then high byte (must push high byte first to call printf)
                     // Assumes that it is pointing at the string you want to print
                     // Prints characters with X+ until it hits a null character
-                    // Pushes the new location of X onto the stack
                     // Returns
 
-                    // X is changed
+                    // W, X, and Z are changed
                     // The string is printed
                     // Next instruction is after
                 this.cycles += 4;
