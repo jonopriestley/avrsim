@@ -238,7 +238,7 @@ class Instruction {
                 const arg = this.args[arg_num].getValue(); // the argument value
                 let var_value;
                 // If it's a 2's comp value then make it 2's comp
-                if (['RJMP','RCALL'].concat(INST_LIST.slice(7, 27)).includes(this.inst.getValue())) {
+                if (['RJMP','RCALL'].concat(INST_LIST.slice(8, 28)).includes(this.inst.getValue())) {
                     var_value = this.twosComp(arg, digit_count);
                 }
                 else if (FUNCTIONS.includes(arg)) {
@@ -1218,7 +1218,7 @@ class Parser {
         //////////////// TEXT SECTION ////////////////
         //////////////////////////////////////////////
 
-        const control_flow_instructions = ['CALL', 'JMP', 'IJMP', 'ICALL', 'RJMP', 'RCALL'].concat(INST_LIST.slice(7, 27)); // all the branching instructions
+        const control_flow_instructions = ['CALL', 'JMP', 'IJMP', 'ICALL', 'RJMP', 'RCALL'].concat(INST_LIST.slice(8, 28)); // all the branching instructions
 
         // Evaluate all refs, hi8()/lo8(), and expressions
         for (let line_num = 0; line_num < this.pmem.length; line_num++) {
@@ -1229,9 +1229,9 @@ class Parser {
                 continue
             }
 
-            line_length = line.length;                      // calculate number of tokens in the line
-            const first_tok = line[0];                          // first token in the line
-            line_in_file = first_tok.getLine();           // the current line if there's an error
+            line_length = line.length;              // calculate number of tokens in the line
+            const first_tok = line[0];              // first token in the line
+            line_in_file = first_tok.getLine();     // the current line if there's an error
 
             // Evaluate hi8()/lo8()
             let tok_num = 0;
@@ -1354,7 +1354,6 @@ class Parser {
                         continue;
                     }
                     
-
                     // If it's none of these and not a function, raise an error
                     else if (!FUNCTIONS.includes(current_tok.getValue())) {
                         this.newError(`Bad reference ${current_tok.getValue()} on line ${line_in_file}.`);
