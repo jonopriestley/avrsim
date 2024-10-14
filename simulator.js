@@ -3,6 +3,8 @@ class Token {
         this.type = type_;
         this.value = value;
         this.location = location;
+        this.line = (location === null) ? 'NULL' : location.split(':')[0];
+        this.start = (location === null) ? 'NULL' : location.split(':')[1];
     }
     getType() {
         return this.type;
@@ -23,10 +25,10 @@ class Token {
         this.location = location;
     }
     getLine() {
-        return this.location.split(':')[0]
+        return this.line;
     }
     getStart() {
-        return this.location.split(':')[1]
+        return this.start;
     }
     toString() {
         return `${this.type.toLowerCase()}\t\'${this.value}\'\tLoc=<${this.location}>`;
