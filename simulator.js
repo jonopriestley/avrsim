@@ -453,6 +453,7 @@ class Lexer {
             [/^[a-zA-Z]{2,6}/, 'INST'],         // instructions → CAN TURN REFS USED IN AN INSTRUCTION INTO INST TYPE
             [/^\".*?\"/, 'STR'],                // string
             [/^\'.*?\'/, 'STR'],                // string
+            [/^“.*?”/, 'STR'],                  // string
             // [/^\.[^\.\s]+/, 'DIR'],          // directives. .ORG WORKS WHAT OTHER DIRECTIVES? NO DEF no UNDEF
             [/^\.[\w\.]+(?=[;\s])/, 'DIR'],      // directives
             [/^[YZ][ \t]*\+[ \t]*\d{1,2}/, 'WORDPLUSQ'],        // word+q
