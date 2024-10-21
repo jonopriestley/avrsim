@@ -2294,8 +2294,11 @@ class Interpreter {
                 break;
             case 'MULS':
                 Rd = this.getArgumentValue(line, 0);
+                Rd = (Rd < 128) ? Rd : Rd - 256;    // convert to signed
                 Rr = this.getArgumentValue(line, 1);
+                Rr = (Rr < 128) ? Rr : Rr - 256;    // convert to signed
                 R = Rd * Rr;
+                R = (R < 0) ? 65536 + R : R;        // convert to unsigned equivalent
                 
                 this.getDMEM()[0].setValue(this.mod256(R));
                 this.getDMEM()[1].setValue(this.mod256(R >> 8));
@@ -2304,8 +2307,10 @@ class Interpreter {
                 break;
             case 'MULSU':
                 Rd = this.getArgumentValue(line, 0);
+                Rd = (Rd < 128) ? Rd : Rd - 256;    // convert to signed
                 Rr = this.getArgumentValue(line, 1);
                 R = Rd * Rr;
+                R = (R < 0) ? 65536 + R : R;        // convert to unsigned equivalent
                 
                 this.getDMEM()[0].setValue(this.mod256(R));
                 this.getDMEM()[1].setValue(this.mod256(R >> 8));
