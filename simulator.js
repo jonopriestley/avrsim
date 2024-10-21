@@ -2134,6 +2134,44 @@ class Interpreter {
                 N = this.getBit(R, 7);
                 this.updateSREG(null, null, null, N ^ V, V, N, (R === 0), null);
                 break;
+                case 'FMUL':
+                    Rd = this.getArgumentValue(line, 0);
+                    Rr = this.getArgumentValue(line, 1);
+                    R = Rd * Rr * 2;
+    
+                    this.getDMEM()[0].setValue(this.mod256(R));
+                    this.getDMEM()[1].setValue(this.mod256(R >> 8));
+    
+                    this.updateSREG(null, null, null, null, null, null, (R === 0), (R >> 16) & 1);
+                    break;
+                case 'FMULS':
+                    Rd = this.getArgumentValue(line, 0);
+                    Rd = (Rd < 128) ? Rd : Rd - 256;    // convert to signed
+                    Rr = this.getArgumentValue(line, 1);
+                    Rr = (Rr < 128) ? Rr : Rr - 256;    // convert to signed
+                    R = Rd * Rr;
+                    R = (R < 0) ? 65536 + R : R;        // convert to unsigned equivalent
+                    R *= 2;
+                    
+                    this.getDMEM()[0].setValue(this.mod256(R));
+                    this.getDMEM()[1].setValue(this.mod256(R >> 8));
+    
+                    this.updateSREG(null, null, null, null, null, null, (R === 0), (R >> 16) & 1);
+                    break;
+                case 'FMULSU':
+                    Rd = this.getArgumentValue(line, 0);
+                    Rd = (Rd < 128) ? Rd : Rd - 256;    // convert to signed
+                    Rr = this.getArgumentValue(line, 1);
+                    R = Rd * Rr;
+                    R = (R < 0) ? 65536 + R : R;        // convert to unsigned equivalent
+                    R *= 2;
+                    
+                    this.getDMEM()[0].setValue(this.mod256(R));
+                    this.getDMEM()[1].setValue(this.mod256(R >> 8));
+    
+                    this.updateSREG(null, null, null, null, null, null, (R === 0), (R >> 16) & 1);
+                    this.cycles += 1;
+                    break;
             case 'ICALL':
                 this.incPC();
 
@@ -3041,6 +3079,9 @@ INST_LIST = [
     'CPSE',
     'DEC',
     'EOR',
+    'FMUL',
+    'FMULS',
+    'FMULSU',
     'ICALL',
     'IJMP',
     'IN',
@@ -3158,6 +3199,9 @@ INST_OPERANDS = {
     'CPSE': [reg_0_31, reg_0_31],
     'DEC': [reg_0_31],
     'EOR': [reg_0_31, reg_0_31],
+    'FMUL': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
+    'FMULS': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
+    'FMULSU': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
     'ICALL': null,
     'IJMP': null,
     'IN': [reg_0_31, int_0_63],
@@ -3264,6 +3308,9 @@ INST_OPCODES = {
     'CPSE': ['d', 'r', '000100rdddddrrrr'],
     'DEC': ['d', '1001010ddddd1010'],
     'EOR': ['d', 'r', '001001rdddddrrrr'],
+    'FMUL': ['d', 'r', '000000110ddd1rrr'],
+    'FMULS': ['d', 'r', '000000111ddd0rrr'],
+    'FMULSU': ['d', 'r', '000000111ddd1rrr'],
     'ICALL': ['1001010100001001'],
     'IJMP': ['1001010000001001'],
     'IN': ['d', 'A', '10110AAdddddAAAA'],
@@ -4583,6 +4630,36 @@ class App {
 
                     Operation:
                     Rd = Rd ⊕ Rr`,
+            'FMUL': `Syntax:   FMUL Rd, Rr
+                    Family:   Arithmetic Instructions
+                    Function: This instruction performs 1.7-bit x 1.7-bit → 1.15-bit unsigned multiplication. The resulting unsigned value is stored in R1:R0.
+
+                    Boundaries:
+                    Rd → [R16 - R23]
+                    Rr → [R16 - R23]
+
+                    Operation:
+                    R1:R0 ← Rd x Rr (unsigned ← unsigned x unsigned)`,
+            'FMULS': `Syntax:   FMULS Rd, Rr
+                    Family:   Arithmetic Instructions
+                    Function: This instruction performs 1.7-bit x 1.7-bit → 1.15-bit signed multiplication. The resulting signed value is stored in R1:R0.
+
+                    Boundaries:
+                    Rd → [R16 - R23]
+                    Rr → [R16 - R23]
+
+                    Operation:
+                    R1:R0 ← Rd x Rr (signed ← signed x signed)`,
+            'FMULSU': `Syntax:   FMULSU Rd, Rr
+                    Family:   Arithmetic Instructions
+                    Function: This instruction performs 1.7-bit x 1.7-bit → 1.15-bit multiplication of a signed and an unsigned number. The resulting signed value is stored in R1:R0.
+
+                    Boundaries:
+                    Rd → [R16 - R23]
+                    Rr → [R16 - R23]
+
+                    Operation:
+                    R1:R0 ← Rd x Rr (signed ← signed x unsigned)`,
             'ICALL': `Syntax:   ICALL
                     Family:   Branch Instructions
                     Function: Calls to a subroutine within the entire 4M (words) Program memory. The return address (to the instruction after the CALL) will be stored onto the Stack. See also RCALL. The Stack Pointer uses a post-decrement scheme during CALL. This instruction is not available in all devices. Refer to the device specific instruction set summary.
@@ -4763,7 +4840,7 @@ class App {
                     Rd+1:Rd = Rr+1:Rr`,
             'MUL': `Syntax:   MUL Rd, Rr
                     Family:   Arithmetic Instructions
-                    Function: This instruction performs 8-bit x 8-bit → 16-bit unsigned multiplication. The resulting value is stored in R1:R0.
+                    Function: This instruction performs 8-bit x 8-bit → 16-bit unsigned multiplication. The resulting unsigned value is stored in R1:R0.
 
                     Boundaries:
                     Rd → [R0 - R31]
@@ -4773,7 +4850,7 @@ class App {
                     R1:R0 ← Rd x Rr (unsigned ← unsigned x unsigned)`,
             'MULS': `Syntax:   MULS Rd, Rr
                     Family:   Arithmetic Instructions
-                    Function: This instruction performs 8-bit x 8-bit → 16-bit signed multiplication. The resulting value is stored in R1:R0.
+                    Function: This instruction performs 8-bit x 8-bit → 16-bit signed multiplication. The resulting signed value is stored in R1:R0.
 
                     Boundaries:
                     Rd → [R16 - R31]
@@ -4781,9 +4858,9 @@ class App {
 
                     Operation:
                     R1:R0 ← Rd x Rr (signed ← signed x signed)`,
-            'MULSU': `Syntax:   MULS Rd, Rr
+            'MULSU': `Syntax:   MULSU Rd, Rr
                     Family:   Arithmetic Instructions
-                    Function: This instruction performs 8-bit x 8-bit → 16-bit multiplication of a signed and an unsigned number. The resulting value is stored in R1:R0.
+                    Function: This instruction performs 8-bit x 8-bit → 16-bit multiplication of a signed and an unsigned number. The resulting signed value is stored in R1:R0.
 
                     Boundaries:
                     Rd → [R16 - R23]
