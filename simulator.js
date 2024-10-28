@@ -1640,11 +1640,9 @@ class Interpreter {
         this.ramend = this.dmem.length - 1;
         this.setPC((this.pch.getValue() << 8) + this.pcl.getValue());
         this.setSP(this.ramend); 
-        
     }
 
     step() {
-
         // Do nothing if it's finished running
         if (this.finished) {
             return;
@@ -1674,7 +1672,6 @@ class Interpreter {
         let Rd, Rr, Result, K_val, k, b, s, A_val, q, w, T_bit, H_bit, V_bit, N_bit, Z_bit, C_bit;    // declaring all the variable names
 
         // Big switch statement
-
         switch (inst) {
             case 'ADC':
                 Rd = this.getArgumentValue(line, 0);
@@ -1702,16 +1699,11 @@ class Interpreter {
                 this.updateSREG(null, null, H_bit, N_bit ^ V_bit, V_bit, N_bit, Result === 0, (Rd + Rr) > 255);
                 break;
             case 'ADIW':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getDMEM()[line.getArgs()[0].getValue()].getValue() + (this.getDMEM()[line.getArgs()[0].getValue() + 1].getValue() << 8);
                 K_val = this.getArgumentValue(line, 1);
-                Result = Rd + K_val;
-                if (Result > 0xff) {
-                    Result = this.mod256(Result);
-                    this.getDMEM()[line.getArgs()[0].getValue() + 1].inc();
-                }
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);
-
-                Result = this.getDMEM()[line.getArgs()[0].getValue()] + (this.getDMEM()[line.getArgs()[0].getValue() + 1] << 8);
+                Result = (Rd + K_val) & 0xffff;
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result & 0xff);
+                this.getDMEM()[line.getArgs()[0].getValue() + 1].setValue((Result >> 8) & 0xff);
                 
                 V_bit = ((Result - K_val) < 0x8000) && (Result >= 0x8000);
                 N_bit = (Result >= 0x8000);
@@ -1758,7 +1750,7 @@ class Interpreter {
                 Rd = this.getArgumentValue(line, 0);
                 b = this.getArgumentValue(line, 1);
                 T_bit = this.getSREGBit(6);
-                Result = T_bit ? Rd | ( 2 ** b ) : Rd & ( 0xff - ( 2 ** b ) );
+                Result = T_bit ? Rd | ( 1 << b ) : Rd & ( 0xff - ( 1 << b ) );
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd(b) <-- T 
                 break;
             case 'BRBC':
@@ -2427,22 +2419,16 @@ class Interpreter {
                 this.cycles += 1;
                 break;
             case 'SBIW':
-                Rd = this.getArgumentValue(line, 0);    // get value of lower byte of Rd:Rd+1
+                Rd = this.getDMEM()[line.getArgs()[0].getValue()].getValue() + (this.getDMEM()[line.getArgs()[0].getValue() + 1].getValue() << 8);
                 K_val = this.getArgumentValue(line, 1);
-                Result = Rd - K_val;
-                if (Result < 0) {
-                    Result += 0x100;
-                    this.getDMEM()[line.getArgs()[0].getValue() + 1].dec();  // if the result goes too low then decrement Rd+1 by 1
-                }
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);
-
-                Result = this.getDMEM()[line.getArgs()[0].getValue()] + (this.getDMEM()[line.getArgs()[0].getValue() + 1] << 8);
-
-                V_bit = (0x8000 - K_val) <= Result < 0x8000; // if it used to start with a 1 and now it starts with a 0
+                Result = (Rd - K_val) & 0xffff;
+                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result & 0xff);
+                this.getDMEM()[line.getArgs()[0].getValue() + 1].setValue((Result >> 8) & 0xff);
+                
+                V_bit = ((Result + K_val) >= 0x8000) && (Result < 0x8000);
                 N_bit = (Result >= 0x8000);
-                C_bit = (Result + K_val) > 0xffff;   // if the result carried below 0
+                C_bit = (Result + K_val) > 0xffff;   // if you carried and went back around to 0 when doing the addition
                 this.updateSREG(null, null, null, N_bit ^ V_bit, V_bit, N_bit, Result === 0, C_bit);
-                this.cycles += 1;
                 break;
             case 'SBR':
                 Rd = this.getArgumentValue(line, 0);
@@ -2735,21 +2721,28 @@ class Interpreter {
         return ((value >> bit) & 1);
     }
 
+    incWord(low_reg) {
+        const val = (this.getDMEM()[low_reg + 1].getValue() << 8) + this.getDMEM()[low_reg].getValue() + 1;
+        this.getDMEM()[low_reg + 1].setValue(this.mod256(val >> 8));
+        this.getDMEM()[low_reg].setValue(this.mod256(val));
+    }
+
+    decWord(low_reg) {
+        const val = (this.getDMEM()[low_reg + 1].getValue() << 8) + this.getDMEM()[low_reg].getValue() - 1;
+        this.getDMEM()[low_reg + 1].setValue(this.mod256(val >> 8));
+        this.getDMEM()[low_reg].setValue(this.mod256(val));
+    }
+
     getW() {
-        return (this.getDMEM()[25].getValue() << 8) + this.getDMEM()[24].getValue()
+        return (this.getDMEM()[25].getValue() << 8) + this.getDMEM()[24].getValue();
     }
 
     incW() {
-        const W = this.getW() + 1;
-        this.getDMEM()[25].setValue(this.mod256(W >> 8));
-        this.getDMEM()[24].setValue(this.mod256(W));
+        this.incWord(24);
     }
 
     decW() {
-        const WL = this.getDMEM()[24].getValue();
-        const WH = this.getDMEM()[25].getValue();
-        if (WL === 0) this.getDMEM()[25].setValue(WH - 1);
-        this.getDMEM()[24].setValue(WL - 1);
+        this.decWord(24);
     }
 
     getX() {
@@ -2757,17 +2750,11 @@ class Interpreter {
     }
 
     incX() {
-        const XL = this.getDMEM()[26].getValue();
-        const XH = this.getDMEM()[27].getValue();
-        if (XL === 255) this.getDMEM()[27].setValue(XH + 1);
-        this.getDMEM()[26].setValue(XL + 1);
+        this.incWord(26);
     }
 
     decX() {
-        const XL = this.getDMEM()[26].getValue();
-        const XH = this.getDMEM()[27].getValue();
-        if (XL === 0) this.getDMEM()[27].setValue(XH - 1);
-        this.getDMEM()[26].setValue(XL - 1);
+        this.decWord(26);
     }
 
     getY() {
@@ -2775,17 +2762,11 @@ class Interpreter {
     }
 
     incY() {
-        const YL = this.getDMEM()[28].getValue();
-        const YH = this.getDMEM()[29].getValue();
-        if (YL === 255) this.getDMEM()[29].setValue(YH + 1);
-        this.getDMEM()[28].setValue(YL + 1);
+        this.incWord(28);
     }
 
     decY() {
-        const YL = this.getDMEM()[28].getValue();
-        const YH = this.getDMEM()[29].getValue();
-        if (YL === 0) this.getDMEM()[29].setValue(YH - 1);
-        this.getDMEM()[28].setValue(YL - 1);
+        this.decWord(28);
     }
 
     getZ() {
@@ -2793,17 +2774,11 @@ class Interpreter {
     }
 
     incZ() {
-        const ZL = this.getDMEM()[30].getValue();
-        const ZH = this.getDMEM()[31].getValue();
-        if (ZL === 255) this.getDMEM()[31].setValue(ZH + 1);
-        this.getDMEM()[30].setValue(ZL + 1);
+        this.incWord(30);
     }
 
     decZ() {
-        const ZL = this.getDMEM()[30].getValue();
-        const ZH = this.getDMEM()[31].getValue();
-        if (ZL === 0) this.getDMEM()[31].setValue(ZH - 1);
-        this.getDMEM()[30].setValue(ZL - 1);
+        this.decWord(30);
     }
 
     getArgumentValue(line, arg_num) {
@@ -3272,9 +3247,7 @@ class App {
         this.hideOpenPopup(this.current_popup); // hide any open popup
 
         // Stop if no text
-        if (txt.length <= 0) {
-            this.newError('No code to parse. Please input code in the code box.');
-        }
+        if (txt.length <= 0) this.newError('No code to parse. Please input code in the code box.');
 
         // Clear the current data for if there's an error
         this.resetAll();
@@ -3320,9 +3293,7 @@ class App {
             else this.success(`The code has run and exited successfully at the breakpoint on line ${this.parser.break_point_line}!`);
         }
 
-        else {
-            this.emptyStatus();
-        }
+        else this.emptyStatus();
 
         this.populateAll();
     }
@@ -3450,9 +3421,7 @@ class App {
     }
 
     populateRegisters() {
-        if (!this.assembled) {
-            return;
-        }
+        if (!this.assembled) return;
 
         const registers = this.interpreter.getDMEM().slice(0, 32);
 
@@ -3834,21 +3803,15 @@ class App {
 
     togglePopup(name) {
         // Remove any open popups 
-        if ( (this.current_popup !== null) && (this.current_popup !== name) ) {
-            this.hideOpenPopup(this.current_popup);
-        }
+        if ( (this.current_popup !== null) && (this.current_popup !== name) ) this.hideOpenPopup(this.current_popup);
 
         const popup = document.getElementById(`popup-${name}`);
 
         let inst = null;
 
-        if (!['PC', 'SP', 'X', 'Y', 'Z'].includes(name)) {
-            inst = document.getElementById(`pmem-line-${name}`).innerHTML;
-        }
+        if (!['PC', 'SP', 'X', 'Y', 'Z'].includes(name)) inst = document.getElementById(`pmem-line-${name}`).innerHTML;
 
-        if (inst === 'None') {
-            return
-        }
+        if (inst === 'None') return;
 
         popup.classList.toggle("show");
 
@@ -3858,23 +3821,19 @@ class App {
             this.fillPopup();
         }
         // Else set the popup to null since you've closed an already open popup
-        else {
-            this.current_popup = null;
-        }
+        else this.current_popup = null;
     }
 
     hideOpenPopup(name) {
-        if (this.current_popup !== null) {
-            const popup = document.getElementById(`popup-${name}`);
-            popup.classList.toggle("show", false);
-        }
+        if (this.current_popup == null) return;
+        
+        const popup = document.getElementById(`popup-${name}`);
+        popup.classList.toggle("show", false);
     }
 
     fillPopup() {
         // Do nothing for closed popups
-        if (this.current_popup === null) {
-            return;
-        }
+        if (this.current_popup === null) return;
 
         const popup = document.getElementById(`popup-${this.current_popup}`);
 
@@ -3889,42 +3848,28 @@ class App {
 
         // Get the instruction mnemonic if it's a PMEM popup 
         let inst_mnemonic;
-        if (inst !== null) {
-            inst_mnemonic = inst.split(' ')[0];   // e.g. LDI, ASR, MOV.
-        } else {
-            inst_mnemonic = this.current_popup;
-        }
+        if (inst !== null) inst_mnemonic = inst.split(' ')[0];   // e.g. LDI, ASR, MOV.
+        else inst_mnemonic = this.current_popup;
 
         let popup_options;                          // the lines for that given popup
-
         if (inst_mnemonic === 'LD') {
             const word_reg = inst.split(' ')[2];
 
-            if ( word_reg.includes('X') ) {
-                popup_options = this.getPopups()['LD_X'].split('\n');
-            }
-            else if ( word_reg.includes('Y') ) {
-                popup_options = this.getPopups()['LD_Y'].split('\n');
-            } else {
-                popup_options = this.getPopups()['LD_Z'].split('\n');
-            }
+            if ( word_reg.includes('X') ) popup_options = this.getPopups()['LD_X'].split('\n');
+            else if ( word_reg.includes('Y') ) popup_options = this.getPopups()['LD_Y'].split('\n');
+            else popup_options = this.getPopups()['LD_Z'].split('\n');
+
         } else if (inst_mnemonic === 'ST') {
             const word_reg = inst.split(' ')[1];
 
-            if ( word_reg.includes('X') ) {
-                popup_options = this.getPopups()['ST_X'].split('\n');
-            }
-            else if ( word_reg.includes('Y') ) {
-                popup_options = this.getPopups()['ST_Y'].split('\n');
-            } else {
-                popup_options = this.getPopups()['ST_Z'].split('\n');
-            }
+            if ( word_reg.includes('X') ) popup_options = this.getPopups()['ST_X'].split('\n');
+            else if ( word_reg.includes('Y') ) popup_options = this.getPopups()['ST_Y'].split('\n');
+            else popup_options = this.getPopups()['ST_Z'].split('\n');
+            
         } else {
-            if ( INST_LIST.includes(inst_mnemonic) ||  ['PC', 'SP', 'X', 'Y', 'Z'].includes(inst_mnemonic)) {
-                popup_options = this.getPopups()[inst_mnemonic].split('\n'); // get the text for that instruction
-            } else {
-                popup_options = '';
-            }
+            if ( INST_LIST.includes(inst_mnemonic) ||  ['PC', 'SP', 'X', 'Y', 'Z'].includes(inst_mnemonic)) popup_options = this.getPopups()[inst_mnemonic].split('\n'); // get the text for that instruction
+            else popup_options = '';
+            
         }
 
 
