@@ -1669,7 +1669,7 @@ class Interpreter {
         let skip_inc = false;
         let branch_taken = false;
 
-        let Rd, Rr, Result, K_val, k, b, s, A_val, q, w, T_bit, H_bit, V_bit, N_bit, Z_bit, C_bit;    // declaring all the variable names
+        let Rd, Rr, Result, K_val, k, b, s, A_val, q, w, T_bit, H_bit, V_bit, N_bit, Z_bit, C_bit, low_byte, plusminus;    // declaring all the variable names
 
         // Big switch statement
         switch (inst) {
@@ -2043,44 +2043,44 @@ class Interpreter {
                 N_bit = (Result >= 128);
                 this.updateSREG(null, null, null, N_bit, 0, N_bit, Result === 0, null);
                 break;
-                case 'FMUL':
-                    Rd = this.getArgumentValue(line, 0);
-                    Rr = this.getArgumentValue(line, 1);
-                    Result = Rd * Rr * 2;
-    
-                    this.getDMEM()[0].setValue(this.mod256(Result));
-                    this.getDMEM()[1].setValue(this.mod256(Result >> 8));
-    
-                    this.updateSREG(null, null, null, null, null, null, Result === 0, (Result >> 16) & 1);
-                    break;
-                case 'FMULS':
-                    Rd = this.getArgumentValue(line, 0);
-                    Rd = (Rd < 128) ? Rd : Rd - 256;    // convert to signed
-                    Rr = this.getArgumentValue(line, 1);
-                    Rr = (Rr < 128) ? Rr : Rr - 256;    // convert to signed
-                    Result = Rd * Rr;
-                    Result = (Result < 0) ? 65536 + Result : Result;        // convert to unsigned equivalent
-                    Result *= 2;
-                    
-                    this.getDMEM()[0].setValue(this.mod256(Result));
-                    this.getDMEM()[1].setValue(this.mod256(Result >> 8));
-    
-                    this.updateSREG(null, null, null, null, null, null, Result === 0, (Result >> 16) & 1);
-                    break;
-                case 'FMULSU':
-                    Rd = this.getArgumentValue(line, 0);
-                    Rd = (Rd < 128) ? Rd : Rd - 256;    // convert to signed
-                    Rr = this.getArgumentValue(line, 1);
-                    Result = Rd * Rr;
-                    Result = (Result < 0) ? 65536 + Result : Result;        // convert to unsigned equivalent
-                    Result *= 2;
-                    
-                    this.getDMEM()[0].setValue(this.mod256(Result));
-                    this.getDMEM()[1].setValue(this.mod256(Result >> 8));
-    
-                    this.updateSREG(null, null, null, null, null, null, Result === 0, (Result >> 16) & 1);
-                    this.cycles += 1;
-                    break;
+            case 'FMUL':
+                Rd = this.getArgumentValue(line, 0);
+                Rr = this.getArgumentValue(line, 1);
+                Result = Rd * Rr * 2;
+
+                this.getDMEM()[0].setValue(this.mod256(Result));
+                this.getDMEM()[1].setValue(this.mod256(Result >> 8));
+
+                this.updateSREG(null, null, null, null, null, null, Result === 0, (Result >> 16) & 1);
+                break;
+            case 'FMULS':
+                Rd = this.getArgumentValue(line, 0);
+                Rd = (Rd < 128) ? Rd : Rd - 256;    // convert to signed
+                Rr = this.getArgumentValue(line, 1);
+                Rr = (Rr < 128) ? Rr : Rr - 256;    // convert to signed
+                Result = Rd * Rr;
+                Result = (Result < 0) ? 65536 + Result : Result;        // convert to unsigned equivalent
+                Result *= 2;
+                
+                this.getDMEM()[0].setValue(this.mod256(Result));
+                this.getDMEM()[1].setValue(this.mod256(Result >> 8));
+
+                this.updateSREG(null, null, null, null, null, null, Result === 0, (Result >> 16) & 1);
+                break;
+            case 'FMULSU':
+                Rd = this.getArgumentValue(line, 0);
+                Rd = (Rd < 128) ? Rd : Rd - 256;    // convert to signed
+                Rr = this.getArgumentValue(line, 1);
+                Result = Rd * Rr;
+                Result = (Result < 0) ? 65536 + Result : Result;        // convert to unsigned equivalent
+                Result *= 2;
+                
+                this.getDMEM()[0].setValue(this.mod256(Result));
+                this.getDMEM()[1].setValue(this.mod256(Result >> 8));
+
+                this.updateSREG(null, null, null, null, null, null, Result === 0, (Result >> 16) & 1);
+                this.cycles += 1;
+                break;
             case 'ICALL':
                 this.incPC();
 
@@ -2130,25 +2130,17 @@ class Interpreter {
                 break;
             case 'LD':
                 w = line.getArgs()[1].getValue();
-                // Decrement X/Y/Z
-                if (w[0] === '-') {
-                    if (w === '-X') this.decX();
-                    else if (w === '-Y') this.decY();
-                    else if (w === '-Z') this.decZ();
-                    w = w[1];
-                    this.cycles += 2;
-                }
+                plusminus = -1 * w.includes('-') + w.includes('+'); // get if it's got a + or -
+                w = w.replace('-', '').replace('+', '');            // make it X, Y, or Z only
+                low_byte = (['X', 'Y', 'Z'].indexOf(w) * 2) + 26;   // convert it to a number
 
-                if (w[0] === 'X') k = this.getX();
-                else if (w[0] === 'Y') k = this.getY();
-                else if (w[0] === 'Z') k = this.getZ();
-
-                if (w.includes('+')) {
-                    if (w === 'X+') this.incX();
-                    else if (w === 'Y+') this.incY();
-                    else if (w === 'Z+') this.incZ();
-                    this.cycles += 1;
-                }
+                if (plusminus === -1) this.decWord(low_byte);
+                
+                k = this.getWord(low_byte);
+                
+                if (plusminus === 1) this.incWord(low_byte);
+                
+                this.cycles += ( (3 * plusminus * plusminus) - plusminus) >> 1; // +2 for -1, +1 for 1, +0 for 0
                 this.getDMEM()[line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 break;
             case 'LDD':
@@ -2503,28 +2495,19 @@ class Interpreter {
                 break;
             case 'ST':
                 w = line.getArgs()[0].getValue();
-                Rr = this.getArgumentValue(line, 1);
-                // Decrement X/Y/Z
-                if (w[0] === '-') {
-                    if (w === '-X') this.decX();
-                    else if (w === '-Y') this.decY();
-                    else if (w === '-Z') this.decZ();
-                    w = w[1];
-                    this.cycles += 2;
-                }
-
-                if (w[0] === 'X') k = this.getX();
-                else if (w[0] === 'Y') k = this.getY();
-                else if (w[0] === 'Z') k = this.getZ();
+                plusminus = -1 * w.includes('-') + w.includes('+'); // get if it's got a + or -
+                w = w.replace('-', '').replace('+', '');            // make it X, Y, or Z only
+                low_byte = (['X', 'Y', 'Z'].indexOf(w) * 2) + 26;   // convert it to a number
                 
-                this.getDMEM()[k] = Rr;   // (k) <-- Rr
+                // Decrement X/Y/Z
+                if (plusminus === -1) this.decWord(low_byte);
 
-                if (w.includes('+')) {
-                    if (w === 'X+') this.incX();
-                    else if (w === 'Y+') this.incY();
-                    else if (w === 'Z+') this.incZ();
-                    this.cycles += 1;
-                }
+                k = this.getWord(low_byte);
+                this.getDMEM()[k] = this.getArgumentValue(line, 1);   // (k) <-- Rr
+                
+                if (plusminus === 1) this.incWord(low_byte);
+                
+                this.cycles += ( (3 * plusminus * plusminus) - plusminus) >> 1; // +2 for -1, +1 for 1, +0 for 0
                 break;
             case 'STD':
                 w = line.getArgs()[0].getValue()[0];
@@ -2731,6 +2714,10 @@ class Interpreter {
         const val = (this.getDMEM()[low_reg + 1].getValue() << 8) + this.getDMEM()[low_reg].getValue() - 1;
         this.getDMEM()[low_reg + 1].setValue(this.mod256(val >> 8));
         this.getDMEM()[low_reg].setValue(this.mod256(val));
+    }
+
+    getWord(low_reg) {
+        return (this.getDMEM()[low_reg + 1].getValue() << 8) + this.getDMEM()[low_reg].getValue();
     }
 
     getW() {
