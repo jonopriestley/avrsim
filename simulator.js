@@ -1609,6 +1609,8 @@ class Interpreter {
         this.branches_taken = 0;
         this.branches_seen = 0;
         this.finished = false;
+        this.error = false;
+        this.error_text = '';
         this.break_point = null;
     }
 
@@ -1621,6 +1623,8 @@ class Interpreter {
 
         this.lines = this.txt.split('\n');
         this.finished = false;
+        this.error = false;
+        this.error_text = '';
         this.step_count = 0;
         this.cycles = 0;
         this.branches_taken = 0;
@@ -1644,9 +1648,7 @@ class Interpreter {
 
     step() {
         // Do nothing if it's finished running
-        if (this.finished) {
-            return;
-        }
+        if (this.finished | this.error) return;
         
         // If breakpoint is reached
         if (this.getPC() === this.break_point) {
@@ -2603,7 +2605,7 @@ class Interpreter {
     }
 
     run() {
-        while (this.finished === false) {
+        while (this.finished === false && this.error == false) {
             this.step();
         }
     }
@@ -2782,7 +2784,8 @@ class Interpreter {
     }
 
     newError(text) {
-        this.finished = true;
+        this.error = true;
+        this.error_text = text;
         document.getElementById('error').innerHTML = text;
         document.getElementById('output').innerHTML = null;
         document.getElementById('status').innerHTML = null;
@@ -3280,6 +3283,8 @@ class App {
             else this.success(`The code has run and exited successfully at the breakpoint on line ${this.parser.break_point_line}!`);
         }
 
+        else if (this.interpreter.error) this.newError(this.interpreter.error_text);
+
         else this.emptyStatus();
 
         this.populateAll();
@@ -3299,6 +3304,8 @@ class App {
             if (this.interpreter.break_point !== this.interpreter.getPC()) this.success('The code has run and exited successfully!');
             else this.success(`The code has run and exited successfully at the breakpoint on line ${this.parser.break_point_line}!`);
         }
+
+        else if (this.interpreter.error) this.newError(this.interpreter.error_text);
 
         this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
 
