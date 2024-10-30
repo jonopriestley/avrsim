@@ -39,7 +39,6 @@ class Register {
     constructor(name, value = 0, changed = 0) {
         this.name = name;
         this.value = value;
-        this.last_value = value;
         this.changed = changed;
         this.bits_changed = 0;
     }
@@ -55,6 +54,7 @@ class Register {
     }
     setChange() {
         this.changed = 1;
+        this.bits_changed = 0xff;
     }
     getChange() {
         return this.changed;
@@ -63,7 +63,6 @@ class Register {
         return this.bits_changed;
     }
     setValue(new_value) {
-        this.last_value = this.value;
         this.value = new_value & 0xff;
         this.setChange();
     }
@@ -75,16 +74,9 @@ class Register {
         this.setValue( (this.value & (0xff - (1 << bit))) | (value * (1 << bit)) );
         this.bits_changed |= (1 << bit);
     }
-    getLastValue() {
-        return this.last_value;
-    }
     getBit(bit) {
         // returns the value of a bit in a number
         return ((this.getValue() >> bit) & 1);
-    }
-    getLastBit(bit) {
-        // returns the value of a bit in a number
-        return ((this.getLastValue() >> bit) & 1);
     }
     inc() {
         this.setValue(this.getValue() + 1);
@@ -3466,7 +3458,6 @@ class App {
         const change_text_colour = '#fff';
 
         let change = this.interpreter.sreg.getBitsChanged();    // the bits that have been changed
-        if (change === 0) change = this.interpreter.sreg.getValue() ^ this.interpreter.sreg.getLastValue(); // all the changed bits if the other one doesnt work
 
         const sreg_flags = ['C', 'Z', 'N', 'V', 'S', 'H', 'T', 'I'];
         for (let i = 0; i < 8; i++) {
