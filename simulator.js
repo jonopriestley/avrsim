@@ -410,7 +410,9 @@ class Lexer {
         const patterns = [
             [/^;.*$/, null],                    // comments
             [/^\s+/, null],                     // whitespace
-            [/^[\w_]{1}[^;\s,]*:/, 'LABEL'],    // labels
+            [/^\.(section|text|data|global|end)/, 'DIR'],      // directives
+            [/^\.(byte|word|string|ascii|asciz|space|equ|set)/, 'DIR'],      // directives
+            [/^[\w_\.]{1}[^;\s,\.]*:/, 'LABEL'],    // labels
             [/^lo8(?=[(])/, 'LO8'],             // lo8
             [/^LO8(?=[(])/, 'LO8'],             // lo8
             [/^hi8(?=[(])/, 'HI8'],             // hi8
@@ -427,7 +429,7 @@ class Lexer {
             [/^“.*?”/, 'STR'],                  // string
             [/^‘.*?’/, 'STR'],                  // string
             // [/^\.[^\.\s]+/, 'DIR'],          // directives. .ORG WORKS WHAT OTHER DIRECTIVES? NO DEF no UNDEF
-            [/^\.[\w\.]+(?=[;\s])/, 'DIR'],      // directives
+            // [/^\.[\w\.]+(?=[;\s])/, 'DIR'],      // directives
             [/^[YZ][ \t]*\+[ \t]*\d{1,2}/, 'WORDPLUSQ'],        // word+q
             [/^[X][ \t]*\+[ \t]*\d{1,2}/, 'XPLUSQ'],            // X+q
             [/^[XYZ]\+/, 'WORDPLUS'],           // word+
@@ -456,7 +458,7 @@ class Lexer {
             [/^>{1}/, 'GT'],                    // greater than
             [/^<{1}/, 'LT'],                    // less than
             [/^=/, 'EQ'],                       // equal (assignment)
-            [/^[^\w\s;]+/, 'SYMBOL'],           // symbols
+            [/^[^\w\s;\.]+/, 'SYMBOL'],           // symbols
             [/^[^\s\d]{1}[\w\d_]*/, 'REF']      // references (like labels used in an instruction)
         ];
         
@@ -2159,15 +2161,11 @@ class Interpreter {
                 break;
             case 'LPM':
                 k = this.getZ();
-                if (line.getArgs().length === 0) {
-                    this.getDMEM()[0].setValue( parseInt( this.getPMEM()[(k - (k & 1)) >> 1].getOpcode().slice(8 * (1 - k & 1), 8 + 8 * (1 - k & 1)), 2) );
+                Rd = (line.getArgs().length === 0) ? 0 : line.getArgs()[0].getValue();      // set Rd as either 0 or whatever it's specified as
+                if (line.getArgs().length !== 0 && line.getArgs()[1].getValue().includes('+')) {
+                    this.incZ();
                 }
-                else {
-                    this.getDMEM()[line.getArgs()[0].getValue()].setValue( parseInt( this.getPMEM()[(k - (k & 1)) >> 1].getOpcode().slice(8 * (1 - k & 1), 8 + 8 * (1 - k & 1)), 2) );
-                    if (line.getArgs()[1].getValue().includes('+')) {
-                        this.incZ();
-                    }
-                }
+                this.getDMEM()[Rd].setValue( parseInt( this.getPMEM()[(k - (k & 1)) >> 1].getOpcode().slice(8 * (1 - k & 1), 8 + 8 * (1 - k & 1)), 2) );
                 this.cycles += 2;
                 break;
             case 'LSL':
