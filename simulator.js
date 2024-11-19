@@ -31,6 +31,9 @@ class Token {
         return this.start;
     }
     toString() {
+        let space1 = ' '.repeat(8 - this.type.toLowerCase().length);
+        let space2 = ' '.repeat(20 - this.value.length);
+        return `${this.type.toLowerCase()}${space1}\'${this.value}\'${space2}Loc=<${this.location}>`;
         return `${this.type.toLowerCase()}\t\'${this.value}\'\tLoc=<${this.location}>`;
     }
 }
@@ -397,17 +400,15 @@ class Lexer {
 
     newData(text) {
         this.text = text;
-        this.token_lines = this.tokenize(this.text);
-    }
 
-    tokenize(code) {
-        /**
-         * Takes the code as raw text and returns the tokens as a list of
-         * lists where each list is a single line as its tokens.
-         */
-
-        // Define regular expressions for each token type
-        const patterns = [
+        this.code_arr = text.split('\n');
+        this.tokens = [];
+        this.line_tokens = [];
+        this.line_number = 0;
+        this.line = '';
+        this.pos = 0;
+        this.match = null;
+        this.patterns = [
             [/^;.*$/, null],                    // comments
             [/^\s+/, null],                     // whitespace
             [/^\.(section|text|data|global|end)/, 'DIR'],      // directives
@@ -458,104 +459,134 @@ class Lexer {
             [/^>{1}/, 'GT'],                    // greater than
             [/^<{1}/, 'LT'],                    // less than
             [/^=/, 'EQ'],                       // equal (assignment)
-            [/^[^\w\s;\.]+/, 'SYMBOL'],           // symbols
+            [/^[^\w\s;\.]+/, 'SYMBOL'],         // symbols
             [/^[^\s\d]{1}[\w\d_]*/, 'REF']      // references (like labels used in an instruction)
         ];
         
+        
+        this.tokenize();
+    }
+
+    tokenize() {
+        /**
+         * Takes the code as raw text and returns the tokens as a list of
+         * lists where each list is a single line as its tokens.
+         */
+
         // TODO: = does the same as .equ
         // TODO: can use variables as int or reg
 
-        const tokens = [];
-
-        const codeArr = code.split('\n');
-
         // Go over every line of code and move through the line making tokens
-        for (let line_number = 0; line_number < codeArr.length; line_number++) {
-            let pos = 0;
-            const line = codeArr[line_number] + ' ';
-            const line_toks = [];
+        for (this.line_number = 0; this.line_number < this.code_arr.length; this.line_number++) {
+            this.tokenizeLine();
+            this.fixBadTokens();
 
-            // Iterate over the input code, finding matches for each token type
-            while (pos < line.length) {
-                let match = null;
-
-                for (let i = 0; i < patterns.length; i++) {
-                    const [regex, tag] = patterns[i];
-                    match = regex.exec(line.slice(pos));
-
-                    if (match) {
-                        if (tag) {
-                            const token = new Token(tag, match[0], `${line_number + 1}:${pos + 1}`);
-                            line_toks.push(token);
-                        }
-                        break;
-                    }
-                }
-                
-                if (!match) {
-                    this.newError(`Invalid syntax on line ${line_number + 1} starting at position ${pos}.`);
-                }
-
-                pos += match[0].length;
-            }
-
-            // Fixing any bad tokens (like REFs being INST tokens)
-            let i = 0;
-            while (i < line_toks.length) {
-                let current_tok = line_toks[i];
-
-                // Turn REG:Rn into REG:n
-                if (current_tok.getType() === 'REG') {
-                    const num = current_tok.getValue().substring(1); // the register number
-                    current_tok.setValue(parseInt(num));
-                }
-
-                // Turn bad 'INST' back into 'REF' (unless it's actually an instruction behind a label)
-                else if (i > 0 && current_tok.getType() === 'INST' && !(i === 1 && line_toks[i - 1].getType() === 'LABEL')) {
-                    current_tok.setType('REF');
-                }
-
-                if (current_tok.getType() === 'DIR') {
-                    if (!DIRECTIVES.includes(current_tok.getValue().toUpperCase())) {
-                        this.newError(`Invalid directive \'${current_tok.getValue()}\'.`);
-                    }
-                    current_tok.setValue(current_tok.getValue().toUpperCase());
-                }
-
-                // If both the current and previous tokens should be 1 REF token combine them
-                if (i > 0 && !['COMMA', 'SYMBOL'].includes(current_tok.getType()) && !MATH.slice(1).includes(current_tok.getType()) && line_toks[i - 1].getType() === 'REF') {
-                    line_toks[i - 1].setValue(line_toks[i - 1].getValue() + current_tok.getValue());
-                    line_toks.splice(i, 1); // Virtually advancing
-                }
-
-                // Actually advancing if you haven't shortened the list length as above
-                else {
-                    i += 1;
-                }
-            }
-
-            if (line_toks.length !== 0) {           // Add to the tokens list if the line isnt empty
-                tokens.push(line_toks);
+            if (this.line_tokens.length !== 0) {           // Add to the tokens list if the line isnt empty
+                this.tokens.push(this.line_tokens);
             }
 
         }
 
-        return tokens;
+    }
+
+    tokenizeLine() {
+        // Creates tokens from a line
+
+        this.pos = 0;
+        this.line = this.code_arr[this.line_number] + ' ';
+        this.line_tokens = [];
+
+        // Iterate over the input code, finding matches for each token type
+        while (this.pos < this.line.length) {
+            this.getMatch();
+            this.pos += this.match[0].length;
+        }
+    }
+
+    getMatch() {
+        // Check all the valid regex token patterns to see if a token can be made
+
+        this.match = null;
+
+        for (let i = 0; i < this.patterns.length; i++) {
+            const [regex, tag] = this.patterns[i];
+            this.match = regex.exec(this.line.slice(this.pos));
+
+            if (!this.match) continue;
+
+            this.creatNewToken(tag);
+            return;
+        }
+
+        if (!this.match) {
+            this.newError(`Invalid syntax on line ${this.line_number + 1} starting at position ${this.pos}.`);
+        }
+    }
+
+    creatNewToken(tag) {
+        if (!tag) return;
+
+        const token = new Token(tag, this.match[0], `${this.line_number + 1}:${this.pos + 1}`);
+        this.line_tokens.push(token);
+    }
+
+    fixBadTokens() {
+        // Fixes any bad tokens (like REFs being INST tokens)
+
+        let i = 0;
+        while (i < this.line_tokens.length) {
+            let current_tok = this.line_tokens[i];
+            let current_type = current_tok.getType();
+            let current_value = current_tok.getValue();
+
+            // Turn REG:Rn into REG:n
+            if (current_type === 'REG') {
+                const num = current_value.substring(1); // the register number
+                current_tok.setValue(parseInt(num));
+            }
+
+            // Turn bad 'INST' back into 'REF' (unless it's actually an instruction behind a label)
+            else if (i > 0 && current_type === 'INST' && !(i === 1 && this.line_tokens[i - 1].getType() === 'LABEL')) {
+                current_tok.setType('REF');
+            }
+
+            if (current_type === 'LABEL') {
+                current_tok.setValue(current_value.slice(0, (current_value.length - 1)).trim()); // remove the colon at the end
+            }
+
+            if (current_type === 'DIR') {
+                if (!DIRECTIVES.includes(current_value.toUpperCase())) {
+                    this.newError(`Invalid directive \'${current_value}\'.`);
+                }
+                current_tok.setValue(current_value.toUpperCase());
+            }
+
+            // If both the current and previous tokens should be 1 REF token combine them
+            if (i > 0 && !['COMMA', 'SYMBOL'].includes(current_type) && !MATH.slice(1).includes(current_type) && this.line_tokens[i - 1].getType() === 'REF') {
+                this.line_tokens[i - 1].setValue(this.line_tokens[i - 1].getValue() + current_value);
+                this.line_tokens.splice(i, 1); // Virtually advancing
+            }
+
+            // Actually advancing if you haven't shortened the list length as above
+            else {
+                i += 1;
+            }
+        }
     }
 
     getText() {
         return this.text;
     }
 
-    getTokenLines() {
-        return this.token_lines;
+    getTokens() {
+        return this.tokens;
     }
-
+    
     toString() {
         let s = '';
         let line;
-        for (let l = 0; l < this.token_lines.length; l++) {
-            line = this.token_lines[l];
+        for (let l = 0; l < this.tokens.length; l++) {
+            line = this.tokens[l];
             for (let tok = 0; tok < line.length; tok++) {
                 s += line[tok].toString() + '\n';
             }
@@ -572,6 +603,103 @@ class Lexer {
 
 }
 
+class ExpressionEvaluator {
+    constructor() {
+        this.line = null;
+        this.evaluation = null;
+        this.expression = '';
+        this.expression_start = null;
+        this.current_tok = null;
+        this.last_tok = null;
+        this.tok_type = null;
+        this.tok_value = null;
+        this.index = 0;
+    }
+
+    evaluateNewLine(line) {
+        this.line = line;
+        this.expression = '';
+        this.evaluateLineExpressions();
+        return this.line;
+    }
+
+    evaluateLineExpressions() {
+        // Evaluate all expressions in the line
+        
+        this.index = 0;
+        while (this.index < this.line.length) {
+            this.setCurrentToken();
+
+            // Add the the expression
+            if (MATH.includes(this.tok_type)) {
+                this.addTokenToExpression();
+            }
+
+            // Evaluate then reset expression to empty
+            else if (this.expression.length > 0) {
+                this.evaluateExpression();
+                this.resetExpression();
+            }
+
+            this.last_tok = this.line[this.index];
+            this.index += 1;
+        }
+
+        if (this.expression.length == 0) return;
+        
+        // Evaluate final expression
+        this.evaluateExpression();
+    }
+
+    setCurrentToken() {
+        this.current_tok = this.line[this.index];
+        this.tok_type = this.current_tok.getType();
+        this.tok_value = this.current_tok.getValue();
+    }
+
+    addTokenToExpression() {
+        if (this.expression.length === 0) {
+            this.expression_start = this.index;
+        }
+
+        else if (this.last_tok.getType() === 'INT' && this.tok_type === 'INT' && this.tok_value >= 0) {
+            this.newError(`Cannot evaluate expression on line ${current_tok.getLine()} beginning at position ${this.line[this.expression_start].getStart()}`);
+        }
+
+        this.expression += this.tok_value;
+    }
+
+    resetExpression() {
+        this.expression = '';       // reset the expression
+        this.index = this.expression_start;
+    }
+
+    evaluateExpression() {
+        try {
+            this.evaluation = eval(this.expression);    // evaluate
+        } catch (error) {
+            this.newError(`${error.message} on line ${this.current_tok.getLine()} beginning at position ${this.line[this.expression_start].getStart()}`);
+        }
+
+        if (this.evaluation === true) this.evaluation = 1;
+
+        this.evaluation = Math.floor(this.evaluation);
+        this.simplifyLine();
+    }
+
+    simplifyLine() {
+        const new_tok = new Token('INT', this.evaluation, this.line[this.expression_start].getLocation());     // make new token
+        this.line.splice(this.expression_start, this.index - this.expression_start, new_tok);                  // replace the expression with the token
+    }
+
+    newError(text) {
+        document.getElementById('error').innerHTML = text;
+        document.getElementById('output').innerHTML = null;
+        document.getElementById('status').innerHTML = null;
+        throw new SyntaxError(text);
+    }
+}
+
 class Parser {
     
     constructor() {
@@ -582,6 +710,7 @@ class Parser {
         // DEFINING THE SIZE OF DMEM AND PMEM
         this.ramend = 0x8FF;
         this.flashend = 0x3FFF;
+        this.evaluator = new ExpressionEvaluator();
 
     }
 
@@ -617,7 +746,7 @@ class Parser {
         for (let i = this.pmem.length; i < (this.flashend + 1); i++) {
             this.pmem.push(new Instruction([new Token('INST', 'NOP')]));
         }
-
+        
     }
 
     parse() {
@@ -871,24 +1000,22 @@ class Parser {
                         this.newError(`Illegal label location on line ${line_in_file}.`);
                     }
 
-                    const label = current_tok.getValue().slice(0, (current_tok.getValue().length - 1)).trim(); // remove the colon from the end
-                    //this.pmem_labels[label] = this.pmem.length; //  add it to the labels dictionary
-                    
+                    const label = current_tok.getValue(); // remove the colon from the end
                     this.newLabel(label, this.pmem.length, line_in_file);
 
                     // Check the global function label when you get to it
                     if (label === global_funct_names[0]) {
-                        this.dmem[0x5B].setValue(this.pmem.length & 0xff);
-                        this.dmem[0x5C].setValue((this.pmem.length >> 8) & 0xff); 
+                        this.dmem[0x5B].setValue(this.lo8(this.pmem.length));
+                        this.dmem[0x5C].setValue(this.hi8(this.pmem.length)); 
                     }
 
                     // Remove the label
                     line = line.slice(1);
                     line_length -= 1;
 
-                } else {
-                 tok_num += 1;
                 }
+                
+                else tok_num += 1;
             }
 
             if (line_length === 0) {
@@ -970,7 +1097,6 @@ class Parser {
             // DEAL WITH LABELS AT THE START OF THE LINE
             if (line[tok_num].getType() === 'LABEL') {
                 let label = line[0].getValue();                     // get label with the colon at the end
-                label = label.slice(0, (label.length - 1)).trim();
                 //this.dmem_labels[label] = this.dmem.length;         // add location of the data label
 
                 this.newLabel(label, this.dmem.length, line_in_file)
@@ -993,10 +1119,10 @@ class Parser {
             if (['.BYTE','.WORD', '.SPACE'].includes(line_directive)) {
                 // Replace the references in the line and evaluate any expressions
                 this.replaceRefs(line, line_in_file);
-                this.evaluateExpression(line);
+                line = this.evaluator.evaluateNewLine(line);
             } else if (['.SET','.EQU'].includes(line_directive)) {
                 this.replaceRefs(line.slice(2));
-                this.evaluateExpression(line);
+                line = this.evaluator.evaluateNewLine(line);
             }
 
             line_length = line.length; 
@@ -1017,13 +1143,12 @@ class Parser {
                 if (parity_of_current_tok === 1 && ['.BYTE','.WORD'].includes(line_directive)) {
 
                     if (current_tok.getType() === 'INT') {
-                        this.dmem.push(current_tok.getValue() & 0xff);
+                        this.dmem.push(this.lo8(current_tok.getValue()));
 
                         if (line_directive === '.WORD') {
-                            this.dmem.push((current_tok.getValue() >> 8) & 0xff);
+                            this.dmem.push(this.hi8(current_tok.getValue()));
                         }
-                    }
-                    else {
+                    } else {
                         this.newError(`Bad token \'${current_tok.getValue()}\' on line ${line_in_file} at position ${current_tok.getStart()}.`);
                     }
                 }
@@ -1087,8 +1212,8 @@ class Parser {
                         //if (char_ascii_value > 127) { // check it's a valid character
                         //    this.newError(`Bad character \'${char}\' on line ${line_in_file}.`);
                         //}
-
-                        this.dmem.push(char_ascii_value & 0xff);           // add to data
+                        
+                        this.dmem.push(this.lo8(char_ascii_value));           // add to data
                     }
 
                     if (['.STRING', '.ASCIZ'].includes(line_directive)) {   // add NULL if directive requires it
@@ -1129,7 +1254,7 @@ class Parser {
                         const space_value = current_tok.getValue();             // value of the spaces
                         const number_of_spaces = line[tok_num - 2].getValue();  // the number of spaces we're making
                         for (let i = 0; i < number_of_spaces; i++) {
-                            this.dmem.push(space_value & 0xff);                // add the value for as many spaces as needed
+                            this.dmem.push(this.lo8(space_value));                // add the value for as many spaces as needed
                         }
                     }
 
@@ -1260,7 +1385,7 @@ class Parser {
 
                     this.replaceRefs(line.slice(expr_start, tok_num - 1));
                     let eval_section = line.slice(expr_start, tok_num - 1);
-                    this.evaluateExpression(eval_section);
+                    line = this.evaluator.evaluateNewLine(line);
                     line.splice(expr_start, tok_num - expr_start - 1, eval_section[0]);
 
                     // Should now be up to whatever is after the RPAR.
@@ -1342,7 +1467,7 @@ class Parser {
 
             }
 
-            this.evaluateExpression(line);
+            line = this.evaluator.evaluateNewLine(line);
         }
 
         ////////// CHECK INSTRUCTION SYNTAX
@@ -1485,7 +1610,7 @@ class Parser {
         }
     }
 
-    evaluateExpression(line) {
+    evaluateLineExpressions(line) {
         let current_tok;
         // Evaluate all expressions in the line
         let expression = '';
@@ -1495,13 +1620,13 @@ class Parser {
         while (i < line.length) {
             current_tok = line[i];
 
-            // Begin expression
+            // Add the the expression
             if (MATH.includes(current_tok.getType())) {
                 if (expression.length === 0) {
                     expression_start = i;
                 }
 
-                else if (last_tok.getType() === 'INT' && current_tok.getType() === 'INT') {
+                else if (last_tok.getType() === 'INT' && current_tok.getType() === 'INT' && current_tok.getValue() >= 0) {
                     this.newError(`Cannot evaluate expression on line ${current_tok.getLine()} beginning at position ${line[expression_start].getStart()}`);
                 }
 
@@ -1510,44 +1635,36 @@ class Parser {
 
             // Evaluate then reset expression to empty
             else if (expression.length > 0) {
-                try {
-                    evaluation = eval(expression);                                  // evaluate
-                } catch (error) {
-                    this.newError(`${error.message} on line ${current_tok.getLine()} beginning at position ${line[expression_start].getStart()}`);
-                }
-                if (evaluation === true) {
-                    evaluation = 1;
-                }
-                evaluation = Math.floor(evaluation);
-                const new_tok = new Token('INT', evaluation, line[expression_start].getLocation());                   // make new token
-                line.splice(expression_start, i - expression_start, new_tok);   // replace the expression with the token
-                expression = '';                                                // reset the expression
+                evaluation = this.evaluateExpression(expression, current_tok.getLine(), line[expression_start].getStart());
+                const new_tok = new Token('INT', evaluation, line[expression_start].getLocation());                 // make new token
+                line.splice(expression_start, i - expression_start, new_tok);                                       // replace the expression with the token
+                expression = '';                                                                                    // reset the expression
                 i = expression_start;
             }
-
-            //else if (expression_start !== null && current_tok.getType() !== 'COMMA') {
-            //    this.newError(`Bad token \'${current_tok.getValue()}\' on line ${current_tok.getLine()} beginning at position ${current_tok.getStart()}`);
-            //}
 
             last_tok = line[i];
             i += 1;
         }
 
-        // Evaluate after the 
-        if (expression.length > 0) {
-            try {
-                evaluation = eval(expression);                                  // evaluate
-            } catch (error) {
-                this.newError(`${error.message} on line ${current_tok.getLine()} beginning at position ${line[expression_start].getStart()}`);
-            }
-            if (evaluation === true) {
-                evaluation = 1;
-            }
-            evaluation = Math.floor(evaluation);
-            const new_tok = new Token('INT', evaluation, line[expression_start].getLocation());    // make new token
-            line.splice(expression_start, line.length - expression_start, new_tok);                     // replace the expression with the token
-        }
+        if (expression.length == 0) return;
+        
+        // Evaluate final expression
+        evaluation = this.evaluateExpression(expression, current_tok.getLine(), line[expression_start].getStart());
+        const new_tok = new Token('INT', evaluation, line[expression_start].getLocation());     // make new token
+        line.splice(expression_start, line.length - expression_start, new_tok);                 // replace the expression with the token
 
+    }
+
+    evaluateExpression(expr, line_num, start_pos) {
+        let evaluation;
+        try {
+            evaluation = eval(expr);    // evaluate
+        } catch (error) {
+            this.newError(`${error.message} on line ${line_num} beginning at position ${start_pos}`);
+        }
+        if (evaluation === true) evaluation = 1;
+        evaluation = Math.floor(evaluation);
+        return evaluation;
     }
 
     getTokenLines() {
@@ -3237,7 +3354,7 @@ class App {
         console.log(this.lexer.toString());
 
         // Parsing
-        this.parser.newData(this.lexer.getTokenLines(), txt);
+        this.parser.newData(this.lexer.getTokens(), txt);
 
         // Interpreter Initialisation
         this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), txt, this.parser.break_point);
