@@ -31,10 +31,10 @@ class Token {
         return this.start;
     }
     toString() {
+        return `${this.type.toLowerCase()}\t\'${this.value}\'\tLoc=<${this.location}>`;
         let space1 = ' '.repeat(8 - this.type.toLowerCase().length);
         let space2 = ' '.repeat(20 - this.value.length);
         return `${this.type.toLowerCase()}${space1}\'${this.value}\'${space2}Loc=<${this.location}>`;
-        return `${this.type.toLowerCase()}\t\'${this.value}\'\tLoc=<${this.location}>`;
     }
 }
 
@@ -173,6 +173,117 @@ class Instruction {
     constructor(tokens) {
         this.inst = tokens[0];
         this.args = tokens.slice(1);
+        // Most op codes can be easily obtained from this
+        this.all_opcodes = {
+            'ADC': ['d', 'r', '000111rdddddrrrr'],
+            'ADD': ['d', 'r', '000011rdddddrrrr'],
+            'ADIW': null,
+            'AND': ['d', 'r', '001000rdddddrrrr'],
+            'ANDI': ['d', 'K', '0111KKKKddddKKKK'],
+            'ASR': ['d', '1001010ddddd0101'],
+            'BCLR': ['s', '100101001sss1000'],
+            'BLD': ['d', 'b', '1111100ddddd0bbb'],
+            'BRBC': ['s', 'k', '111101kkkkkkksss'],
+            'BRBS': ['s', 'k', '111100kkkkkkksss'],
+            'BRCC': ['k', '111101kkkkkkk000'],
+            'BRCS': ['k', '111100kkkkkkk000'],
+            'BREQ': ['k', '111100kkkkkkk001'],
+            'BRGE': ['k', '111101kkkkkkk100'],
+            'BRHC': ['k', '111101kkkkkkk101'],
+            'BRHS': ['k', '111100kkkkkkk101'],
+            'BRID': ['k', '111101kkkkkkk111'],
+            'BRIE': ['k', '111100kkkkkkk111'],
+            'BRLO': ['k', '111100kkkkkkk000'],
+            'BRLT': ['k', '111100kkkkkkk100'],
+            'BRMI': ['k', '111100kkkkkkk010'],
+            'BRNE': ['k', '111101kkkkkkk001'],
+            'BRPL': ['k', '111101kkkkkkk010'],
+            'BRSH': ['k', '111101kkkkkkk000'],
+            'BRTC': ['k', '111101kkkkkkk110'],
+            'BRTS': ['k', '111100kkkkkkk110'],
+            'BRVC': ['k', '111101kkkkkkk011'],
+            'BRVS': ['k', '111100kkkkkkk011'],
+            'BSET': ['s', '100101000sss1000'],
+            'BST': ['d', 'b', '1111101ddddd0bbb'],
+            'CALL': ['k', '1001010kkkkk111kkkkkkkkkkkkkkkkk'],
+            'CBI': ['A', 'b', '10011000AAAAAbbb'],
+            'CBR': null,
+            'CLC': ['1001010010001000'],
+            'CLH': ['1001010011011000'],
+            'CLI': ['1001010011111000'],
+            'CLN': ['1001010010101000'],
+            'CLR': null,
+            'CLS': ['1001010011001000'],
+            'CLT': ['1001010011101000'],
+            'CLV': ['1001010010111000'],
+            'CLZ': ['1001010010011000'],
+            'COM': ['d', '1001010ddddd0000'],
+            'CP': ['d', 'r', '000101rdddddrrrr'],
+            'CPC': ['d', 'r', '000001rdddddrrrr'],
+            'CPI': ['d', 'K', '0011KKKKddddKKKK'],
+            'CPSE': ['d', 'r', '000100rdddddrrrr'],
+            'DEC': ['d', '1001010ddddd1010'],
+            'EOR': ['d', 'r', '001001rdddddrrrr'],
+            'FMUL': ['d', 'r', '000000110ddd1rrr'],
+            'FMULS': ['d', 'r', '000000111ddd0rrr'],
+            'FMULSU': ['d', 'r', '000000111ddd1rrr'],
+            'ICALL': ['1001010100001001'],
+            'IJMP': ['1001010000001001'],
+            'IN': ['d', 'A', '10110AAdddddAAAA'],
+            'INC': ['d', '1001010ddddd0011'],
+            'JMP': ['k', '1001010kkkkk110kkkkkkkkkkkkkkkkk'],
+            'LD': null,
+            'LDD': null,
+            'LDI': ['d', 'K', '1110KKKKddddKKKK'],
+            'LDS': ['d', 'k', '1001000ddddd0000kkkkkkkkkkkkkkkk'],
+            'LPM': null,
+            'LSL': null,
+            'LSR': ['d', '1001010ddddd0110'],
+            'MOV': ['d', 'r', '001011rdddddrrrr'],
+            'MOVW': null,
+            'MUL': ['d', 'r', '100111rdddddrrrr'],
+            'MULS': ['d', 'r', '00000010ddddrrrr'],
+            'MULSU': ['d', 'r', '000000110ddd0rrr'],
+            'NEG': ['d', '1001010ddddd0001'],
+            'NOP': ['0000000000000000'],
+            'OR': ['d', 'r', '001010rdddddrrrr'],
+            'ORI': ['d', 'K', '0110KKKKddddKKKK'],
+            'OUT': ['A', 'r', '10111AArrrrrAAAA'],
+            'POP': ['d', '1001000ddddd1111'],
+            'PUSH': ['r', '1001001rrrrr1111'],
+            'RCALL': ['k', '1101kkkkkkkkkkkk'], // this one needs 2's comp too
+            'RET': ['1001010100001000'],
+            'RJMP': ['k', '1100kkkkkkkkkkkk'], // this one needs 2's comp too
+            'ROL': null,
+            'ROR': ['d', '1001010ddddd0111'],
+            'SBC': ['d', 'r', '000010rdddddrrrr'],
+            'SBCI': ['d', 'K', '0100KKKKddddKKKK'],
+            'SBI': ['A', 'b', '10011010AAAAAbbb'],
+            'SBIW': null,
+            'SBR': ['d', 'K', '0110KKKKddddKKKK'],
+            'SBRC': ['r', 'b', '1111110rrrrr0bbb'],
+            'SBRS': ['r', 'b', '1111111rrrrr0bbb'],
+            'SEC': ['1001010000001000'],
+            'SEH': ['1001010001011000'],
+            'SEI': ['1001010001111000'],
+            'SEN': ['1001010000101000'],
+            'SER': ['d', '11101111dddd1111'],
+            'SES': ['1001010001001000'],
+            'SET': ['1001010001101000'],
+            'SEV': ['1001010000111000'],
+            'SEZ': ['1001010000011000'],
+            'ST': null,
+            'STD': null,
+            'STS': ['k', 'r', '1001001rrrrr0000kkkkkkkkkkkkkkkk'],
+            'SUB': ['d', 'r', '000110rdddddrrrr'],
+            'SUBI': ['d', 'K', '0101KKKKddddKKKK'],
+            'SWAP': ['d', '1001010ddddd0010'],
+            'TST': null,
+            'XCH': ['Z', 'd', '1001001ddddd0100']
+        };
+
+        this.operands = new Operands();
+        this.inst_set = new InstructionSet();
         this.opcode = this.makeOpcode();
     }
 
@@ -205,7 +316,7 @@ class Instruction {
 
     makeOpcode() {
         const inst = this.inst.getValue();
-        const opcode_requirements = INST_OPCODES[inst];
+        const opcode_requirements = this.all_opcodes[inst];
         // If it's a simple opcode
         if (opcode_requirements !== null) {
             // Return the opcode if it's always the same opcode
@@ -221,10 +332,10 @@ class Instruction {
                 if (digit_count === 0) continue;                            // skip if it's an argument that doesnt matter (like Z in XCH)
 
                 const arg = this.args[arg_num].getValue();                  // the argument value
-                const uses_twos_comp = ['RJMP','RCALL'].concat(INST_LIST.slice(8, 28)).includes(this.inst.getValue());
+                const is_relative = this.inst_set.isRelativeControlFlowInstruction(this.inst.getValue());
                 
                 // either 2's comp, in functions, or just normal
-                const var_value = uses_twos_comp ? this.twosComp(arg, digit_count) : FUNCTIONS.includes(arg) ? '1111111111111111111111' : this.binLenDigits(arg, digit_count);
+                const var_value = is_relative ? this.twosComp(arg, digit_count) : FUNCTIONS.includes(arg) ? '1111111111111111111111' : this.binLenDigits(arg, digit_count);
 
                 for (let i = 0; i < digit_count; i++) {
                     opcode = opcode.replace(symbol, var_value[i], 1);
@@ -355,7 +466,7 @@ class Instruction {
         
         let arg1 = this.args[0].getValue();
 
-        if (INST_OPERANDS[inst][0].getTokenType().includes('REG')) {
+        if (this.operands.getInstructionArg(inst, 0).getTokenType().includes('REG')) {
             arg1 = `R${arg1}`;
         }
 
@@ -369,7 +480,7 @@ class Instruction {
 
         let arg2 = this.args[1].getValue();
 
-        if (INST_OPERANDS[inst][1].getTokenType().includes('REG')) {
+        if (this.operands.getOperand(inst)[1].getTokenType().includes('REG')) {
             arg2 = `R${arg2}`;
         }
 
@@ -408,6 +519,7 @@ class Lexer {
         this.line = '';
         this.pos = 0;
         this.match = null;
+        this.math = new MathTokens();
         this.patterns = [
             [/^;.*$/, null],                    // comments
             [/^\s+/, null],                     // whitespace
@@ -462,7 +574,6 @@ class Lexer {
             [/^[^\w\s;\.]+/, 'SYMBOL'],         // symbols
             [/^[^\s\d]{1}[\w\d_]*/, 'REF']      // references (like labels used in an instruction)
         ];
-        
         
         this.tokenize();
     }
@@ -562,7 +673,7 @@ class Lexer {
             }
 
             // If both the current and previous tokens should be 1 REF token combine them
-            if (i > 0 && !['COMMA', 'SYMBOL'].includes(current_type) && !MATH.slice(1).includes(current_type) && this.line_tokens[i - 1].getType() === 'REF') {
+            if (i > 0 && !['COMMA', 'SYMBOL'].includes(current_type) && !this.math.isValidSymbol(current_type) && this.line_tokens[i - 1].getType() === 'REF') {
                 this.line_tokens[i - 1].setValue(this.line_tokens[i - 1].getValue() + current_value);
                 this.line_tokens.splice(i, 1); // Virtually advancing
             }
@@ -614,6 +725,7 @@ class ExpressionEvaluator {
         this.tok_type = null;
         this.tok_value = null;
         this.index = 0;
+        this.math = new MathTokens();
     }
 
     evaluateNewLine(line) {
@@ -631,7 +743,7 @@ class ExpressionEvaluator {
             this.setCurrentToken();
 
             // Add the the expression
-            if (MATH.includes(this.tok_type)) {
+            if (this.math.isValidType(this.tok_type)) {
                 this.addTokenToExpression();
             }
 
@@ -711,6 +823,8 @@ class Parser {
         this.ramend = 0x8FF;
         this.flashend = 0x3FFF;
         this.evaluator = new ExpressionEvaluator();
+        this.operands = new Operands();
+        this.inst_set = new InstructionSet();
 
     }
 
@@ -824,8 +938,8 @@ class Parser {
                 // Check INST and make upper case
                 if (current_tok.getType() === 'INST') {
                     current_tok.setValue(current_tok.getValue().toUpperCase()); // make all directives upper case
-
-                    if (!INST_LIST.includes(current_tok.getValue())) { // check if the token is a valid instruction
+                    
+                    if (!this.inst_set.isInstruction(current_tok.getValue())) { // check if the token is a valid instruction
                         this.newError(`Invalid instruction \'${current_tok.getValue()}\' on line ${line_in_file}.`);
                     }
                 }
@@ -1320,8 +1434,6 @@ class Parser {
         //////////////// TEXT SECTION ////////////////
         //////////////////////////////////////////////
 
-        const control_flow_instructions = ['CALL', 'JMP', 'IJMP', 'ICALL', 'RJMP', 'RCALL'].concat(INST_LIST.slice(8, 28)); // all the branching instructions
-
         // Evaluate all refs, hi8()/lo8(), and expressions
         for (let line_num = 0; line_num < this.pmem.length; line_num++) {
 
@@ -1425,12 +1537,12 @@ class Parser {
                     let tok_val;
 
                     // If it's a non relative control flow instruction and it's not a function
-                    if (control_flow_instructions.slice(0, 4).includes(first_tok.getValue()) && !FUNCTIONS.includes(current_tok.getValue())) {
+                    if (this.inst_set.isNonrelativeControlFlowInstruction(first_tok.getValue()) && !FUNCTIONS.includes(current_tok.getValue())) {
                         tok_val = this.labels[current_tok.getValue()];      // Get k for label
                     }
 
                     // If it's a relative control flow instruction
-                    else if (control_flow_instructions.slice(4).includes(first_tok.getValue())) {
+                    else if (this.inst_set.isRelativeControlFlowInstruction(first_tok.getValue())) {
                         tok_val = this.labels[current_tok.getValue()] - 1 - line_num;
                     }
 
@@ -1502,13 +1614,14 @@ class Parser {
             const inst = line[0].getValue();            // instruction for that line
 
             // CHECK IT'S A REAL INSTRUCTION
-            if (INST_OPERANDS[inst] === undefined) {
+            
+            if (this.operands.isNotDefined(inst)) {
                 this.newError(`Illegal instruction \'${inst}\' on line ${line_in_file}.`);
             }
 
             // GET GIVEN AND EXPECTED ARGUMENTS
-            const expected_args = INST_OPERANDS[inst];  // the arguments we expect
-            const given_args = line.slice(1);           // the arguments we have
+            const expected_args = this.operands.getOperand(inst);   // the arguments we expect
+            const given_args = line.slice(1);                       // the arguments we have
 
             if (inst === 'LPM' && given_args.length === 0) {
                 // SET THE LINE TO AN INSTRUCTION
@@ -1517,7 +1630,7 @@ class Parser {
             }
 
             // CHECK IF IT'S GOT THE WRONG NUMBER OF ARGUMENTS
-            if ((expected_args === null && given_args.length > 0) || (expected_args !== null && (given_args.length !== expected_args.length))) {
+            if (this.operands.numArgs(inst) !== given_args.length) {
                 this.newError(`Wrong number of arguments given on line ${line_in_file} for the ${inst} instruction. Please refer to the instruction manual.`);
             }
 
@@ -1549,8 +1662,8 @@ class Parser {
         if ( this.defs[label] !== undefined ) {
             this.newError(`Previous definition of \'${label}\'. Illegal use of register \'${label}\' as label on line ${line_in_file}.`);
         }
-
-        if ( INST_LIST.includes(this.labels[label]) ) {
+        
+        if (this.inst_set.isInstruction(this.labels[label])) {
             this.newError(`Illegal re-use of instruction \'${label}\' as label on line ${line_in_file}.`);
         }
 
@@ -1567,8 +1680,8 @@ class Parser {
         if ( this.defs[label] !== undefined ) {
             this.newError(`Previous definition of \'${label}\'. Illegal use of register \'${label}\' as variable on line ${line_in_file}.`);
         }
-
-        if ( INST_LIST.includes(this.labels[label]) ) {
+        
+        if (this.inst_set.isInstruction(this.labels[label])) {
             this.newError(`Attempt to redefine keyword \'${label}\' on line ${line_in_file}.`);
         }
 
@@ -1584,7 +1697,8 @@ class Parser {
         // Allow redefinition of defs already in this.defs
 
         // Dont allow definitions that are already instructions
-        if ( INST_LIST.includes(this.labels[label]) ) {
+        
+        if (this.inst_set.isInstruction(this.labels[label])) {
             this.newError(`Illegal re-use of instruction \'${label}\' as definition on line ${line_in_file}.`);
         }
 
@@ -1608,63 +1722,6 @@ class Parser {
                 current_tok.setType('INT');
             }
         }
-    }
-
-    evaluateLineExpressions(line) {
-        let current_tok;
-        // Evaluate all expressions in the line
-        let expression = '';
-        let expression_start = null;
-        let evaluation, last_tok;
-        let i = 0;
-        while (i < line.length) {
-            current_tok = line[i];
-
-            // Add the the expression
-            if (MATH.includes(current_tok.getType())) {
-                if (expression.length === 0) {
-                    expression_start = i;
-                }
-
-                else if (last_tok.getType() === 'INT' && current_tok.getType() === 'INT' && current_tok.getValue() >= 0) {
-                    this.newError(`Cannot evaluate expression on line ${current_tok.getLine()} beginning at position ${line[expression_start].getStart()}`);
-                }
-
-                expression += current_tok.getValue();
-            }
-
-            // Evaluate then reset expression to empty
-            else if (expression.length > 0) {
-                evaluation = this.evaluateExpression(expression, current_tok.getLine(), line[expression_start].getStart());
-                const new_tok = new Token('INT', evaluation, line[expression_start].getLocation());                 // make new token
-                line.splice(expression_start, i - expression_start, new_tok);                                       // replace the expression with the token
-                expression = '';                                                                                    // reset the expression
-                i = expression_start;
-            }
-
-            last_tok = line[i];
-            i += 1;
-        }
-
-        if (expression.length == 0) return;
-        
-        // Evaluate final expression
-        evaluation = this.evaluateExpression(expression, current_tok.getLine(), line[expression_start].getStart());
-        const new_tok = new Token('INT', evaluation, line[expression_start].getLocation());     // make new token
-        line.splice(expression_start, line.length - expression_start, new_tok);                 // replace the expression with the token
-
-    }
-
-    evaluateExpression(expr, line_num, start_pos) {
-        let evaluation;
-        try {
-            evaluation = eval(expr);    // evaluate
-        } catch (error) {
-            this.newError(`${error.message} on line ${line_num} beginning at position ${start_pos}`);
-        }
-        if (evaluation === true) evaluation = 1;
-        evaluation = Math.floor(evaluation);
-        return evaluation;
     }
 
     getTokenLines() {
@@ -1714,6 +1771,8 @@ class Interpreter {
         this.pch = new Token('REG', 0); // PC hi8
         this.spl = new Token('REG', 0); // SP lo8
         this.sph = new Token('REG', 0); // SP hi8
+
+        this.operands = new Operands();
 
         this.step_count = 0;
         this.cycles = 0;
@@ -2881,7 +2940,7 @@ class Interpreter {
         // For getting the value of a register or integer
         const arg = line.getArgs()[arg_num];
         const inst = line.getInst().getValue();
-        const reqs = INST_OPERANDS[inst][arg_num].getTokenType();
+        const reqs = this.operands.getOperand(inst)[arg_num].getTokenType();
         if (reqs.includes('REG')) return this.getDMEM()[arg.getValue()].getValue();   
         if (arg.getType() === 'INT') return arg.getValue();
     }
@@ -2901,346 +2960,314 @@ class Interpreter {
 
 }
 
+class Operands {
+    constructor() {
+        const reg_0_31 = new Argument(['REG','INT'], 0, 31);
+        const reg_16_31 = new Argument(['REG','INT'], 16, 31);
+        const reg_word_low = new Argument(['REG','INT'], null, null, [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]);
+        const int_0_7 = new Argument('INT', 0, 7);
+        const int_0_31 = new Argument('INT', 0, 31);
+        const int_0_63 = new Argument('INT', 0, 63);
+        const int_0_255 = new Argument('INT', 0, 255);
+        const int_n64_63 = new Argument('INT', -64, 63);
+        const word_plus_q_0_63 = new Argument('WORDPLUSQ', 0, 63);
+        const word_wxyz = new Argument(['REG','INT'], null, null, [24, 26, 28, 30]);
+
+        // Allows ranges for each inst
+        this.inst_operands = {
+            'ADC': [reg_0_31, reg_0_31],
+            'ADD': [reg_0_31, reg_0_31],
+            'ADIW': [word_wxyz, int_0_63],
+            'AND': [reg_0_31, reg_0_31],
+            'ANDI': [reg_16_31, int_0_255],
+            'ASR': [reg_0_31],
+            'BCLR': [int_0_7],
+            'BLD': [reg_0_31, int_0_7],
+            'BRBC': [int_0_7, int_n64_63],
+            'BRBS': [int_0_7, int_n64_63],
+            'BRCC': [int_n64_63],
+            'BRCS': [int_n64_63],
+            'BREQ': [int_n64_63],
+            'BRGE': [int_n64_63],
+            'BRHC': [int_n64_63],
+            'BRHS': [int_n64_63],
+            'BRID': [int_n64_63],
+            'BRIE': [int_n64_63],
+            'BRLO': [int_n64_63],
+            'BRLT': [int_n64_63],
+            'BRMI': [int_n64_63],
+            'BRNE': [int_n64_63],
+            'BRPL': [int_n64_63],
+            'BRSH': [int_n64_63],
+            'BRTC': [int_n64_63],
+            'BRTS': [int_n64_63],
+            'BRVC': [int_n64_63],
+            'BRVS': [int_n64_63],
+            'BSET': [int_0_7],
+            'BST': [reg_0_31, int_0_7],
+            'CALL': [new Argument(['INT', 'REF'], 0, 4194303, FUNCTIONS)],
+            'CBI': [int_0_31, int_0_7],
+            'CBR': [reg_16_31, int_0_255],
+            'CLC': null,
+            'CLH': null,
+            'CLI': null,
+            'CLN': null,
+            'CLR': [reg_0_31],
+            'CLS': null,
+            'CLT': null,
+            'CLV': null,
+            'CLZ': null,
+            'COM': [reg_0_31],
+            'CP': [reg_0_31, reg_0_31],
+            'CPC': [reg_0_31, reg_0_31],
+            'CPI': [reg_16_31, int_0_255],
+            'CPSE': [reg_0_31, reg_0_31],
+            'DEC': [reg_0_31],
+            'EOR': [reg_0_31, reg_0_31],
+            'FMUL': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
+            'FMULS': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
+            'FMULSU': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
+            'ICALL': null,
+            'IJMP': null,
+            'IN': [reg_0_31, int_0_63],
+            'INC': [reg_0_31],
+            'JMP': [new Argument('INT', 0, 4194303)],
+            'LD': [reg_0_31, new Argument(['WORD', 'MINUSWORD', 'WORDPLUS'])],
+            'LDD': [reg_0_31, word_plus_q_0_63],
+            'LDI': [reg_16_31, int_0_255],
+            'LDS': [reg_0_31, new Argument('INT', 256, 65535)],
+            'LPM': [reg_0_31, new Argument(['WORD', 'WORDPLUS'])],
+            'LSL': [reg_0_31],
+            'LSR': [reg_0_31],
+            'MOV': [reg_0_31, reg_0_31],
+            'MOVW': [reg_word_low, reg_word_low],
+            'MUL': [reg_0_31, reg_0_31],
+            'MULS': [reg_16_31, reg_16_31],
+            'MULSU': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
+            'NEG': [reg_0_31],
+            'NOP': null,
+            'OR': [reg_0_31, reg_0_31],
+            'ORI': [reg_16_31, int_0_255],
+            'OUT': [int_0_63, reg_0_31],
+            'POP': [reg_0_31],
+            'PUSH': [reg_0_31],
+            'RCALL': [new Argument('INT', -2048, 2047)],
+            'RET': null,
+            'RJMP': [new Argument('INT', -2048, 2047)],
+            'ROL': [reg_0_31],
+            'ROR': [reg_0_31],
+            'SBC': [reg_0_31, reg_0_31],
+            'SBCI': [reg_16_31, int_0_255],
+            'SBI': [int_0_31, int_0_7],
+            'SBIW': [word_wxyz, int_0_63],
+            'SBR': [reg_16_31, int_0_255],
+            'SBRC': [reg_0_31, int_0_7],
+            'SBRS': [reg_0_31, int_0_7],
+            'SEC': null,
+            'SEH': null,
+            'SEI': null,
+            'SEN': null,
+            'SER': [reg_0_31],
+            'SES': null,
+            'SET': null,
+            'SEV': null,
+            'SEZ': null,
+            'ST': [new Argument(['WORD', 'MINUSWORD', 'WORDPLUS']), reg_0_31],
+            'STD': [word_plus_q_0_63, reg_0_31],
+            'STS': [new Argument('INT', 256, 65535), reg_0_31],
+            'SUB': [reg_0_31, reg_0_31],
+            'SUBI': [reg_16_31, int_0_255],
+            'SWAP': [reg_0_31],
+            'TST': [reg_0_31],
+            'XCH': [new Argument('WORD', null, null, null, 'Z'), reg_0_31]
+        };
+    }
+
+    isNotDefined(op) {
+        return (this.inst_operands[op] === undefined);
+    }
+
+    getOperand(op) {
+        return this.inst_operands[op];
+    }
+
+    getInstructionArg(op, arg_num) {
+        return this.inst_operands[op][arg_num];
+    }
+
+    numArgs(op) {
+        return this.inst_operands[op] === null ? 0 : this.inst_operands[op].length;
+    }
+}
+
+class MathTokens {
+    constructor() {
+        this.types = [
+            'INT',
+            'PLUS',
+            'MINUS',
+            'TIMES',
+            'DIV',
+            'BITAND',
+            'BITOR',
+            'BITXOR',
+            'BITNOT',
+            'LSHIFT',
+            'RSHIFT',
+            'LT',
+            'GT',
+            'DEQ',
+            'LEQ',
+            'GEQ',
+            'NEQ',
+            'LOGAND',
+            'LOGOR',
+            'LOGNOT',
+            'LPAR',
+            'RPAR'
+        ];
+    }
+
+    isValidType(tok_type) {
+        return this.types.includes(tok_type);
+    }
+
+    isValidSymbol(tok_type) {
+        return this.types.slice(1).includes(tok_type);
+    }
+}
+
+class InstructionSet {
+    constructor() {
+        this.inst_set = [
+            'ADC',
+            'ADD',
+            'ADIW',
+            'AND',
+            'ANDI',
+            'ASR',
+            'BCLR',
+            'BLD',
+            'BRBC',
+            'BRBS',
+            'BRCC',
+            'BRCS',
+            'BREQ',
+            'BRGE',
+            'BRHC',
+            'BRHS',
+            'BRID',
+            'BRIE',
+            'BRLO',
+            'BRLT',
+            'BRMI',
+            'BRNE',
+            'BRPL',
+            'BRSH',
+            'BRTC',
+            'BRTS',
+            'BRVC',
+            'BRVS',
+            'BSET',
+            'BST',
+            'CALL',
+            'CBI',
+            'CBR',
+            'CLC',
+            'CLH',
+            'CLI',
+            'CLN',
+            'CLR',
+            'CLS',
+            'CLT',
+            'CLV',
+            'CLZ',
+            'COM',
+            'CP',
+            'CPC',
+            'CPI',
+            'CPSE',
+            'DEC',
+            'EOR',
+            'FMUL',
+            'FMULS',
+            'FMULSU',
+            'ICALL',
+            'IJMP',
+            'IN',
+            'INC',
+            'JMP',
+            'LD',
+            'LDD',
+            'LDI',
+            'LDS',
+            'LPM',
+            'LSL',
+            'LSR',
+            'MOV',
+            'MOVW',
+            'MUL',
+            'MULS',
+            'MULSU',
+            'NEG',
+            'NOP',
+            'OR',
+            'ORI',
+            'OUT',
+            'POP',
+            'PUSH',
+            'RCALL',
+            'RET',
+            'RJMP',
+            'ROL',
+            'ROR',
+            'SBC',
+            'SBCI',
+            'SBI',
+            'SBIW',
+            'SBR',
+            'SBRC',
+            'SBRS',
+            'SEC',
+            'SEH',
+            'SEI',
+            'SEN',
+            'SER',
+            'SES',
+            'SET',
+            'SEV',
+            'SEZ',
+            'ST',
+            'STD',
+            'STS',
+            'SUB',
+            'SUBI',
+            'SWAP',
+            'TST',
+            'XCH'
+        ];
+    }
+
+    isInstruction(inst) {
+        return this.inst_set.includes(inst);
+    }
+
+    usesTwosComp(inst) {
+        return ['RJMP', 'RCALL'].concat(this.inst_set.slice(8, 28)).includes(inst);
+    }
+
+    isRelativeControlFlowInstruction(inst) {
+        return this.usesTwosComp(inst);
+    }
+
+    isNonrelativeControlFlowInstruction(inst) {
+        return ['CALL', 'JMP', 'IJMP', 'ICALL'].includes(inst);
+    }
+}
+
 FUNCTIONS = [
     'printf'
 ];
-
-INST_LIST = [
-    'ADC',
-    'ADD',
-    'ADIW',
-    'AND',
-    'ANDI',
-    'ASR',
-    'BCLR',
-    'BLD',
-    'BRBC',
-    'BRBS',
-    'BRCC',
-    'BRCS',
-    'BREQ',
-    'BRGE',
-    'BRHC',
-    'BRHS',
-    'BRID',
-    'BRIE',
-    'BRLO',
-    'BRLT',
-    'BRMI',
-    'BRNE',
-    'BRPL',
-    'BRSH',
-    'BRTC',
-    'BRTS',
-    'BRVC',
-    'BRVS',
-    'BSET',
-    'BST',
-    'CALL',
-    'CBI',
-    'CBR',
-    'CLC',
-    'CLH',
-    'CLI',
-    'CLN',
-    'CLR',
-    'CLS',
-    'CLT',
-    'CLV',
-    'CLZ',
-    'COM',
-    'CP',
-    'CPC',
-    'CPI',
-    'CPSE',
-    'DEC',
-    'EOR',
-    'FMUL',
-    'FMULS',
-    'FMULSU',
-    'ICALL',
-    'IJMP',
-    'IN',
-    'INC',
-    'JMP',
-    'LD',
-    'LDD',
-    'LDI',
-    'LDS',
-    'LPM',
-    'LSL',
-    'LSR',
-    'MOV',
-    'MOVW',
-    'MUL',
-    'MULS',
-    'MULSU',
-    'NEG',
-    'NOP',
-    'OR',
-    'ORI',
-    'OUT',
-    'POP',
-    'PUSH',
-    'RCALL',
-    'RET',
-    'RJMP',
-    'ROL',
-    'ROR',
-    'SBC',
-    'SBCI',
-    'SBI',
-    'SBIW',
-    'SBR',
-    'SBRC',
-    'SBRS',
-    'SEC',
-    'SEH',
-    'SEI',
-    'SEN',
-    'SER',
-    'SES',
-    'SET',
-    'SEV',
-    'SEZ',
-    'ST',
-    'STD',
-    'STS',
-    'SUB',
-    'SUBI',
-    'SWAP',
-    'TST',
-    'XCH'
-];
-
-const reg_0_31 = new Argument(['REG','INT'], 0, 31);
-const reg_16_31 = new Argument(['REG','INT'], 16, 31);
-const reg_word_low = new Argument(['REG','INT'], null, null, [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]);
-const int_0_7 = new Argument('INT', 0, 7);
-const int_0_31 = new Argument('INT', 0, 31);
-const int_0_63 = new Argument('INT', 0, 63);
-const int_0_255 = new Argument('INT', 0, 255);
-const int_n64_63 = new Argument('INT', -64, 63);
-const word_plus_q_0_63 = new Argument('WORDPLUSQ', 0, 63);
-const word_wxyz = new Argument(['REG','INT'], null, null, [24, 26, 28, 30]);
-
-// Allows ranges for each inst
-INST_OPERANDS = {
-    'ADC': [reg_0_31, reg_0_31],
-    'ADD': [reg_0_31, reg_0_31],
-    'ADIW': [word_wxyz, int_0_63],
-    'AND': [reg_0_31, reg_0_31],
-    'ANDI': [reg_16_31, int_0_255],
-    'ASR': [reg_0_31],
-    'BCLR': [int_0_7],
-    'BLD': [reg_0_31, int_0_7],
-    'BRBC': [int_0_7, int_n64_63],
-    'BRBS': [int_0_7, int_n64_63],
-    'BRCC': [int_n64_63],
-    'BRCS': [int_n64_63],
-    'BREQ': [int_n64_63],
-    'BRGE': [int_n64_63],
-    'BRHC': [int_n64_63],
-    'BRHS': [int_n64_63],
-    'BRID': [int_n64_63],
-    'BRIE': [int_n64_63],
-    'BRLO': [int_n64_63],
-    'BRLT': [int_n64_63],
-    'BRMI': [int_n64_63],
-    'BRNE': [int_n64_63],
-    'BRPL': [int_n64_63],
-    'BRSH': [int_n64_63],
-    'BRTC': [int_n64_63],
-    'BRTS': [int_n64_63],
-    'BRVC': [int_n64_63],
-    'BRVS': [int_n64_63],
-    'BSET': [int_0_7],
-    'BST': [reg_0_31, int_0_7],
-    'CALL': [new Argument(['INT', 'REF'], 0, 4194303, FUNCTIONS)],
-    'CBI': [int_0_31, int_0_7],
-    'CBR': [reg_16_31, int_0_255],
-    'CLC': null,
-    'CLH': null,
-    'CLI': null,
-    'CLN': null,
-    'CLR': [reg_0_31],
-    'CLS': null,
-    'CLT': null,
-    'CLV': null,
-    'CLZ': null,
-    'COM': [reg_0_31],
-    'CP': [reg_0_31, reg_0_31],
-    'CPC': [reg_0_31, reg_0_31],
-    'CPI': [reg_16_31, int_0_255],
-    'CPSE': [reg_0_31, reg_0_31],
-    'DEC': [reg_0_31],
-    'EOR': [reg_0_31, reg_0_31],
-    'FMUL': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
-    'FMULS': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
-    'FMULSU': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
-    'ICALL': null,
-    'IJMP': null,
-    'IN': [reg_0_31, int_0_63],
-    'INC': [reg_0_31],
-    'JMP': [new Argument('INT', 0, 4194303)],
-    'LD': [reg_0_31, new Argument(['WORD', 'MINUSWORD', 'WORDPLUS'])],
-    'LDD': [reg_0_31, word_plus_q_0_63],
-    'LDI': [reg_16_31, int_0_255],
-    'LDS': [reg_0_31, new Argument('INT', 256, 65535)],
-    'LPM': [reg_0_31, new Argument(['WORD', 'WORDPLUS'])],
-    'LSL': [reg_0_31],
-    'LSR': [reg_0_31],
-    'MOV': [reg_0_31, reg_0_31],
-    'MOVW': [reg_word_low, reg_word_low],
-    'MUL': [reg_0_31, reg_0_31],
-    'MULS': [reg_16_31, reg_16_31],
-    'MULSU': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
-    'NEG': [reg_0_31],
-    'NOP': null,
-    'OR': [reg_0_31, reg_0_31],
-    'ORI': [reg_16_31, int_0_255],
-    'OUT': [int_0_63, reg_0_31],
-    'POP': [reg_0_31],
-    'PUSH': [reg_0_31],
-    'RCALL': [new Argument('INT', -2048, 2047)],
-    'RET': null,
-    'RJMP': [new Argument('INT', -2048, 2047)],
-    'ROL': [reg_0_31],
-    'ROR': [reg_0_31],
-    'SBC': [reg_0_31, reg_0_31],
-    'SBCI': [reg_16_31, int_0_255],
-    'SBI': [int_0_31, int_0_7],
-    'SBIW': [word_wxyz, int_0_63],
-    'SBR': [reg_16_31, int_0_255],
-    'SBRC': [reg_0_31, int_0_7],
-    'SBRS': [reg_0_31, int_0_7],
-    'SEC': null,
-    'SEH': null,
-    'SEI': null,
-    'SEN': null,
-    'SER': [reg_0_31],
-    'SES': null,
-    'SET': null,
-    'SEV': null,
-    'SEZ': null,
-    'ST': [new Argument(['WORD', 'MINUSWORD', 'WORDPLUS']), reg_0_31],
-    'STD': [word_plus_q_0_63, reg_0_31],
-    'STS': [new Argument('INT', 256, 65535), reg_0_31],
-    'SUB': [reg_0_31, reg_0_31],
-    'SUBI': [reg_16_31, int_0_255],
-    'SWAP': [reg_0_31],
-    'TST': [reg_0_31],
-    'XCH': [new Argument('WORD', null, null, null, 'Z'), reg_0_31]
-}
-
-// Most op codes can be easily obtained from this
-INST_OPCODES = {
-    'ADC': ['d', 'r', '000111rdddddrrrr'],
-    'ADD': ['d', 'r', '000011rdddddrrrr'],
-    'ADIW': null,
-    'AND': ['d', 'r', '001000rdddddrrrr'],
-    'ANDI': ['d', 'K', '0111KKKKddddKKKK'],
-    'ASR': ['d', '1001010ddddd0101'],
-    'BCLR': ['s', '100101001sss1000'],
-    'BLD': ['d', 'b', '1111100ddddd0bbb'],
-    'BRBC': ['s', 'k', '111101kkkkkkksss'],
-    'BRBS': ['s', 'k', '111100kkkkkkksss'],
-    'BRCC': ['k', '111101kkkkkkk000'],
-    'BRCS': ['k', '111100kkkkkkk000'],
-    'BREQ': ['k', '111100kkkkkkk001'],
-    'BRGE': ['k', '111101kkkkkkk100'],
-    'BRHC': ['k', '111101kkkkkkk101'],
-    'BRHS': ['k', '111100kkkkkkk101'],
-    'BRID': ['k', '111101kkkkkkk111'],
-    'BRIE': ['k', '111100kkkkkkk111'],
-    'BRLO': ['k', '111100kkkkkkk000'],
-    'BRLT': ['k', '111100kkkkkkk100'],
-    'BRMI': ['k', '111100kkkkkkk010'],
-    'BRNE': ['k', '111101kkkkkkk001'],
-    'BRPL': ['k', '111101kkkkkkk010'],
-    'BRSH': ['k', '111101kkkkkkk000'],
-    'BRTC': ['k', '111101kkkkkkk110'],
-    'BRTS': ['k', '111100kkkkkkk110'],
-    'BRVC': ['k', '111101kkkkkkk011'],
-    'BRVS': ['k', '111100kkkkkkk011'],
-    'BSET': ['s', '100101000sss1000'],
-    'BST': ['d', 'b', '1111101ddddd0bbb'],
-    'CALL': ['k', '1001010kkkkk111kkkkkkkkkkkkkkkkk'],
-    'CBI': ['A', 'b', '10011000AAAAAbbb'],
-    'CBR': null,
-    'CLC': ['1001010010001000'],
-    'CLH': ['1001010011011000'],
-    'CLI': ['1001010011111000'],
-    'CLN': ['1001010010101000'],
-    'CLR': null,
-    'CLS': ['1001010011001000'],
-    'CLT': ['1001010011101000'],
-    'CLV': ['1001010010111000'],
-    'CLZ': ['1001010010011000'],
-    'COM': ['d', '1001010ddddd0000'],
-    'CP': ['d', 'r', '000101rdddddrrrr'],
-    'CPC': ['d', 'r', '000001rdddddrrrr'],
-    'CPI': ['d', 'K', '0011KKKKddddKKKK'],
-    'CPSE': ['d', 'r', '000100rdddddrrrr'],
-    'DEC': ['d', '1001010ddddd1010'],
-    'EOR': ['d', 'r', '001001rdddddrrrr'],
-    'FMUL': ['d', 'r', '000000110ddd1rrr'],
-    'FMULS': ['d', 'r', '000000111ddd0rrr'],
-    'FMULSU': ['d', 'r', '000000111ddd1rrr'],
-    'ICALL': ['1001010100001001'],
-    'IJMP': ['1001010000001001'],
-    'IN': ['d', 'A', '10110AAdddddAAAA'],
-    'INC': ['d', '1001010ddddd0011'],
-    'JMP': ['k', '1001010kkkkk110kkkkkkkkkkkkkkkkk'],
-    'LD': null,
-    'LDD': null,
-    'LDI': ['d', 'K', '1110KKKKddddKKKK'],
-    'LDS': ['d', 'k', '1001000ddddd0000kkkkkkkkkkkkkkkk'],
-    'LPM': null,
-    'LSL': null,
-    'LSR': ['d', '1001010ddddd0110'],
-    'MOV': ['d', 'r', '001011rdddddrrrr'],
-    'MOVW': null,
-    'MUL': ['d', 'r', '100111rdddddrrrr'],
-    'MULS': ['d', 'r', '00000010ddddrrrr'],
-    'MULSU': ['d', 'r', '000000110ddd0rrr'],
-    'NEG': ['d', '1001010ddddd0001'],
-    'NOP': ['0000000000000000'],
-    'OR': ['d', 'r', '001010rdddddrrrr'],
-    'ORI': ['d', 'K', '0110KKKKddddKKKK'],
-    'OUT': ['A', 'r', '10111AArrrrrAAAA'],
-    'POP': ['d', '1001000ddddd1111'],
-    'PUSH': ['r', '1001001rrrrr1111'],
-    'RCALL': ['k', '1101kkkkkkkkkkkk'], // this one needs 2's comp too
-    'RET': ['1001010100001000'],
-    'RJMP': ['k', '1100kkkkkkkkkkkk'], // this one needs 2's comp too
-    'ROL': null,
-    'ROR': ['d', '1001010ddddd0111'],
-    'SBC': ['d', 'r', '000010rdddddrrrr'],
-    'SBCI': ['d', 'K', '0100KKKKddddKKKK'],
-    'SBI': ['A', 'b', '10011010AAAAAbbb'],
-    'SBIW': null,
-    'SBR': ['d', 'K', '0110KKKKddddKKKK'],
-    'SBRC': ['r', 'b', '1111110rrrrr0bbb'],
-    'SBRS': ['r', 'b', '1111111rrrrr0bbb'],
-    'SEC': ['1001010000001000'],
-    'SEH': ['1001010001011000'],
-    'SEI': ['1001010001111000'],
-    'SEN': ['1001010000101000'],
-    'SER': ['d', '11101111dddd1111'],
-    'SES': ['1001010001001000'],
-    'SET': ['1001010001101000'],
-    'SEV': ['1001010000111000'],
-    'SEZ': ['1001010000011000'],
-    'ST': null,
-    'STD': null,
-    'STS': ['k', 'r', '1001001rrrrr0000kkkkkkkkkkkkkkkk'],
-    'SUB': ['d', 'r', '000110rdddddrrrr'],
-    'SUBI': ['d', 'K', '0101KKKKddddKKKK'],
-    'SWAP': ['d', '1001010ddddd0010'],
-    'TST': null,
-    'XCH': ['Z', 'd', '1001001ddddd0100']
-}
 
 DIRECTIVES = [
     '.SECTION',
@@ -3256,31 +3283,6 @@ DIRECTIVES = [
     '.SPACE',
     '.EQU',
     '.SET'
-];
-
-MATH = [
-    'INT',
-    'PLUS',
-    'MINUS',
-    'TIMES',
-    'DIV',
-    'BITAND',
-    'BITOR',
-    'BITXOR',
-    'BITNOT',
-    'LSHIFT',
-    'RSHIFT',
-    'LT',
-    'GT',
-    'DEQ',
-    'LEQ',
-    'GEQ',
-    'NEQ',
-    'LOGAND',
-    'LOGOR',
-    'LOGNOT',
-    'LPAR',
-    'RPAR'
 ];
 
 
@@ -3320,6 +3322,7 @@ class App {
         this.lexer = new Lexer();
         this.parser = new Parser();
         this.interpreter = new Interpreter();
+        this.inst_set = new InstructionSet();
 
         // Displays
         this.base = 16; // value base for display
@@ -3967,7 +3970,8 @@ class App {
             else popup_options = this.getPopups()['ST_Z'].split('\n');
             
         } else {
-            if ( INST_LIST.includes(inst_mnemonic) ||  ['PC', 'SP', 'X', 'Y', 'Z'].includes(inst_mnemonic)) popup_options = this.getPopups()[inst_mnemonic].split('\n'); // get the text for that instruction
+            
+            if ( this.inst_set.isInstruction(inst_mnemonic) ||  ['PC', 'SP', 'X', 'Y', 'Z'].includes(inst_mnemonic)) popup_options = this.getPopups()[inst_mnemonic].split('\n'); // get the text for that instruction
             else popup_options = '';
             
         }
