@@ -834,9 +834,7 @@ class ExpressionEvaluator {
     }
 
     addTokenToExpression() {
-        if (this.expression.length === 0) {
-            this.expression_start = this.index;
-        }
+        if (this.expression.length === 0) this.expression_start = this.index;
 
         else if (this.last_tok.getType() === 'INT' && this.tok_type === 'INT' && this.tok_value >= 0) {
             this.newError(`Cannot evaluate expression on line ${current_tok.getLine()} beginning at position ${this.line[this.expression_start].getStart()}`);
@@ -993,8 +991,6 @@ class Parser {
         //////////////// TEXT SECTION ////////////////
         //////////////////////////////////////////////
 
-        this.evaluateallLines(); // Evaluate all refs, hi8()/lo8(), and expressions
-
         this.checkInstructionSyntax();
     }
 
@@ -1053,31 +1049,34 @@ class Parser {
         this.defs[label] = value;
     }
 
-    replaceRefs(line, line_in_file) {
+    replaceRefs(line) {
         let current_tok;
         // Go through the tokens once first and replace refs with ints
         for (let i = 0; i < line.length; i++) {
             current_tok = line[i];
-            if (current_tok.getType() === 'REF') this.setRefToInt(current_tok, line_in_file);
+            if (current_tok.getType() === 'REF') this.setRefToInt(current_tok);
         }
     }
 
     replaceDirectiveRefs() {
-        if (['.BYTE','.WORD', '.SPACE'].includes(this.line_directive)) this.replaceRefs(this.line, this.line_in_file);
-        else if (['.SET','.EQU'].includes(this.line_directive)) this.replaceRefs(this.line.slice(2), this.line_in_file);        
+        if (['.BYTE','.WORD', '.SPACE'].includes(this.line_directive)) this.replaceRefs(this.line);
+        else if (['.SET','.EQU'].includes(this.line_directive)) this.replaceRefs(this.line.slice(2));        
         else return;
 
-        this.line = this.evaluator.evaluateNewLine(this.line);
-
+        this.evaluateCurrentLine(); 
     }
 
-    setRefToInt(current_tok, line_in_file) {
+    setRefToInt(current_tok) {
         // Replace it in the line
         if (this.labels[current_tok.getValue()] !== undefined) current_tok.setValue(this.labels[current_tok.getValue()]);
         else if (this.equs[current_tok.getValue()] !== undefined) current_tok.setValue(this.equs[current_tok.getValue()]);
-        else this.newError(`Invalid reference \'${current_tok.getValue()}\' on line ${line_in_file}.`);
+        else this.newError(`Invalid reference \'${current_tok.getValue()}\' on line ${this.line_in_file}.`);
 
         current_tok.setType('INT');
+    }
+
+    evaluateCurrentLine() {
+        this.line = this.evaluator.evaluateNewLine(this.line);
     }
 
     getTokenLines() {
@@ -1194,7 +1193,7 @@ class Parser {
 
     defineEqus() {
         // Create pre-existing equs
-        /*const existing_equs = {
+        const existing_equs = {
             'SREG': 0x3f,
             'SPL': 0x3d,
             'SPH': 0x3e,
@@ -1234,9 +1233,9 @@ class Parser {
             'PORTB': 0x05,
             'DDRB': 0x04,
             'PINB': 0x03,
-        }; */
+        };
 
-        const existing_equs = {};
+        //const existing_equs = {};
 
         for (let [key, value] of Object.entries(existing_equs)) {
             this.newEqu(key, value, 0);
@@ -1376,10 +1375,12 @@ class Parser {
             this.line_length = this.line.length;                                          // calculate number of tokens in the line
             this.line_in_file = this.line[0].getLine();    // the current line if there's an error
 
+            this.evaluateLineExpressions(); // Evaluate all refs, hi8()/lo8(), and expressions
+
             // CHECK FOR COMMA AND REMOVE THEM IF THEYRE CORRECTLY PLACED
             if (this.line_length > 2) {
 
-                // If the 2rd token is not a comma then its bad syntax
+                // If the 3rd token is not a comma then its bad syntax
                 if (this.line[2].getType() !== 'COMMA') {
                     this.newError(`Illegal token ${this.line[2].getValue()} on line ${this.line_in_file}: expecting comma.`);
                 }
@@ -1485,12 +1486,12 @@ class Parser {
             // Byte directive
             if (parity_of_current_tok === 1 && ['.BYTE','.WORD'].includes(this.line_directive)) {
 
-                if (this.current_tok.getType() === 'INT') {
-                    this.dmem.push(this.lo8(this.current_tok.getValue()));
-                    if (this.line_directive === '.WORD') this.dmem.push(this.hi8(this.current_tok.getValue()));
-                } else {
+                if (this.current_tok.getType() !== 'INT') {
                     this.newError(`Bad token \'${this.current_tok.getValue()}\' on line ${this.line_in_file} at position ${this.current_tok.getStart()}.`);
                 }
+                this.dmem.push(this.lo8(this.current_tok.getValue()));
+                if (this.line_directive === '.WORD') this.dmem.push(this.hi8(this.current_tok.getValue()));
+            
             }
 
             // String, Ascii, Asciz directives
@@ -1531,7 +1532,7 @@ class Parser {
                         if (char === '\\') {
                             escape = true;
                             if (i + 1 === string_text.length) {
-                                this.newError(`Bad escape character \'${char}\' on line ${this.line_in_file}.`);
+                                this.newError(`Invalid escape character \'${char}\' on line ${this.line_in_file}.`);
                             }
                             continue;
                         }
@@ -1541,25 +1542,17 @@ class Parser {
                     else {
                         // Check if it's a valid escape character
                         if (!Object.keys(escape_chars).includes(char)) {
-                            this.newError(`Bad escape character \'\\${char}\' on line ${this.line_in_file}.`);
+                            this.newError(`Invalid escape character \'\\${char}\' on line ${this.line_in_file}.`);
                         }
 
                         char_ascii_value = escape_chars[char]; // get ascii code
-
                         escape = false;
                     }
-
-                    //if (char_ascii_value > 127) { // check it's a valid character
-                    //    this.newError(`Bad character \'${char}\' on line ${this.line_in_file}.`);
-                    //}
                     
                     this.dmem.push(this.lo8(char_ascii_value));           // add to data
                 }
 
-                if (['.STRING', '.ASCIZ'].includes(this.line_directive)) {   // add NULL if directive requires it
-                    this.dmem.push(0);                                  // add NULL to data
-                }
-
+                if (['.STRING', '.ASCIZ'].includes(this.line_directive)) this.dmem.push(0);                                  // add NULL to data
             }
 
             // Space directive
@@ -1676,7 +1669,7 @@ class Parser {
             else if (isRef) this.evaluateRef();
         }
 
-        this.line = this.evaluator.evaluateNewLine(this.line);
+        this.evaluateCurrentLine();
     }
 
     evaluateHiLo() {
@@ -1697,24 +1690,22 @@ class Parser {
         this.tok_num += 1;
 
         const expr_start = this.tok_num;
-        
+
         this.checkBracketsClose();
 
-        this.replaceRefs(this.line.slice(expr_start, this.tok_num - 1), this.line_in_file);
-        let eval_section = this.line.slice(expr_start, this.tok_num - 1);
-        this.line = this.evaluator.evaluateNewLine(this.line);
-        this.line.splice(expr_start, this.tok_num - expr_start - 1, eval_section[0]);
+        this.replaceRefs(this.line.slice(expr_start, this.tok_num - 1));
+        
+        this.evaluateCurrentLine();
 
-        // Should now be up to whatever is after the RPAR.
+        this.tok_num = expr_start - 1;
+        const val = this.line[this.tok_num].getValue();
 
-        const val = eval_section[0].getValue();
-
-        if (val > 0xffffffff) this.newError(`Error: bignum invalid on line ${this.line_in_file}. Cannot have a number >= 2^32.`);
+        if (val > 0x7fffffff || val < -0x80000000) this.newError(`Error: bignum invalid on line ${this.line_in_file}. Cannot have a number outside of [-2^31, 2^31 - 1].`);
 
         // Convert the value to the hi8/lo8 value
         let int_value = (fnct === 'HI8') ? this.hi8(val) : this.lo8(val);
 
-        this.line.splice(expr_start - 2, 4, new Token('INT', int_value, this.current_tok.getLocation()));
+        this.line.splice(expr_start - 2, 2, new Token('INT', int_value, this.current_tok.getLocation()));
         this.tok_num = expr_start - 2;
         this.line_length = this.line.length;
     }
@@ -1868,41 +1859,26 @@ class Interpreter {
     }
 
     step() {
-        // Do nothing if it's finished running
-        if (this.finished | this.error) return;
-        
-        // If breakpoint is reached
-        if (this.getPC() === this.break_point) {
-            this.finished = true;
-            return;
-        }
+        if (this.checkFinished()) return;
 
-        // If it should be finished, set it to finished then return
-        if (this.getPC() >= this.flashend) {
-            this.finished = true;
-            console.log(this.step_count);
-            this.setPC(this.flashend);
-            return;
-        }
+        this.line = this.pmem[this.getPC()];
+        this.line_in_file = this.line.getInst().getLine();
+        this.branch_taken = false;
 
-        const line = this.pmem[this.getPC()];
-        const inst = line.getInst().getValue();
-        const line_in_file = line.getInst().getLine();
+        const inst = this.line.getInst().getValue();
 
-        let skip_inc = false;
-        let branch_taken = false;
-
-        let Rd, Rr, Result, K_val, k, b, s, A_val, q, w, T_bit, H_bit, V_bit, N_bit, Z_bit, C_bit, low_byte, plusminus;    // declaring all the variable names
+        let Rd, Rr, Result, K_val, k, b, s, A_val, q, w, low_byte, plusminus;    // declaring all the variable names
+        let [T_bit, H_bit, V_bit, N_bit, Z_bit, C_bit] = [null, null, null, null, null, null];
 
         // Big switch statement
         switch (inst) {
             case 'ADC':
-                Rd = this.getArgumentValue(line, 0);
-                Rr = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                Rr = this.getArgumentValue(1);
                 C_bit = this.getSREG() & 1;
                 Result = this.mod256(Rd + Rr + C_bit);
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd + Rr + C
+                this.writeResultRd(Result);   // Rd <-- Rd + Rr + C
 
                 H_bit = (this.getBit(Rd, 3) & this.getBit(Rr, 3)) | (this.getBit(Rr, 3) & (1 - this.getBit(Result, 3))) | (this.getBit(Rd, 3) & (1 - this.getBit(Result, 3)));
                 V_bit = ((Rd >= 128) & (Rr >= 128) & (Result < 128)) | ((Rd < 128) & (Rr < 128) & (Result >= 128));
@@ -1910,11 +1886,11 @@ class Interpreter {
                 this.updateSREG(null, null, H_bit, N_bit ^ V_bit, V_bit, N_bit, Result === 0, (Rd + Rr + C_bit) > 255);
                 break;
             case 'ADD':
-                Rd = this.getArgumentValue(line, 0);
-                Rr = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                Rr = this.getArgumentValue(1);
                 Result = this.mod256(Rd + Rr);
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd + Rr
+                this.writeResultRd(Result);   // Rd <-- Rd + Rr
 
                 H_bit = (this.getBit(Rd, 3) & this.getBit(Rr, 3)) | (this.getBit(Rr, 3) & (1 - this.getBit(Result, 3))) | (this.getBit(Rd, 3) & (1 - this.getBit(Result, 3)));
                 V_bit = ((Rd >= 128) & (Rr >= 128) & (Result < 128)) | ((Rd < 128) & (Rr < 128) & (Result >= 128));
@@ -1922,11 +1898,11 @@ class Interpreter {
                 this.updateSREG(null, null, H_bit, N_bit ^ V_bit, V_bit, N_bit, Result === 0, (Rd + Rr) > 255);
                 break;
             case 'ADIW':
-                Rd = this.getDMEM()[line.getArgs()[0].getValue()].getValue() + (this.getDMEM()[line.getArgs()[0].getValue() + 1].getValue() << 8);
-                K_val = this.getArgumentValue(line, 1);
+                Rd = this.getDMEM()[this.line.getArgs()[0].getValue()].getValue() + (this.getDMEM()[this.line.getArgs()[0].getValue() + 1].getValue() << 8);
+                K_val = this.getArgumentValue(1);
                 Result = (Rd + K_val) & 0xffff;
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result & 0xff);
-                this.getDMEM()[line.getArgs()[0].getValue() + 1].setValue((Result >> 8) & 0xff);
+                this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(Result & 0xff);
+                this.getDMEM()[this.line.getArgs()[0].getValue() + 1].setValue((Result >> 8) & 0xff);
                 
                 V_bit = ((Result - K_val) < 0x8000) && (Result >= 0x8000);
                 N_bit = (Result >= 0x8000);
@@ -1934,31 +1910,31 @@ class Interpreter {
                 this.updateSREG(null, null, null, N_bit ^ V_bit, V_bit, N_bit, Result === 0, C_bit);
                 break;
             case 'AND':
-                Rd = this.getArgumentValue(line, 0);
-                Rr = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                Rr = this.getArgumentValue(1);
                 Result = Rd & Rr;
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd & Rr
+                this.writeResultRd(Result);   // Rd <-- Rd & Rr
 
                 N_bit = (Result >= 128);
                 this.updateSREG(null, null, null, N_bit, 0, N_bit, Result === 0, null);
                 break;
             case 'ANDI':
-                Rd = this.getArgumentValue(line, 0);
-                K_val = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                K_val = this.getArgumentValue(1);
                 Result = Rd & K_val;
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd & K
+                this.writeResultRd(Result);   // Rd <-- Rd & K
 
                 N_bit = (Result >= 128);
                 this.updateSREG(null, null, null, N_bit, 0, N_bit, Result === 0, null);
                 break;
             case 'ASR':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 Result = this.mod256(Rd >> 1);
                 if (Rd >= 128) Result += 128;
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);
+                this.writeResultRd(Result);
 
                 N_bit = (Result >= 128);
                 C_bit = Rd & 1;
@@ -1966,116 +1942,116 @@ class Interpreter {
                 this.updateSREG(null, null, null, N_bit ^ V_bit, V_bit, N_bit, Result === 0, C_bit);
                 break;
             case 'BCLR':
-                s = this.getArgumentValue(line, 0);
+                s = this.getArgumentValue(0);
                 this.updateSREGBit(0, s);   // Clear bit s
                 break;
             case 'BLD':
-                Rd = this.getArgumentValue(line, 0);
-                b = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                b = this.getArgumentValue(1);
                 T_bit = this.getSREGBit(6);
                 Result = T_bit ? Rd | ( 1 << b ) : Rd & ( 0xff - ( 1 << b ) );
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd(b) <-- T 
+                this.writeResultRd(Result);   // Rd(b) <-- T 
                 break;
             case 'BRBC':
-                s = this.getArgumentValue(line, 0);
-                branch_taken = this.getSREGBit(1 << s) === 0;
+                s = this.getArgumentValue(0);
+                this.branch_taken = this.getSREGBit(1 << s) === 0;
                 this.branches_seen += 1;
                 break;
             case 'BRBS':
-                s = this.getArgumentValue(line, 0);
-                branch_taken = this.getSREGBit(1 << s) === 1;
+                s = this.getArgumentValue(0);
+                this.branch_taken = this.getSREGBit(1 << s) === 1;
                 this.branches_seen += 1;
                 break;
             case 'BRCC':
-                branch_taken = this.getSREGBit(0) === 0;
+                this.branch_taken = this.getSREGBit(0) === 0;
                 this.branches_seen += 1;
                 break;
             case 'BRCS':
-                branch_taken = this.getSREGBit(0) === 1;
+                this.branch_taken = this.getSREGBit(0) === 1;
                 this.branches_seen += 1;
                 break;
             case 'BREQ':
-                branch_taken = this.getSREGBit(1) === 1;
+                this.branch_taken = this.getSREGBit(1) === 1;
                 this.branches_seen += 1;
                 break;
             case 'BRGE':
-                branch_taken = this.getSREGBit(4) === 0;
+                this.branch_taken = this.getSREGBit(4) === 0;
                 this.branches_seen += 1;
                 break;
             case 'BRHC':
-                branch_taken = this.getSREGBit(5) === 0;
+                this.branch_taken = this.getSREGBit(5) === 0;
                 this.branches_seen += 1;
                 break;
             case 'BRHS':
-                branch_taken = this.getSREGBit(5) === 1;
+                this.branch_taken = this.getSREGBit(5) === 1;
                 this.branches_seen += 1;
                 break;
             case 'BRID':
-                branch_taken = this.getSREGBit(7) === 0;
+                this.branch_taken = this.getSREGBit(7) === 0;
                 this.branches_seen += 1;
                 break;
             case 'BRIE':
-                branch_taken = this.getSREGBit(7) === 1;
+                this.branch_taken = this.getSREGBit(7) === 1;
                 this.branches_seen += 1;
                 break;
             case 'BRLO':
-                branch_taken = this.getSREGBit(0) === 1;
+                this.branch_taken = this.getSREGBit(0) === 1;
                 this.branches_seen += 1;
                 break;
             case 'BRLT':
-                branch_taken = this.getSREGBit(4) === 1;
+                this.branch_taken = this.getSREGBit(4) === 1;
                 this.branches_seen += 1;
                 break;
             case 'BRMI':
-                branch_taken = this.getSREGBit(2) === 1; 
+                this.branch_taken = this.getSREGBit(2) === 1; 
                 this.branches_seen += 1;
                 break;
             case 'BRNE':
-                branch_taken = this.getSREGBit(1) === 0;
+                this.branch_taken = this.getSREGBit(1) === 0;
                 this.branches_seen += 1;
                 break;
             case 'BRPL':
-                branch_taken = this.getSREGBit(2) === 0;
+                this.branch_taken = this.getSREGBit(2) === 0;
                 this.branches_seen += 1;
                 break;
             case 'BRSH':
-                branch_taken = this.getSREGBit(0) === 0;
+                this.branch_taken = this.getSREGBit(0) === 0;
                 this.branches_seen += 1;
                 break;
             case 'BRTC':
-                branch_taken = this.getSREGBit(6) === 0;
+                this.branch_taken = this.getSREGBit(6) === 0;
                 this.branches_seen += 1;
                 break;
             case 'BRTS':
-                branch_taken = this.getSREGBit(6) === 1;
+                this.branch_taken = this.getSREGBit(6) === 1;
                 this.branches_seen += 1;
                 break;
             case 'BRVC':
-                branch_taken = this.getSREGBit(3) === 0;
+                this.branch_taken = this.getSREGBit(3) === 0;
                 this.branches_seen += 1;
                 break;
             case 'BRVS':
-                branch_taken = this.getSREGBit(3) === 1;
+                this.branch_taken = this.getSREGBit(3) === 1;
                 this.branches_seen += 1;
                 break;
             case 'BSET':
-                s = this.getArgumentValue(line, 0);
+                s = this.getArgumentValue(0);
                 this.updateSREGBit(1, s);   // Set bit s
                 break;
             case 'BST':
-                Rd = this.getArgumentValue(line, 0);
-                b = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                b = this.getArgumentValue(1);
                 T_bit = this.getBit(Rd, b);
                 this.updateSREGBit(T_bit, 6);
                 break;
             case 'CALL':
                 let sp = this.getSP();
-                if (line.getArgs()[0].getType() === 'INT') {
+                if (this.line.getArgs()[0].getType() === 'INT') {
                     this.incPC();
                     this.incPC();
 
                     if (sp <= 0x101) {
-                        this.newError(`Bad stack pointer for CALL on line ${line_in_file}.`)
+                        this.newError(`Bad stack pointer for CALL on line ${this.line_in_file}.`)
                         return;
                     }
 
@@ -2084,19 +2060,18 @@ class Interpreter {
                     this.getDMEM()[this.getSP()] = this.pch.getValue();     // push pch in STACK
                     this.decSP();
 
-                    k = this.getArgumentValue(line, 0);
-                    this.setPC(k);
-                    skip_inc = true;
+                    k = this.getArgumentValue(0);
+                    this.setPC(k - 1);
                     this.cycles += 5;
                     break;
                 }
 
                 // OTHERWISE IF IT'S PRINTF
-                if (line.getArgs()[0].getValue() === 'printf') {
+                if (this.line.getArgs()[0].getValue() === 'printf') {
                     
                     // Check you can pop twice
                     if (sp >= (this.ramend - 1)) {
-                        this.newError(`Bad stack pointer for CALL on line ${line_in_file}.`);
+                        this.newError(`Bad stack pointer for CALL on line ${this.line_in_file}.`);
                         return;
                     }
                     
@@ -2144,18 +2119,18 @@ class Interpreter {
                 this.cycles += 4;
                 break;
             case 'CBI':
-                A_val = this.getArgumentValue(line, 0);
-                b = this.getArgumentValue(line, 1);
+                A_val = this.getArgumentValue(0);
+                b = this.getArgumentValue(1);
                 Result = this.getDMEM()[A_val + 0x20].getValue() & (0xff - (1 << b));
                 this.getDMEM()[A_val + 0x20].setValue(Result);
                 this.cycles += 1;
                 break;
             case 'CBR':
-                Rd = this.getArgumentValue(line, 0);
-                K_val = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                K_val = this.getArgumentValue(1);
                 Result = Rd & (0xff - K_val);
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd & (0xff - K)
+                this.writeResultRd(Result);   // Rd <-- Rd & (0xff - K)
 
                 N_bit = (Result >= 128);
                 this.updateSREG(null, null, null, N_bit, 0, N_bit, Result === 0, null);
@@ -2173,7 +2148,7 @@ class Interpreter {
                 this.updateSREGBit(0, 2);
                 break;
             case 'CLR':
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(0);   // Rd <-- 0
+                this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(0);   // Rd <-- 0
                 this.updateSREG(null, null, null, 0, 0, 0, 1, null);
                 break;
             case 'CLS':
@@ -2189,17 +2164,17 @@ class Interpreter {
                 this.updateSREGBit(0, 1);
                 break;
             case 'COM':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 Result = 0xff - Rd;
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- 0xff - Rd
+                this.writeResultRd(Result);   // Rd <-- 0xff - Rd
 
                 N_bit = (Result >= 128);
                 this.updateSREG(null, null, null, N_bit, 0, N_bit, Result === 0, 1);
                 break;
             case 'CP':
-                Rd = this.getArgumentValue(line, 0);
-                Rr = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                Rr = this.getArgumentValue(1);
                 Result = this.mod256(Rd - Rr);
 
                 H_bit = (this.getBit(Result, 3) & this.getBit(Rr, 3)) | (this.getBit(Rr, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(Result, 3) & (1 - this.getBit(Rd, 3)));
@@ -2208,8 +2183,8 @@ class Interpreter {
                 this.updateSREG(null, null, H_bit, N_bit ^ V_bit, V_bit, N_bit, Result === 0, (Rd - Rr) < 0);
                 break;
             case 'CPC':
-                Rd = this.getArgumentValue(line, 0);
-                Rr = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                Rr = this.getArgumentValue(1);
                 C_bit = this.getSREG() & 1;
                 Result = this.mod256(Rd - Rr - C_bit);
 
@@ -2220,8 +2195,8 @@ class Interpreter {
                 this.updateSREG(null, null, H_bit, N_bit ^ V_bit, V_bit, N_bit, Z_bit, (Rd - Rr - C_bit) < 0);
                 break;
             case 'CPI':
-                Rd = this.getArgumentValue(line, 0);
-                K_val = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                K_val = this.getArgumentValue(1);
                 Result = this.mod256(Rd - K_val);
 
                 H_bit = (this.getBit(Result, 3) & this.getBit(K_val, 3)) | (this.getBit(K_val, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(Result, 3) & (1 - this.getBit(Rd, 3)));
@@ -2230,8 +2205,8 @@ class Interpreter {
                 this.updateSREG(null, null, H_bit, N_bit ^ V_bit, V_bit, N_bit, Result === 0, (Rd - K_val) < 0);
                 break;
             case 'CPSE':
-                Rd = this.getArgumentValue(line, 0);
-                Rr = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                Rr = this.getArgumentValue(1);
                 this.branches_seen += 1;
 
                 if ( Rd !== Rr ) break;
@@ -2247,28 +2222,28 @@ class Interpreter {
 
                 break;
             case 'DEC':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 Result = this.mod256(Rd - 1);
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd - 1
+                this.writeResultRd(Result);   // Rd <-- Rd - 1
 
                 V_bit = (Result === 127);
                 N_bit = (Result >= 128);
                 this.updateSREG(null, null, null, N_bit ^ V_bit, V_bit, N_bit, Result === 0, null);
                 break;
             case 'EOR':
-                Rd = this.getArgumentValue(line, 0);
-                Rr = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                Rr = this.getArgumentValue(1);
                 Result = Rd ^ Rr;
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd ^ Rr
+                this.writeResultRd(Result);   // Rd <-- Rd ^ Rr
 
                 N_bit = (Result >= 128);
                 this.updateSREG(null, null, null, N_bit, 0, N_bit, Result === 0, null);
                 break;
             case 'FMUL':
-                Rd = this.getArgumentValue(line, 0);
-                Rr = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                Rr = this.getArgumentValue(1);
                 Result = Rd * Rr * 2;
 
                 this.getDMEM()[0].setValue(this.mod256(Result));
@@ -2277,9 +2252,9 @@ class Interpreter {
                 this.updateSREG(null, null, null, null, null, null, Result === 0, (Result >> 16) & 1);
                 break;
             case 'FMULS':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 Rd = (Rd < 128) ? Rd : Rd - 256;    // convert to signed
-                Rr = this.getArgumentValue(line, 1);
+                Rr = this.getArgumentValue(1);
                 Rr = (Rr < 128) ? Rr : Rr - 256;    // convert to signed
                 Result = Rd * Rr;
                 Result = (Result < 0) ? 65536 + Result : Result;        // convert to unsigned equivalent
@@ -2291,9 +2266,9 @@ class Interpreter {
                 this.updateSREG(null, null, null, null, null, null, Result === 0, (Result >> 16) & 1);
                 break;
             case 'FMULSU':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 Rd = (Rd < 128) ? Rd : Rd - 256;    // convert to signed
-                Rr = this.getArgumentValue(line, 1);
+                Rr = this.getArgumentValue(1);
                 Result = Rd * Rr;
                 Result = (Result < 0) ? 65536 + Result : Result;        // convert to unsigned equivalent
                 Result *= 2;
@@ -2308,7 +2283,7 @@ class Interpreter {
                 this.incPC();
 
                 if (this.getSP() <= 0x101) {
-                    this.newError(`Bad stack pointer for CALL on line ${line_in_file}.`)
+                    this.newError(`Bad stack pointer for CALL on line ${this.line_in_file}.`)
                     return;
                 }
 
@@ -2318,41 +2293,38 @@ class Interpreter {
                 this.decSP();
 
                 k = this.getZ();
-                this.setPC(k);
-                skip_inc = true;
+                this.setPC(k - 1);
                 this.cycles += 3;
                 break;
             case 'IJMP':
                 k = this.getZ();
-                this.setPC(k);
-                skip_inc = true;
+                this.setPC(k - 1);
                 this.cycles += 1;
                 break;
             case 'IN':
-                Rd = this.getArgumentValue(line, 0);
-                A_val = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                A_val = this.getArgumentValue(1);
                 Result = this.getDMEM()[A_val + 0x20].getValue();
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- I/O(A)
+                this.writeResultRd(Result);   // Rd <-- I/O(A)
                 break;
             case 'INC':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 Result = this.mod256(Rd + 1);
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd + 1
+                this.writeResultRd(Result);   // Rd <-- Rd + 1
 
                 V_bit = (Result === 128);
                 N_bit = (Result >= 128);
                 this.updateSREG(null, null, null, N_bit ^ V_bit, V_bit, N_bit, Result === 0, null);
                 break;
             case 'JMP':
-                k = this.getArgumentValue(line, 0);
-                this.setPC(k);
-                skip_inc = true;
+                k = this.getArgumentValue(0);
+                this.setPC(k - 1);
                 this.cycles += 2;
                 break;
             case 'LD':
-                w = line.getArgs()[1].getValue();
+                w = this.line.getArgs()[1].getValue();
                 plusminus = -1 * w.includes('-') + w.includes('+'); // get if it's got a + or -
                 w = w.replace('-', '').replace('+', '');            // make it X, Y, or Z only
                 low_byte = (['X', 'Y', 'Z'].indexOf(w) * 2) + 26;   // convert it to a number
@@ -2364,42 +2336,42 @@ class Interpreter {
                 if (plusminus === 1) this.incWord(low_byte);
                 
                 this.cycles += ( (3 * plusminus * plusminus) - plusminus) >> 1; // +2 for -1, +1 for 1, +0 for 0
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
+                this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 break;
             case 'LDD':
-                w = line.getArgs()[1].getValue()[0];
-                q = parseInt(line.getArgs()[1].getValue().slice(2));
+                w = this.line.getArgs()[1].getValue()[0];
+                q = parseInt(this.line.getArgs()[1].getValue().slice(2));
 
                 if (w === 'Y') k = this.getY() + q;
                 else if (w === 'Z') k = this.getZ() + q;
                 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
+                this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 this.cycles += 1;
                 break;
             case 'LDI':
-                K_val = this.getArgumentValue(line, 1);
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(K_val);   // Rd <-- K
+                K_val = this.getArgumentValue(1);
+                this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(K_val);   // Rd <-- K
                 break;
             case 'LDS':
-                k = this.getArgumentValue(line, 1);
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
+                k = this.getArgumentValue(1);
+                this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 this.incPC(); // increment once now cause total needs to be + 2
                 this.cycles += 1;
                 break;
             case 'LPM':
                 k = this.getZ();
-                Rd = (line.getArgs().length === 0) ? 0 : line.getArgs()[0].getValue();      // set Rd as either 0 or whatever it's specified as
-                if (line.getArgs().length !== 0 && line.getArgs()[1].getValue().includes('+')) {
+                Rd = (this.line.getArgs().length === 0) ? 0 : this.line.getArgs()[0].getValue();      // set Rd as either 0 or whatever it's specified as
+                if (this.line.getArgs().length !== 0 && this.line.getArgs()[1].getValue().includes('+')) {
                     this.incZ();
                 }
                 this.getDMEM()[Rd].setValue( parseInt( this.getPMEM()[(k - (k & 1)) >> 1].getOpcode().slice(8 * (1 - k & 1), 8 + 8 * (1 - k & 1)), 2) );
                 this.cycles += 2;
                 break;
             case 'LSL':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 Result = this.mod256(Rd + Rd);
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd + Rd
+                this.writeResultRd(Result);   // Rd <-- Rd + Rd
 
                 H_bit = this.getBit(Rd, 3);
                 N_bit = (Result >= 128);
@@ -2408,26 +2380,26 @@ class Interpreter {
                 this.updateSREG(null, null, H_bit, N_bit ^ V_bit, V_bit, N_bit, Result === 0, C_bit);
                 break;
             case 'LSR':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 Result = this.mod256(Rd >> 1);
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);
+                this.writeResultRd(Result);
 
                 C_bit = Rd & 1;
                 this.updateSREG(null, null, null, C_bit, C_bit, 0, Result === 0, C_bit);
                 break;
             case 'MOV':
-                Rr = this.getArgumentValue(line, 1);
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Rr);   // Rd <-- Rr
+                Rr = this.getArgumentValue(1);
+                this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(Rr);   // Rd <-- Rr
                 break;
             case 'MOVW':
-                Rr = this.getArgumentValue(line, 1);
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Rr);   // Rd <-- Rr
-                Rr = this.getDMEM()[line.getArgs()[1].getValue() + 1].getValue();
-                this.getDMEM()[line.getArgs()[0].getValue() + 1].setValue(Rr);   // Rd <-- Rr
+                Rr = this.getArgumentValue(1);
+                this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(Rr);   // Rd <-- Rr
+                Rr = this.getDMEM()[this.line.getArgs()[1].getValue() + 1].getValue();
+                this.getDMEM()[this.line.getArgs()[0].getValue() + 1].setValue(Rr);   // Rd <-- Rr
                 break;
             case 'MUL':
-                Rd = this.getArgumentValue(line, 0);
-                Rr = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                Rr = this.getArgumentValue(1);
                 Result = Rd * Rr;
 
                 this.getDMEM()[0].setValue(this.mod256(Result));
@@ -2436,9 +2408,9 @@ class Interpreter {
                 this.updateSREG(null, null, null, null, null, null, Result === 0, (Result >> 15) & 1);
                 break;
             case 'MULS':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 Rd = (Rd < 128) ? Rd : Rd - 256;    // convert to signed
-                Rr = this.getArgumentValue(line, 1);
+                Rr = this.getArgumentValue(1);
                 Rr = (Rr < 128) ? Rr : Rr - 256;    // convert to signed
                 Result = Rd * Rr;
                 Result = (Result < 0) ? 65536 + Result : Result;        // convert to unsigned equivalent
@@ -2449,9 +2421,9 @@ class Interpreter {
                 this.updateSREG(null, null, null, null, null, null, Result === 0, (Result >> 15) & 1);
                 break;
             case 'MULSU':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 Rd = (Rd < 128) ? Rd : Rd - 256;    // convert to signed
-                Rr = this.getArgumentValue(line, 1);
+                Rr = this.getArgumentValue(1);
                 Result = Rd * Rr;
                 Result = (Result < 0) ? 65536 + Result : Result;        // convert to unsigned equivalent
                 
@@ -2462,10 +2434,10 @@ class Interpreter {
                 this.cycles += 1;
                 break;
             case 'NEG':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 Result = this.mod256(0 - Rd);
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- 0 - Rd
+                this.writeResultRd(Result);   // Rd <-- 0 - Rd
 
                 H_bit = this.getBit(Result, 3) | (1 - this.getBit(Rd, 3));
                 V_bit = (Result === 128);
@@ -2475,47 +2447,47 @@ class Interpreter {
             case 'NOP':
                 break;
             case 'OR':
-                Rd = this.getArgumentValue(line, 0);
-                Rr = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                Rr = this.getArgumentValue(1);
                 Result = Rd | Rr;
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd | Rr
+                this.writeResultRd(Result);   // Rd <-- Rd | Rr
 
                 N_bit = (Result >= 128);
                 this.updateSREG(null, null, null, N_bit, 0, N_bit, Result === 0, null);
                 break;
             case 'ORI':
-                Rd = this.getArgumentValue(line, 0);
-                K_val = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                K_val = this.getArgumentValue(1);
                 Result = Rd | K_val;
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd | K
+                this.writeResultRd(Result);   // Rd <-- Rd | K
 
                 N_bit = (Result >= 128);
                 this.updateSREG(null, null, null, N_bit, 0, N_bit, Result === 0, null);
                 break;
             case 'OUT':
-                A_val = this.getArgumentValue(line, 0);
-                Rr = this.getArgumentValue(line, 1);
+                A_val = this.getArgumentValue(0);
+                Rr = this.getArgumentValue(1);
 
                 this.getDMEM()[A_val + 0x20].setValue(Rr);   // I/O(A) <-- Rr
                 break;
             case 'POP':
                 if (this.getSP() >= this.ramend) {
-                    this.newError(`Bad stack pointer for POP on line ${line_in_file}.`)
+                    this.newError(`Bad stack pointer for POP on line ${this.line_in_file}.`)
                     return;
                 }
                 this.incSP();                                                       // increment the SP by 1
-                Rd = line.getArgs()[0].getValue();                                  // register number
+                Rd = this.line.getArgs()[0].getValue();                                  // register number
                 this.getDMEM()[Rd].setValue(this.getDMEM()[this.getSP()]);          // set register value
                 this.cycles += 1;
                 break;
             case 'PUSH':
                 if (this.getSP() <= 0x100) {
-                    this.newError(`Stack overflow. Bad stack pointer for PUSH on line ${line_in_file}.`)
+                    this.newError(`Stack overflow. Bad stack pointer for PUSH on line ${this.line_in_file}.`)
                     return;
                 }
-                Rr = this.getArgumentValue(line, 0);            // register held value
+                Rr = this.getArgumentValue(0);            // register held value
                 this.getDMEM()[this.getSP()] = Rr;              // set the value in DMEM
                 this.decSP();                                   // decrement the SP by 1
                 this.cycles += 1;
@@ -2524,7 +2496,7 @@ class Interpreter {
                 this.incPC();
 
                 if (this.getSP() <= 0x101) {
-                    this.newError(`Bad stack pointer for CALL on line ${line_in_file}.`)
+                    this.newError(`Bad stack pointer for CALL on line ${this.line_in_file}.`)
                     return;
                 }
 
@@ -2535,9 +2507,8 @@ class Interpreter {
 
                 this.decPC();
 
-                k = this.getArgumentValue(line, 0);
-                this.setPC(this.getPC() + k + 1);
-                skip_inc = true;
+                k = this.getArgumentValue(0);
+                this.setPC(this.getPC() + k);
                 this.cycles += 3;
                 break;
             case 'RET':
@@ -2550,7 +2521,7 @@ class Interpreter {
                 }
 
                 if ((this.getSP() < 0x100) || (this.getSP() > (this.ramend - 2))) {
-                    this.newError(`Bad stack pointer for RET on line ${line_in_file}.`);
+                    this.newError(`Bad stack pointer for RET on line ${this.line_in_file}.`);
                     return;
                 }
 
@@ -2559,22 +2530,20 @@ class Interpreter {
                 let ret_line = (this.getDMEM()[this.getSP()] << 8); // get the ret high value
                 this.incSP();
                 ret_line += this.getDMEM()[this.getSP()]; // add the ret low value to the ret high value
-                this.setPC(ret_line);
-                skip_inc = true;
+                this.setPC(ret_line - 1);
                 this.cycles += 4;
                 break;
             case 'RJMP':
-                k = this.getArgumentValue(line, 0);
-                this.setPC(this.getPC() + k + 1);
-                skip_inc = true;
+                k = this.getArgumentValue(0);
+                this.setPC(this.getPC() + k);
                 this.cycles += 1;
                 break;
             case 'ROL':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 C_bit = this.getSREG() & 1;
                 Result = this.mod256(Rd << 1) + C_bit;
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);
+                this.writeResultRd(Result);
 
                 H_bit = this.getBit(Rd, 3);
                 N_bit = (Result >= 128);
@@ -2583,11 +2552,11 @@ class Interpreter {
                 this.updateSREG(null, null, null, N_bit ^ V_bit, V_bit, N_bit, Result === 0, C_bit);
                 break;
             case 'ROR':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 C_bit = this.getSREG() & 1;
                 Result = this.mod256(Rd >> 1) + (C_bit << 7);
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);
+                this.writeResultRd(Result);
 
                 N_bit = (Result >= 128);
                 C_bit = Rd & 1;
@@ -2595,12 +2564,12 @@ class Interpreter {
                 this.updateSREG(null, null, null, N_bit ^ V_bit, V_bit, N_bit, Result === 0, C_bit);
                 break;
             case 'SBC':
-                Rd = this.getArgumentValue(line, 0);
-                Rr = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                Rr = this.getArgumentValue(1);
                 C_bit = this.getSREG() & 1;
                 Result = this.mod256(Rd - Rr - C_bit);
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd - Rr - C
+                this.writeResultRd(Result);   // Rd <-- Rd - Rr - C
 
                 H_bit = (this.getBit(Result, 3) & this.getBit(Rr, 3)) | (this.getBit(Rr, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(Result, 3) & (1 - this.getBit(Rd, 3)));
                 V_bit = ((Result >= 128) & (Rr >= 128) & (Rd < 128)) | ((Result < 128) & (Rr < 128) & (Rd >= 128));
@@ -2609,12 +2578,12 @@ class Interpreter {
                 this.updateSREG(null, null, H_bit, N_bit ^ V_bit, V_bit, N_bit, Z_bit, (Rd - Rr - C_bit) < 0);
                 break;
             case 'SBCI':
-                Rd = this.getArgumentValue(line, 0);
-                K_val = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                K_val = this.getArgumentValue(1);
                 C_bit = this.getSREG() & 1;
                 Result = this.mod256(Rd - K_val - C_bit);
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd - K - C
+                this.writeResultRd(Result);   // Rd <-- Rd - K - C
 
                 H_bit = (this.getBit(Result, 3) & this.getBit(K_val, 3)) | (this.getBit(K_val, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(Result, 3) & (1 - this.getBit(Rd, 3)));
                 V_bit = ((Result >= 128) & (K_val >= 128) & (Rd < 128)) | ((Result < 128) & (K_val < 128) & (Rd >= 128));
@@ -2623,18 +2592,18 @@ class Interpreter {
                 this.updateSREG(null, null, H_bit, N_bit ^ V_bit, V_bit, N_bit, Z_bit, (Rd - K_val - C_bit) < 0);
                 break;
             case 'SBI':
-                A_val = this.getArgumentValue(line, 0);
-                b = this.getArgumentValue(line, 1);
+                A_val = this.getArgumentValue(0);
+                b = this.getArgumentValue(1);
                 Result = this.getDMEM()[A_val + 0x20].getValue() | (1 << b);
                 this.getDMEM()[A_val + 0x20].setValue(Result);
                 this.cycles += 1;
                 break;
             case 'SBIW':
-                Rd = this.getDMEM()[line.getArgs()[0].getValue()].getValue() + (this.getDMEM()[line.getArgs()[0].getValue() + 1].getValue() << 8);
-                K_val = this.getArgumentValue(line, 1);
+                Rd = this.getDMEM()[this.line.getArgs()[0].getValue()].getValue() + (this.getDMEM()[this.line.getArgs()[0].getValue() + 1].getValue() << 8);
+                K_val = this.getArgumentValue(1);
                 Result = (Rd - K_val) & 0xffff;
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result & 0xff);
-                this.getDMEM()[line.getArgs()[0].getValue() + 1].setValue((Result >> 8) & 0xff);
+                this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(Result & 0xff);
+                this.getDMEM()[this.line.getArgs()[0].getValue() + 1].setValue((Result >> 8) & 0xff);
                 
                 V_bit = ((Result + K_val) >= 0x8000) && (Result < 0x8000);
                 N_bit = (Result >= 0x8000);
@@ -2642,18 +2611,18 @@ class Interpreter {
                 this.updateSREG(null, null, null, N_bit ^ V_bit, V_bit, N_bit, Result === 0, C_bit);
                 break;
             case 'SBR':
-                Rd = this.getArgumentValue(line, 0);
-                K_val = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                K_val = this.getArgumentValue(1);
                 Result = Rd | K_val;
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd | K
+                this.writeResultRd(Result);   // Rd <-- Rd | K
 
                 N_bit = (Result >= 128);
                 this.updateSREG(null, null, null, N_bit, 0, N_bit, Result === 0, null);
                 break;
             case 'SBRC':
-                Rd = this.getArgumentValue(line, 0);
-                b = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                b = this.getArgumentValue(1);
 
                 this.branches_seen += 1;
 
@@ -2669,8 +2638,8 @@ class Interpreter {
                 this.cycles += 1;
                 break;
             case 'SBRS':
-                Rd = this.getArgumentValue(line, 0);
-                b = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                b = this.getArgumentValue(1);
                 
                 this.branches_seen += 1;
 
@@ -2698,7 +2667,7 @@ class Interpreter {
                 this.updateSREGBit(1, 2);
                 break;
             case 'SER':
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(0xff);   // Rd <-- 0xff
+                this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(0xff);   // Rd <-- 0xff
                 break;
             case 'SES':
                 this.updateSREGBit(1, 4);
@@ -2713,7 +2682,7 @@ class Interpreter {
                 this.updateSREGBit(1, 1);
                 break;
             case 'ST':
-                w = line.getArgs()[0].getValue();
+                w = this.line.getArgs()[0].getValue();
                 plusminus = -1 * w.includes('-') + w.includes('+'); // get if it's got a + or -
                 w = w.replace('-', '').replace('+', '');            // make it X, Y, or Z only
                 low_byte = (['X', 'Y', 'Z'].indexOf(w) * 2) + 26;   // convert it to a number
@@ -2722,34 +2691,34 @@ class Interpreter {
                 if (plusminus === -1) this.decWord(low_byte);
 
                 k = this.getWord(low_byte);
-                this.getDMEM()[k] = this.getArgumentValue(line, 1);   // (k) <-- Rr
+                this.getDMEM()[k] = this.getArgumentValue(1);   // (k) <-- Rr
                 
                 if (plusminus === 1) this.incWord(low_byte);
                 
                 this.cycles += ( (3 * plusminus * plusminus) - plusminus) >> 1; // +2 for -1, +1 for 1, +0 for 0
                 break;
             case 'STD':
-                w = line.getArgs()[0].getValue()[0];
-                q = parseInt(line.getArgs()[0].getValue().slice(2));
-                Rd = this.getArgumentValue(line, 1);
+                w = this.line.getArgs()[0].getValue()[0];
+                q = parseInt(this.line.getArgs()[0].getValue().slice(2));
+                Rd = this.getArgumentValue(1);
                 if (w === 'Y') k = this.getY() + q;
                 else if (w === 'Z') k = this.getZ() + q;
                 this.getDMEM()[k] = Rd;   // (k) <-- Rd
                 this.cycles += 1;
                 break;
             case 'STS':
-                k = this.getArgumentValue(line, 0);
-                Rd = this.getArgumentValue(line, 1);
+                k = this.getArgumentValue(0);
+                Rd = this.getArgumentValue(1);
                 this.getDMEM()[k] = Rd;   // (k) <-- Rd
                 this.incPC(); // increment once now cause total needs to be + 2
                 this.cycles += 1;
                 break;
             case 'SUB':
-                Rd = this.getArgumentValue(line, 0);
-                Rr = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                Rr = this.getArgumentValue(1);
                 Result = this.mod256(Rd - Rr);
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd - Rr
+                this.writeResultRd(Result);   // Rd <-- Rd - Rr
 
                 H_bit = (this.getBit(Result, 3) & this.getBit(Rr, 3)) | (this.getBit(Rr, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(Result, 3) & (1 - this.getBit(Rd, 3)));
                 V_bit = ((Result >= 128) & (Rr >= 128) & (Rd < 128)) | ((Result < 128) & (Rr < 128) & (Rd >= 128));
@@ -2757,11 +2726,11 @@ class Interpreter {
                 this.updateSREG(null, null, H_bit, N_bit ^ V_bit, V_bit, N_bit, Result === 0, (Rd - Rr) < 0);
                 break;
             case 'SUBI':
-                Rd = this.getArgumentValue(line, 0);
-                K_val = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(0);
+                K_val = this.getArgumentValue(1);
                 Result = this.mod256(Rd - K_val);
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);   // Rd <-- Rd - K
+                this.writeResultRd(Result);   // Rd <-- Rd - K
 
                 H_bit = (this.getBit(Result, 3) & this.getBit(K_val, 3)) | (this.getBit(K_val, 3) & (1 - this.getBit(Rd, 3))) | (this.getBit(Result, 3) & (1 - this.getBit(Rd, 3)));
                 V_bit = ((Result >= 128) & (K_val >= 128) & (Rd < 128)) | ((Result < 128) & (K_val < 128) & (Rd >= 128));
@@ -2769,13 +2738,13 @@ class Interpreter {
                 this.updateSREG(null, null, H_bit, N_bit ^ V_bit, V_bit, N_bit, Result === 0, (Rd - K_val) < 0);
                 break;
             case 'SWAP':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 Result = ((Rd & 0x0F) << 4 | (Rd & 0xF0) >> 4);
 
-                this.getDMEM()[line.getArgs()[0].getValue()].setValue(Result);
+                this.writeResultRd(Result);
                 break;
             case 'TST':
-                Rd = this.getArgumentValue(line, 0);
+                Rd = this.getArgumentValue(0);
                 Result = Rd;
 
                 N_bit = (Result >= 128);
@@ -2783,32 +2752,68 @@ class Interpreter {
                 break;
             case 'XCH':
                 k = this.getZ();
-                Rd = this.getArgumentValue(line, 1);
+                Rd = this.getArgumentValue(1);
                 if ((k < 0x100) || (k > 0x8ff)) {
-                    this.newError(`Illegal value of Z pointer \'${k}\' on line ${line_in_file}.`);
+                    this.newError(`Illegal value of Z pointer \'${k}\' on line ${this.line_in_file}.`);
                 }
 
                 let vals = [Rd, this.getDMEM()[k]];
 
                 this.getDMEM()[k] = vals[0];                                    // (Z) <-- Rd
-                this.getDMEM()[line.getArgs()[1].getValue()].setValue(vals[1]); // Rd <-- (Z)
+                this.getDMEM()[this.line.getArgs()[1].getValue()].setValue(vals[1]); // Rd <-- (Z)
                 this.cycles += 1;
                 break;
             default:
                 break;
         }
 
-        if (branch_taken === true) {
-            k = this.getArgumentValue(line, 0);
-            this.setPC(this.getPC() + k + 1);
-            skip_inc = true;
-            this.cycles += 1;
-            this.branches_taken += 1;
-        }
+        if (this.branch_taken) this.branch();  // will branch if branch is required
 
         // almost every instruction does this, so its easier to counterract it if you don't want to do exactly that
-        if (skip_inc === false) this.incPC();
+        this.incPC();
 
+        this.incrementStepCount();
+    }
+
+    run() {
+        while (this.finished === false && this.error == false) {
+            this.step();
+        }
+    }
+
+    checkFinished() {
+        // Do nothing if it's finished running
+        if (this.finished | this.error) return true;
+                
+        // If breakpoint is reached
+        if (this.getPC() === this.break_point) {
+            this.finished = true;
+            return true;
+        }
+
+        // If it should be finished, set it to finished then return
+        if (this.getPC() >= this.flashend) {
+            this.finished = true;
+            console.log(this.step_count);
+            this.setPC(this.flashend);
+            return true;
+        }
+
+        return false;
+    }
+
+    writeResultRd(result) {
+        this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(result);
+    }
+
+    branch(k) {
+        k = this.getArgumentValue(0);
+        this.setPC(this.getPC() + k);
+        this.cycles += 1;
+        this.branches_taken += 1;
+    }
+
+    incrementStepCount() {
         this.step_count += 1 // count the number of steps to prevent infinite loops
         this.cycles += 1 // count the number of clock cycles used
 
@@ -2817,14 +2822,6 @@ class Interpreter {
             this.newError('Number of steps in code too large. Execution terminated.')
             return;
         } 
-
-
-    }
-
-    run() {
-        while (this.finished === false && this.error == false) {
-            this.step();
-        }
     }
 
     getPC() {
@@ -2987,10 +2984,10 @@ class Interpreter {
         this.decWord(30);
     }
 
-    getArgumentValue(line, arg_num) {
+    getArgumentValue(arg_num) {
         // For getting the value of a register or integer
-        const arg = line.getArgs()[arg_num];
-        const inst = line.getInst().getValue();
+        const arg = this.line.getArgs()[arg_num];
+        const inst = this.line.getInst().getValue();
         const reqs = this.operands.getOperands(inst)[arg_num].getTokenType();
         if (reqs.includes('REG')) return this.getDMEM()[arg.getValue()].getValue();   
         if (arg.getType() === 'INT') return arg.getValue();
