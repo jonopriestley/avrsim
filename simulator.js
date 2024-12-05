@@ -1233,6 +1233,9 @@ class Parser {
             'PORTB': 0x05,
             'DDRB': 0x04,
             'PINB': 0x03,
+            'PORTA': 0x02,
+            'DDRA': 0x01,
+            'PINA': 0x00,
         };
 
         //const existing_equs = {};
