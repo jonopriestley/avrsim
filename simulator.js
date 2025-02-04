@@ -57,7 +57,6 @@ class Register {
     }
     setChange() {
         this.changed = 1;
-        this.bits_changed = 0xff;
     }
     getChange() {
         return this.changed;
@@ -74,7 +73,7 @@ class Register {
     }
     updateBit(value, bit) {
         // Set the bit to 0 then OR it with the new value bit shifted
-        this.setValue( (this.value & (0xff - (1 << bit))) | (value * (1 << bit)) );
+        this.setValue( (this.value & (0xff - (1 << bit))) | ((value * 1) << bit) );
         this.bits_changed |= (1 << bit);
     }
     getBit(bit) {
