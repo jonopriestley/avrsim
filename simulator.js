@@ -2705,7 +2705,7 @@ class Interpreter {
                 Rd = this.getArgumentValue(1);
                 if (w === 'Y') k = this.getY() + q;
                 else if (w === 'Z') k = this.getZ() + q;
-                this.getDMEM()[k] = Rd;   // (k) <-- Rd
+                this.getDMEM()[k].setValue(Rd);   // (k) <-- Rd
                 this.cycles += 1;
                 break;
             case 'STS':
