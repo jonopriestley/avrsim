@@ -2334,7 +2334,7 @@ class Interpreter {
                 if (plusminus === -1) this.decWord(low_byte);
                 
                 k = this.getWord(low_byte);
-                
+                if (k < 0x100 || k > this.ramend) this.newError(`Illegal value of k \'${k}\' on line ${this.line_in_file}.`)
                 if (plusminus === 1) this.incWord(low_byte);
                 
                 this.cycles += ( (3 * plusminus * plusminus) - plusminus) >> 1; // +2 for -1, +1 for 1, +0 for 0
@@ -2346,7 +2346,7 @@ class Interpreter {
 
                 if (w === 'Y') k = this.getY() + q;
                 else if (w === 'Z') k = this.getZ() + q;
-                
+                if (k < 0x100 || k > this.ramend) this.newError(`Illegal value of k \'${k}\' on line ${this.line_in_file}.`)
                 this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 this.cycles += 1;
                 break;
@@ -2356,6 +2356,7 @@ class Interpreter {
                 break;
             case 'LDS':
                 k = this.getArgumentValue(1);
+                if (k < 0x100 || k > this.ramend) this.newError(`Illegal value of k \'${k}\' on line ${this.line_in_file}.`)
                 this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 this.incPC(); // increment once now cause total needs to be + 2
                 this.cycles += 1;
@@ -2688,11 +2689,12 @@ class Interpreter {
                 plusminus = -1 * w.includes('-') + w.includes('+'); // get if it's got a + or -
                 w = w.replace('-', '').replace('+', '');            // make it X, Y, or Z only
                 low_byte = (['X', 'Y', 'Z'].indexOf(w) * 2) + 26;   // convert it to a number
-                
+
                 // Decrement X/Y/Z
                 if (plusminus === -1) this.decWord(low_byte);
 
                 k = this.getWord(low_byte);
+                if (k < 0x100 || k > this.ramend) this.newError(`Illegal address \'${k}\' for ${w} on line ${this.line_in_file}.`)
                 this.getDMEM()[k] = this.getArgumentValue(1);   // (k) <-- Rr
                 
                 if (plusminus === 1) this.incWord(low_byte);
@@ -2705,11 +2707,13 @@ class Interpreter {
                 Rd = this.getArgumentValue(1);
                 if (w === 'Y') k = this.getY() + q;
                 else if (w === 'Z') k = this.getZ() + q;
+                if (k < 0x100 || k > this.ramend) this.newError(`Illegal value of k \'${k}\' on line ${this.line_in_file}.`)
                 this.getDMEM()[k] = Rd;   // (k) <-- Rd
                 this.cycles += 1;
                 break;
             case 'STS':
                 k = this.getArgumentValue(0);
+                if (k < 0x100 || k > this.ramend) this.newError(`Illegal value of k \'${k}\' on line ${this.line_in_file}.`)
                 Rd = this.getArgumentValue(1);
                 this.getDMEM()[k] = Rd;   // (k) <-- Rd
                 this.incPC(); // increment once now cause total needs to be + 2
@@ -3603,15 +3607,9 @@ class App {
 
         const registers = this.interpreter.getDMEM().slice(0, 32);
 
-        let no_change_background_colour, no_change_text_colour;
+        const no_change_background_colour = (this.theme === 'light') ? '#ddd' : '#7e7e7e';
+        const no_change_text_colour = (this.theme === 'light') ? '#444' : '#fff';
 
-        if (this.theme === 'light') {
-            no_change_background_colour = '#ddd';
-            no_change_text_colour = '#444';
-        } else {
-            no_change_background_colour = '#7e7e7e';
-            no_change_text_colour = '#fff';
-        }
         const change_background_colour = '#fd0002';
         const change_text_colour = '#fff';
 
@@ -3637,15 +3635,9 @@ class App {
             return;
         }
 
-        let no_change_background_colour, no_change_text_colour;
+        const no_change_background_colour = (this.theme === 'light') ? '#ddd' : '#7e7e7e';
+        const no_change_text_colour = (this.theme === 'light') ? '#444' : '#fff';
 
-        if (this.theme === 'light') {
-            no_change_background_colour = '#ddd';
-            no_change_text_colour = '#444';
-        } else {
-            no_change_background_colour = '#7e7e7e';
-            no_change_text_colour = '#fff';
-        }
         const change_background_colour = '#fd0002';
         const change_text_colour = '#fff';
 
@@ -3701,15 +3693,8 @@ class App {
 
         const pc = this.interpreter.getPC();
 
-        let normal_background_colour, normal_text_colour;
-
-        if (this.theme === 'light') {
-            normal_background_colour = '#bbb';
-            normal_text_colour = '#333';
-        } else {
-            normal_background_colour = '#474747';
-            normal_text_colour = '#fff';
-        }
+        const normal_background_colour = (this.theme === 'light') ? '#bbb' : '#474747';
+        const normal_text_colour = (this.theme === 'light') ? '#333' : '#fff';
 
         const pc_background_colour = '#4a5cff';
         const pc_text_colour = '#fff';
@@ -3769,15 +3754,8 @@ class App {
         const y = this.interpreter.getY();
         const z = this.interpreter.getZ();
 
-        let normal_background_colour, normal_text_colour;
-
-        if (this.theme === 'light') {
-            normal_background_colour = '#ddd';
-            normal_text_colour = '#444';
-        } else {
-            normal_background_colour = '#7e7e7e';
-            normal_text_colour = '#fff';
-        }
+        const normal_background_colour = (this.theme === 'light') ? '#ddd' : '#7e7e7e';
+        const normal_text_colour = (this.theme === 'light') ? '#444' : '#fff';
 
         const sp_background_colour = '#da920d';
         const x_background_colour = '#32bd32';
@@ -3800,13 +3778,9 @@ class App {
             // Put the cell values in the html
             for (let row = 0; row < num_rows; row++) {
                 const cell_number = start_cell + row + (num_rows * line);
-                let cell_value = this.interpreter.getDMEM()[cell_number];
 
-                if (this.display_ascii) {
-                    cell_value = this.getAscii(cell_value);
-                } else {
-                    cell_value = this.convertValueToBase(cell_value, 2);
-                }
+                let cell_value = this.interpreter.getDMEM()[cell_number];
+                cell_value = (this.display_ascii) ? this.getAscii(cell_value) : this.convertValueToBase(cell_value, 2);
 
                 // Assume it's not being pointed to by SP, X, Y, or Z
                 document.getElementById(`dmem-line-${line}${row}`).innerHTML = cell_value;
