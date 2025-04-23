@@ -2334,7 +2334,7 @@ class Interpreter {
                 if (plusminus === -1) this.decWord(low_byte);
                 
                 k = this.getWord(low_byte);
-                if (k < 0x100 || k > this.ramend) this.newError(`Illegal value of k \'${k}\' on line ${this.line_in_file}.`)
+                if (k < 0x100 || k > this.ramend) this.newError(`Illegal value \'${k}\' for ${w} on line ${this.line_in_file}.`)
                 if (plusminus === 1) this.incWord(low_byte);
                 
                 this.cycles += ( (3 * plusminus * plusminus) - plusminus) >> 1; // +2 for -1, +1 for 1, +0 for 0
@@ -2346,7 +2346,7 @@ class Interpreter {
 
                 if (w === 'Y') k = this.getY() + q;
                 else if (w === 'Z') k = this.getZ() + q;
-                if (k < 0x100 || k > this.ramend) this.newError(`Illegal value of k \'${k}\' on line ${this.line_in_file}.`)
+                if (k < 0x100 || k > this.ramend) this.newError(`Illegal value \'${k}\' for ${w}+${q} on line ${this.line_in_file}.`)
                 this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 this.cycles += 1;
                 break;
@@ -2356,7 +2356,7 @@ class Interpreter {
                 break;
             case 'LDS':
                 k = this.getArgumentValue(1);
-                if (k < 0x100 || k > this.ramend) this.newError(`Illegal value of k \'${k}\' on line ${this.line_in_file}.`)
+                if (k < 0x100 || k > this.ramend) this.newError(`Illegal address \'${k}\' for LDS on line ${this.line_in_file}.`)
                 this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 this.incPC(); // increment once now cause total needs to be + 2
                 this.cycles += 1;
@@ -2694,7 +2694,7 @@ class Interpreter {
                 if (plusminus === -1) this.decWord(low_byte);
 
                 k = this.getWord(low_byte);
-                if (k < 0x100 || k > this.ramend) this.newError(`Illegal address \'${k}\' for ${w} on line ${this.line_in_file}.`)
+                if (k < 0x100 || k > this.ramend) this.newError(`Illegal value \'${k}\' for ${w} on line ${this.line_in_file}.`)
                 this.getDMEM()[k] = this.getArgumentValue(1);   // (k) <-- Rr
                 
                 if (plusminus === 1) this.incWord(low_byte);
@@ -2707,13 +2707,13 @@ class Interpreter {
                 Rd = this.getArgumentValue(1);
                 if (w === 'Y') k = this.getY() + q;
                 else if (w === 'Z') k = this.getZ() + q;
-                if (k < 0x100 || k > this.ramend) this.newError(`Illegal value of k \'${k}\' on line ${this.line_in_file}.`)
+                if (k < 0x100 || k > this.ramend) this.newError(`Illegal value \'${k}\' for ${w}+${q} on line ${this.line_in_file}.`)
                 this.getDMEM()[k] = Rd;   // (k) <-- Rd
                 this.cycles += 1;
                 break;
             case 'STS':
                 k = this.getArgumentValue(0);
-                if (k < 0x100 || k > this.ramend) this.newError(`Illegal value of k \'${k}\' on line ${this.line_in_file}.`)
+                if (k < 0x100 || k > this.ramend) this.newError(`Illegal address \'${k}\' for STS on line ${this.line_in_file}.`)
                 Rd = this.getArgumentValue(1);
                 this.getDMEM()[k] = Rd;   // (k) <-- Rd
                 this.incPC(); // increment once now cause total needs to be + 2
