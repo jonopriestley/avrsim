@@ -2356,7 +2356,6 @@ class Interpreter {
                 break;
             case 'LDS':
                 k = this.getArgumentValue(1);
-                if (k < 0x100 || k > this.ramend) this.newError(`Illegal address \'${k}\' for LDS on line ${this.line_in_file}.`)
                 this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(this.getDMEM()[k]);   // Rd <-- (k)
                 this.incPC(); // increment once now cause total needs to be + 2
                 this.cycles += 1;
@@ -2713,7 +2712,6 @@ class Interpreter {
                 break;
             case 'STS':
                 k = this.getArgumentValue(0);
-                if (k < 0x100 || k > this.ramend) this.newError(`Illegal address \'${k}\' for STS on line ${this.line_in_file}.`)
                 Rd = this.getArgumentValue(1);
                 this.getDMEM()[k] = Rd;   // (k) <-- Rd
                 this.incPC(); // increment once now cause total needs to be + 2
@@ -3061,7 +3059,7 @@ class Operands {
             'BRVS': [int_n64_63],
             'BSET': [int_0_7],
             'BST': [reg_0_31, int_0_7],
-            'CALL': [new Argument(['INT', 'REF'], 0, 4194303, this.functions.getFunctions())],
+            'CALL': [new Argument(['INT', 'REF'], 0, 16383, this.functions.getFunctions())], // 16383 because flashend = 0x3fff
             'CBI': [int_0_31, int_0_7],
             'CBR': [reg_16_31, int_0_255],
             'CLC': null,
@@ -3087,11 +3085,11 @@ class Operands {
             'IJMP': null,
             'IN': [reg_0_31, int_0_63],
             'INC': [reg_0_31],
-            'JMP': [new Argument('INT', 0, 4194303)],
+            'JMP': [new Argument('INT', 0, 16383)], // 16383 because flashend = 0x3fff
             'LD': [reg_0_31, new Argument(['WORD', 'MINUSWORD', 'WORDPLUS'])],
             'LDD': [reg_0_31, word_plus_q_0_63],
             'LDI': [reg_16_31, int_0_255],
-            'LDS': [reg_0_31, new Argument('INT', 256, 65535)],
+            'LDS': [reg_0_31, new Argument('INT', 256, 2303)],  // 2303 because ramend = 0x8ff
             'LPM': [reg_0_31, new Argument(['WORD', 'WORDPLUS'])],
             'LSL': [reg_0_31],
             'LSR': [reg_0_31],
@@ -3130,7 +3128,7 @@ class Operands {
             'SEZ': null,
             'ST': [new Argument(['WORD', 'MINUSWORD', 'WORDPLUS']), reg_0_31],
             'STD': [word_plus_q_0_63, reg_0_31],
-            'STS': [new Argument('INT', 256, 65535), reg_0_31],
+            'STS': [new Argument('INT', 256, 2303), reg_0_31],  // 2303 because ramend = 0x8ff
             'SUB': [reg_0_31, reg_0_31],
             'SUBI': [reg_16_31, int_0_255],
             'SWAP': [reg_0_31],
