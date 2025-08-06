@@ -305,8 +305,7 @@ class Instruction {
         let b = number.toString(2);
         // Remove digits from the front if it's too long
         if (b.length >= digits) return b.slice(b.length - digits);
-        const zeros = digits - b.length; // Add digits to the front if it's too short
-        return '0'.repeat(zeros) + b;
+        return b.padStart(digits, '0'); // Add digits to the front if it's too short
     }
 
     countElements(string, symbol) {
@@ -3764,11 +3763,9 @@ class App {
         for (let line = 0; line < num_lines; line++) {
 
             let line_value = (start_cell + (num_rows * line)).toString(this.base);     // Calculate line start cell number as base 16 string
-
+            
             // Add 0's to the front until it's 4 digits long
-            for (let i = line_value.length; i < 4; i++) {
-                line_value = '0' + line_value;
-            }
+            line_value = line_value.padStart(4, '0');
 
             // Put the line value in the html
             document.getElementById(`dmem-linenum-${line}`).innerHTML = line_value;
@@ -3893,17 +3890,9 @@ class App {
     }
 
     convertValueToBase(value, num_digits) {
-        // Returns the value in the this.base base with a given number of digits
-        let n = value.toString(this.base);
-
-        if (this.base === 16) {
-
-            for (let i = n.length; i < num_digits; i++) {
-                n = '0' + n;
-            }
-        }
-
-        return n;
+        // Returns the value in the this.base base with a given number of digits (except for base 10)
+        if (this.base === 10) return value.toString(this.base);
+        return value.toString(this.base).padStart(num_digits, '0');
     }
 
     changeBase() {
