@@ -305,7 +305,8 @@ class Instruction {
         let b = number.toString(2);
         // Remove digits from the front if it's too long
         if (b.length >= digits) return b.slice(b.length - digits);
-        return b.padStart(digits, '0'); // Add digits to the front if it's too short
+        const zeros = digits - b.length; // Add digits to the front if it's too short
+        return '0'.repeat(zeros) + b;
     }
 
     countElements(string, symbol) {
@@ -967,7 +968,7 @@ class Parser {
         
         
         /* // Add 83 NOPs to pmem, since that's where the file starts
-        const pmem_initial_value = 0; // can set to 83 for "realistic" location
+        const pmem_initial_value = 83; // set to 83 for "realistic" location
         for (let i = 0; i < pmem_initial_value; i++) {
             this.pmem.push(new Instruction([new Token('INST', 'NOP')]));
         }
@@ -975,7 +976,7 @@ class Parser {
         
         this.checkGlobalAtStart();
         
-        this.createPMEM(); // create PMEM andget the label locations
+        this.createPMEM(); // create PMEM and get the label locations
         
         this.checkGlobalFunctions();
 
@@ -1075,6 +1076,7 @@ class Parser {
 
     evaluateCurrentLine() {
         this.line = this.evaluator.evaluateNewLine(this.line);
+        this.line_length = this.line.length;
     }
 
     getTokenLines() {
@@ -1160,8 +1162,8 @@ class Parser {
             for (this.tok_num = 0; this.tok_num < this.line_length; this.tok_num++) {
                 current_tok = this.line[this.tok_num];
 
-                // Check INST are valid
-                if (current_tok.getType() === 'INST' && !this.inst_set.isInstruction(current_tok.getValue())) { // check if the token is a valid instruction
+                // Check INST tokens are real instructions 
+                if (current_tok.getType() === 'INST' && !this.inst_set.isInstruction(current_tok.getValue())) {
                     this.newError(`Invalid instruction \'${current_tok.getValue()}\' on line ${this.line_in_file}.`);
                 }
             }
@@ -1264,7 +1266,7 @@ class Parser {
                 continue;
             }
 
-            let skip = this.defineGlobalFunctions();    //
+            let skip = this.defineGlobalFunctions();
             if (skip) continue;
 
             // If theyre not instructions, it's illegal
@@ -1375,7 +1377,7 @@ class Parser {
 
             this.line_length = this.line.length;                                          // calculate number of tokens in the line
             this.line_in_file = this.line[0].getLine();    // the current line if there's an error
-
+            
             this.evaluateLineExpressions(); // Evaluate all refs, hi8()/lo8(), and expressions
 
             // CHECK FOR COMMA AND REMOVE THEM IF THEYRE CORRECTLY PLACED
@@ -1393,7 +1395,6 @@ class Parser {
             const inst = this.line[0].getValue();            // instruction for that line
 
             // CHECK IT'S A REAL INSTRUCTION
-            
             this.checkInstructionExists(inst);
 
             // GET GIVEN AND EXPECTED ARGUMENTS
@@ -1413,7 +1414,6 @@ class Parser {
 
                 const given_arg = this.line[this.tok_num];          // given arg
                 const exp_arg = expected_args[this.tok_num - 1];    // expected arg
-
                 // CHECK THE TOKEN IS LEGAL
                 exp_arg.isLegalToken(given_arg, this.line_in_file);
             }
@@ -3763,9 +3763,11 @@ class App {
         for (let line = 0; line < num_lines; line++) {
 
             let line_value = (start_cell + (num_rows * line)).toString(this.base);     // Calculate line start cell number as base 16 string
-            
+
             // Add 0's to the front until it's 4 digits long
-            line_value = line_value.padStart(4, '0');
+            for (let i = line_value.length; i < 4; i++) {
+                line_value = '0' + line_value;
+            }
 
             // Put the line value in the html
             document.getElementById(`dmem-linenum-${line}`).innerHTML = line_value;
@@ -3890,9 +3892,17 @@ class App {
     }
 
     convertValueToBase(value, num_digits) {
-        // Returns the value in the this.base base with a given number of digits (except for base 10)
-        if (this.base === 10) return value.toString(this.base);
-        return value.toString(this.base).padStart(num_digits, '0');
+        // Returns the value in the this.base base with a given number of digits
+        let n = value.toString(this.base);
+
+        if (this.base === 16) {
+
+            for (let i = n.length; i < num_digits; i++) {
+                n = '0' + n;
+            }
+        }
+
+        return n;
     }
 
     changeBase() {
