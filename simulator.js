@@ -1423,9 +1423,9 @@ class Parser {
         }
     }
 
-    checkArguments(instruction, given_arguments) {
+    checkArguments(inst, given_arguments) {
         // CHECK IF IT'S GOT THE WRONG NUMBER OF ARGUMENTS
-        if (this.operands.numArgs(instruction) === given_arguments.length) return;
+        if (this.operands.numArgs(inst) === given_arguments.length) return;
         this.newError(`Wrong number of arguments given on line ${this.line_in_file} for the ${inst} instruction. Please refer to the instruction manual.`);
     }
 
@@ -5242,6 +5242,7 @@ class App {
 }
 
 app = new App();
+
 
 
 
