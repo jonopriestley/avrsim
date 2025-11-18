@@ -836,7 +836,7 @@ class ExpressionEvaluator {
         if (this.expression.length === 0) this.expression_start = this.index;
 
         else if (this.last_tok.getType() === 'INT' && this.tok_type === 'INT' && this.tok_value >= 0) {
-            this.newError(`Cannot evaluate expression on line ${current_tok.getLine()} beginning at position ${this.line[this.expression_start].getStart()}`);
+            this.newError(`Cannot evaluate expression on line ${this.current_tok.getLine()} beginning at position ${this.line[this.expression_start].getStart()}`);
         }
 
         this.expression += this.tok_value;
@@ -1604,7 +1604,7 @@ class Parser {
 
                 // if it's the 3rd last argument (expecting REF)
                 if (this.current_tok.getType() !== 'REF') {
-                    this.newError(`Bad argument \'${current_tok.getValue()}\' on line ${this.line_in_file}.`)
+                    this.newError(`Bad argument \'${this.current_tok.getValue()}\' on line ${this.line_in_file}.`)
                 }
 
                 // Move to next token
@@ -5242,6 +5242,7 @@ class App {
 }
 
 app = new App();
+
 
 
 
