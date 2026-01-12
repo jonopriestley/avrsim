@@ -695,7 +695,7 @@ class Lexer {
             // Support ASCII character literals 
             else if (this.current_type === 'STR') {
                 const val = this.current_value;
-                if (val.length === 3 && val.startsWith("'") && val.endsWith("'")) {
+                if (val.length === 3 && (val.startsWith("'") && val.endsWith("'")) || (val.startsWith("\"") && val.endsWith("\""))) {
                     const charCode = val.charCodeAt(1);
                     this.setCurrentTokenType('INT');           
                     this.setCurrentTokenValue(charCode);      
@@ -5254,6 +5254,7 @@ class App {
 }
 
 app = new App();
+
 
 
 
