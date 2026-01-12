@@ -692,6 +692,18 @@ class Lexer {
                 }
             }
 
+            // Support ASCII character literals 
+            else if (this.current_type === 'STR') {
+                const val = this.current_value;
+                if (val.length === 3 && val.startsWith("'") && val.endsWith("'")) {
+                    const charCode = val.charCodeAt(1);
+                    this.setCurrentTokenType('INT');           
+                    this.setCurrentTokenValue(charCode);      
+                } else {
+                    this.newError(`Illegal character literal ${val} on line ${this.current_tok.getLine()}.`);
+                }
+            }
+
             // Convert integers to base 10
             else if (this.current_type === 'INT') {
 
