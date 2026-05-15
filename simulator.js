@@ -1970,12 +1970,12 @@ class Interpreter {
                 break;
             case 'BRBC':
                 s = this.getArgumentValue(0);
-                this.branch_taken = this.getSREGBit(1 << s) === 0;
+                this.branch_taken = this.getSREGBit(s) === 0;
                 this.branches_seen += 1;
                 break;
             case 'BRBS':
                 s = this.getArgumentValue(0);
-                this.branch_taken = this.getSREGBit(1 << s) === 1;
+                this.branch_taken = this.getSREGBit(s) === 1;
                 this.branches_seen += 1;
                 break;
             case 'BRCC':
