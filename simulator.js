@@ -1969,13 +1969,26 @@ class Interpreter {
                 this.writeResultRd(Result);   // Rd(b) <-- T 
                 break;
             case 'BRBC':
+                
+                const BRBCargs = this.line.getArgs(); 
+    
+                let bufferBRBC = BRBCargs[0];
+                BRBCargs[0] = BRBCargs[1];
+                BRBCargs[1] = bufferBRBC;
+                
                 s = this.getArgumentValue(0);
-                this.branch_taken = this.getSREGBit(1 << s) === 0;
+                this.branch_taken = this.getSREGBit(s) === 0;
                 this.branches_seen += 1;
                 break;
             case 'BRBS':
+                const BRBSargs = this.line.getArgs(); 
+                    
+                let bufferBRBS = BRBSargs[0];
+                BRBSargs[0] = BRBSargs[1];
+                BRBSargs[1] = bufferBRBS;
+                
                 s = this.getArgumentValue(0);
-                this.branch_taken = this.getSREGBit(1 << s) === 1;
+                this.branch_taken = this.getSREGBit(s) === 1;
                 this.branches_seen += 1;
                 break;
             case 'BRCC':
