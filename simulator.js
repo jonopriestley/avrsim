@@ -1969,24 +1969,11 @@ class Interpreter {
                 this.writeResultRd(Result);   // Rd(b) <-- T 
                 break;
             case 'BRBC':
-                
-                const BRBCargs = this.line.getArgs(); 
-    
-                let bufferBRBC = BRBCargs[0];
-                BRBCargs[0] = BRBCargs[1];
-                BRBCargs[1] = bufferBRBC;
-                
                 s = this.getArgumentValue(0);
                 this.branch_taken = this.getSREGBit(s) === 0;
                 this.branches_seen += 1;
                 break;
-            case 'BRBS':
-                const BRBSargs = this.line.getArgs(); 
-                    
-                let bufferBRBS = BRBSargs[0];
-                BRBSargs[0] = BRBSargs[1];
-                BRBSargs[1] = bufferBRBS;
-                
+            case 'BRBS':                
                 s = this.getArgumentValue(0);
                 this.branch_taken = this.getSREGBit(s) === 1;
                 this.branches_seen += 1;
@@ -2798,7 +2785,7 @@ class Interpreter {
                 break;
         }
 
-        if (this.branch_taken) this.branch();  // will branch if branch is required
+        if (this.branch_taken) this.branch(inst);  // will branch if branch is required
 
         // almost every instruction does this, so its easier to counterract it if you don't want to do exactly that
         this.incPC();
@@ -2837,8 +2824,9 @@ class Interpreter {
         this.getDMEM()[this.line.getArgs()[0].getValue()].setValue(result);
     }
 
-    branch(k) {
-        k = this.getArgumentValue(0);
+    branch(inst) {
+        let n = ['BRBC', 'BRBS'].includes(inst) ? 1 : 0;
+        let k = this.getArgumentValue(n);
         this.setPC(this.getPC() + k);
         this.cycles += 1;
         this.branches_taken += 1;
