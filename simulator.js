@@ -2565,7 +2565,7 @@ class Interpreter {
                 N_bit = (Result >= 128);
                 C_bit = (Rd >= 128);
                 V_bit = N_bit ^ C_bit;
-                this.updateSREG(null, null, null, N_bit ^ V_bit, V_bit, N_bit, Result === 0, C_bit);
+                this.updateSREG(null, null, H_bit, N_bit ^ V_bit, V_bit, N_bit, Result === 0, C_bit);
                 break;
             case 'ROR':
                 Rd = this.getArgumentValue(0);
