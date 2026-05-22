@@ -1898,7 +1898,7 @@ class Interpreter {
                 this.add();
                 break;
             case 'ADIW':
-                this.calcImmediateWithWord();
+                this.immediateWithWord();
                 break;
             case 'AND':
                 this.bitwiseOperation('AND');
@@ -2002,68 +2002,11 @@ class Interpreter {
                 this.updateSREGBit(T_bit, 6);
                 break;
             case 'CALL':
-                let sp = this.getSP();
-                if (this.line.getArgs()[0].getType() === 'INT') {
-                    this.incPC();
-                    this.incPC();
+                const type_arg0 = this.line.getArgs()[0].getType();
+                if (type_arg0 === 'INT') this.call();
+                if (this.getArgValue(0) === 'printf') this.printf();    // OTHERWISE IF IT'S PRINTF
+                break;
 
-                    if (sp <= 0x101) {
-                        this.newError(`Bad stack pointer for CALL on line ${this.line_in_file}.`);
-                        return;
-                    }
-
-                    this.setDMEM(sp, this.pcl.getValue());               // push pcl in STACK
-                    this.decSP();
-                    this.setDMEM(this.getSP(), this.pch.getValue());     // push pch in STACK
-                    this.decSP();
-
-                    k = this.getArgValue(0);
-                    this.setPC(k - 1);
-                    this.cycles += 5;
-                    break;
-                }
-
-                // OTHERWISE IF IT'S PRINTF
-                if (this.getArgValue(0) === 'printf') {
-                    
-                    // Check you can pop twice
-                    if (sp >= (this.ramend - 1)) {
-                        this.newError(`Bad stack pointer for CALL on line ${this.line_in_file}.`);
-                        return;
-                    }
-                    
-                    let address = this.getDMEM(sp + 1) + ( this.getDMEM(sp + 2) << 8);
-
-                    this.setDMEM(26, 0xff);
-                    this.setDMEM(27, 0x08);
-                    this.setDMEM(30, 0x02);
-                    this.setDMEM(31, 0x01);
-                    
-                    // Do the printing
-                    let K_val, char;
-                    let W_val = 0;
-                    while (true) {
-                        K_val = this.getDMEM(address);
-                        if (K_val === 0) break;
-                        address += 1;
-                        W_val += 1;
-                        char = String.fromCharCode(K_val);
-                        document.getElementById('console').innerHTML += char;           // add it to the console
-                    }
-
-                    this.setDMEM(24, this.mod256(W_val));
-                    this.setDMEM(25, this.mod256(W_val >> 8));
-
-                    //document.getElementById('console').innerHTML += '\n';               // add a new line after a print
-
-                    // Increment to go past the double instruction
-                    this.incPC();    
-                    
-                    // Move the scroll to the bottom
-                    const console_box = document.getElementById('console');
-                    console_box.scrollTop = console_box.scrollHeight;
-                    
-                }
                     // Printf takes the top two values from the stack
                     // Puts them into X low byte then high byte (must push high byte first to call printf)
                     // Assumes that it is pointing at the string you want to print
@@ -2073,14 +2016,10 @@ class Interpreter {
                     // W, X, and Z are changed
                     // The string is printed
                     // Next instruction is after
-                this.cycles += 4;
-                break;
+                
+                
             case 'CBI':
-                A_val = this.getArgValue(0);
-                b = this.getArgValue(1);
-                Result = this.getDMEM(A_val + 0x20) & (0xff - (1 << b));
-                this.setDMEM(A_val + 0x20, Result);
-                this.cycles += 1;
+                this.bitInIO(0);
                 break;
             case 'CBR':
                 this.bitwiseOperation('CBR');
@@ -2133,12 +2072,12 @@ class Interpreter {
                 if (Rd !== Rr) break;
 
                 this.branches_taken += 1;
-                this.incPC();
+                this.offsetPC(1);
                 this.cycles += 1;
 
                 if (this.getLine(1) !== null) break;    // break if the next inst is 16 bit not 32 bit
 
-                this.incPC();
+                this.offsetPC(1);
                 this.cycles += 1;
                 break;
             case 'DEC':
@@ -2157,25 +2096,10 @@ class Interpreter {
                 this.mul(1, 1);
                 break;
             case 'ICALL':
-                this.incPC();
-
-                if (this.getSP() <= 0x101) {
-                    this.newError(`Bad stack pointer for CALL on line ${this.line_in_file}.`);
-                    return;
-                }
-
-                this.setDMEM(this.getSP(), this.pcl.getValue());              // push pcl in STACK
-                this.decSP();
-                this.setDMEM(this.getSP(), this.pch.getValue());              // push pch in STACK
-                this.decSP();
-
-                k = this.getZ();
-                this.setPC(k - 1);
-                this.cycles += 3;
+                this.call(1);
                 break;
             case 'IJMP':
-                k = this.getZ();
-                this.setPC(k - 1);
+                this.setPC(this.getZ() - 1);
                 this.cycles += 1;
                 break;
             case 'IN':
@@ -2187,8 +2111,7 @@ class Interpreter {
                 this.incDec();
                 break;
             case 'JMP':
-                k = this.getArgValue(0);
-                this.setPC(k - 1);
+                this.setPC(this.getArgValue(0) - 1);
                 this.cycles += 2;
                 break;
             case 'LD':
@@ -2197,11 +2120,11 @@ class Interpreter {
                 w = w.replace('-', '').replace('+', '');            // make it X, Y, or Z only
                 low_byte = (['X', 'Y', 'Z'].indexOf(w) * 2) + 26;   // convert it to a number
 
-                if (plusminus === -1) this.decWord(low_byte);
+                if (plusminus === -1) this.offsetWord(low_byte, -1);
                 
                 k = this.getWord(low_byte);
                 if (k < 0x100 || k > this.ramend) this.newError(`Illegal value \'${k}\' for ${w} on line ${this.line_in_file}.`);
-                if (plusminus === 1) this.incWord(low_byte);
+                if (plusminus === 1) this.offsetWord(low_byte, 1);
                 
                 this.cycles += ( (3 * plusminus * plusminus) - plusminus) >> 1; // +2 for -1, +1 for 1, +0 for 0
                 this.writeResultToRd(this.getDMEM(k));  // Rd <-- (k)
@@ -2223,7 +2146,7 @@ class Interpreter {
             case 'LDS':
                 k = this.getArgValue(1);
                 this.writeResultToRd(this.getDMEM(k));  // Rd <-- (k)
-                this.incPC(); // increment once now cause total needs to be + 2
+                this.offsetPC(1); // increment once now cause total needs to be + 2
                 this.cycles += 1;
                 break;
             case 'LPM':
@@ -2236,7 +2159,7 @@ class Interpreter {
                 const start = 8 * !(k & 1); // slicing at 0 gives the most significant 8 bits, so k = 1 returns 0
                 const opcode_slice = inst_opcode.slice(start, start + 8);
 
-                this.setDMEM(Rd, parseInt(opcode_slice, 2));
+                this.setDMEMValue(Rd, parseInt(opcode_slice, 2));
                 this.cycles += 2;
                 break;
             case 'LSL':
@@ -2258,7 +2181,7 @@ class Interpreter {
                 Rr = this.getArgValue(1);
                 this.writeResultToRd(Rr); // Rd <-- Rr
                 Rr = this.getDMEM(this.getRegNum(1) + 1);
-                this.setDMEM(this.getArgValue(0) + 1, Rr);   // Rd <-- Rr
+                this.setDMEMValue(this.getArgValue(0) + 1, Rr);   // Rd <-- Rr
                 break;
             case 'MUL':
                 this.mul(0);
@@ -2291,7 +2214,7 @@ class Interpreter {
             case 'OUT':
                 A_val = this.getArgValue(0);
                 Rr = this.getArgValue(1);
-                this.setDMEM(A_val + 0x20, Rr);   // I/O(A) <-- Rr
+                this.setDMEMValue(A_val + 0x20, Rr);   // I/O(A) <-- Rr
                 break;
             case 'POP':
                 if (this.getSP() >= this.ramend) {
@@ -2308,28 +2231,12 @@ class Interpreter {
                     return;
                 }
                 Rr = this.getArgValue(0);               // register held value
-                this.setDMEM(this.getSP(), Rr);    // set the value in DMEM
+                this.setDMEMValue(this.getSP(), Rr);    // set the value in DMEM
                 this.decSP();                           // decrement the SP by 1
                 this.cycles += 1;
                 break;
             case 'RCALL':
-                this.incPC();
-
-                if (this.getSP() <= 0x101) {
-                    this.newError(`Bad stack pointer for CALL on line ${this.line_in_file}.`);
-                    return;
-                }
-
-                this.setDMEM(this.getSP(), this.pcl.getValue());              // push pcl in STACK
-                this.decSP();
-                this.setDMEM(this.getSP(), this.pch.getValue());              // push pch in STACK
-                this.decSP();
-
-                this.decPC();
-
-                k = this.getArgValue(0);
-                this.setPC(this.getPC() + k);
-                this.cycles += 3;
+                this.call(2);
                 break;
             case 'RET':
                 if (this.getSP() === this.ramend) {
@@ -2354,8 +2261,7 @@ class Interpreter {
                 this.cycles += 4;
                 break;
             case 'RJMP':
-                k = this.getArgValue(0);
-                this.setPC(this.getPC() + k);
+                this.offsetPC(this.getArgValue(0));
                 this.cycles += 1;
                 break;
             case 'ROL':
@@ -2380,14 +2286,10 @@ class Interpreter {
                 this.sub(1);
                 break;
             case 'SBI':
-                A_val = this.getArgValue(0);
-                b = this.getArgValue(1);
-                Result = this.getDMEM(A_val + 0x20) | (1 << b);
-                this.setDMEM(A_val + 0x20, Result);
-                this.cycles += 1;
+                this.bitInIO(1);
                 break;
             case 'SBIW':
-                this.calcImmediateWithWord(1);
+                this.immediateWithWord(1);
                 break;
             case 'SBR':
                 this.bitwiseOperation('OR');
@@ -2432,15 +2334,15 @@ class Interpreter {
                 low_byte = (['X', 'Y', 'Z'].indexOf(w) * 2) + 26;   // convert it to a number
 
                 // Decrement X/Y/Z
-                if (plusminus === -1) this.decWord(low_byte);
+                if (plusminus === -1) this.offsetWord(low_byte, -1);
 
                 k = this.getWord(low_byte);
                 
                 if (k < 0x100 || k > this.ramend) this.newError(`Illegal value \'${k}\' for ${w} on line ${this.line_in_file}.`);
                 
-                this.setDMEM(k, this.getArgValue(1));  // (k) <-- Rr
+                this.setDMEMValue(k, this.getArgValue(1));  // (k) <-- Rr
                 
-                if (plusminus === 1) this.incWord(low_byte);
+                if (plusminus === 1) this.offsetWord(low_byte, 1);
                 
                 this.cycles += ( (3 * plusminus * plusminus) - plusminus) >> 1; // +2 for -1, +1 for 1, +0 for 0
                 break;
@@ -2451,14 +2353,14 @@ class Interpreter {
                 if (w === 'Y') k = this.getY() + q;
                 else if (w === 'Z') k = this.getZ() + q;
                 if (k < 0x100 || k > this.ramend) this.newError(`Illegal value \'${k}\' for ${w}+${q} on line ${this.line_in_file}.`);
-                this.setDMEM(k, Rd);   // (k) <-- Rd
+                this.setDMEMValue(k, Rd);   // (k) <-- Rd
                 this.cycles += 1;
                 break;
             case 'STS':
                 k = this.getArgValue(0);
                 Rd = this.getArgValue(1);
-                this.setDMEM(k, Rd);   // (k) <-- Rd
-                this.incPC(); // increment once now cause total needs to be + 2
+                this.setDMEMValue(k, Rd);   // (k) <-- Rd
+                this.offsetPC(1); // increment once now cause total needs to be + 2
                 this.cycles += 1;
                 break;
             case 'SUB':
@@ -2485,8 +2387,7 @@ class Interpreter {
                 const reg_num = this.getRegNum(1);
                 const k_val = this.getDMEM(k);
 
-                this.setDMEM(k, Rd);            // (Z) <-- Rd
-                this.setDMEM(reg_num, k_val);   // Rd <-- (Z)
+                this.setDMEM([k, reg_num], [Rd, k_val]);            // (Z) <-- Rd   and    Rd <-- (Z)
                 this.cycles += 1;
                 break;
             default:
@@ -2494,7 +2395,7 @@ class Interpreter {
         }
 
         // almost every instruction does this, so its easier to counterract it if you don't want to do exactly that
-        this.incPC();
+        this.offsetPC(1);
 
         this.incrementStepCount();
     }
@@ -2524,7 +2425,7 @@ class Interpreter {
     }
 
     writeResultToRd(result, whole_word = 0) {
-        this.setDMEM(this.getRegNum(0) + whole_word, result);
+        this.setDMEMValue(this.getRegNum(0) + whole_word, result);
     }
 
     branch(s, clear_set, branch_arg = 0) {
@@ -2551,7 +2452,7 @@ class Interpreter {
         let incs = (this.getLine(2) === null) ? 2 : 1;  // increment twice if the next instruction is double size
 
         for (let i = 0; i < incs; i++) {
-            this.incPC();
+            this.offsetPC(1);
             this.cycles += 1;
         }
     }
@@ -2607,7 +2508,7 @@ class Interpreter {
         this.updateSREG(null, null, H_bit, N_bit ^ V_bit, V_bit, N_bit, Z_bit, C_bit_new);
     }
 
-    calcImmediateWithWord(is_sub = 0) {
+    immediateWithWord(is_sub = 0) {
         const Rd = this.getArgValue(0) + (this.getDMEM(this.getRegNum(0) + 1) << 8);
         const K_val = this.getArgValue(1);
         let Result = (is_sub) ? Rd - K_val : Rd + K_val;
@@ -2647,13 +2548,108 @@ class Interpreter {
         if (num_signed) Result = (Result < 0) ? 65536 + Result : Result;        // convert to unsigned equivalent
         if (is_frac) Result *= 2;
         
-        this.setDMEM(0, this.mod256(Result));
-        this.setDMEM(1, this.mod256(Result >> 8));
+        this.setDMEM([0, 1], [this.mod256(Result), this.mod256(Result >> 8)]);
 
         const C_shift = 15 + is_frac;
         this.updateSREG(null, null, null, null, null, null, !Result, (Result >> C_shift) & 1);
 
         if (num_signed === 1) this.cycles += 1;  // for MULSU and FMULSU
+    }
+
+    call(call_type = 0) {
+        // 0 = CALL, 1 = ICALL, 2 = RCALL
+        this.offsetPC(1);
+        if (!call_type) this.offsetPC(1);   // CALL is a 32 bit instruction
+
+        if (this.getSP() <= 0x101) return this.newError(`Bad stack pointer for CALL on line ${this.line_in_file}.`);
+
+        this.pushPCToStack();
+
+        const k = (call_type === 1) ? this.getZ() : this.getArgValue(0);
+
+        if (call_type === 2) this.offsetPC(k - 1);
+        else this.setPC(k - 1);
+
+        this.cycles += 3;
+        if (!call_type) this.cycles += 1;   // CALL takes 1 more cycle than the others
+    }
+
+    pushPCToStack() {
+        this.setDMEMValue(this.getSP(), this.pcl.getValue());               // push pcl in STACK
+        this.decSP();
+        this.setDMEMValue(this.getSP(), this.pch.getValue());     // push pch in STACK
+        this.decSP();
+    }
+
+    printf() {
+        /*
+        This function:
+        1) Takes the top two values from the stack
+        2) Puts them into X low byte then high byte (must push high byte first to call printf)
+        3) Assumes that it is pointing at the string you want to print
+        4) Prints characters with X+ until it hits a null character
+        5) Returns
+        
+        The effects are:
+        - W, X, and Z are changed
+        - The string is printed
+        - Goes to next instruction
+        */
+
+        const sp = this.getSP();
+
+        const can_pop_twice = (sp <= this.ramend - 2);
+        if (!can_pop_twice) return this.newError(`Bad stack pointer for CALL on line ${this.line_in_file}.`);
+        
+        let address = this.getDMEM(sp + 1) + ( this.getDMEM(sp + 2) << 8);
+
+        // Printf just does this
+        this.setDMEM([26, 27, 30, 31], [0xff, 0x08, 0x02, 0x01]);
+        
+        // Do the printing
+        let W_val = this.printToConsole(address);
+
+        this.setDMEM([24, 25], [this.mod256(W_val), this.mod256(W_val >> 8)]);
+        //document.getElementById('console').innerHTML += '\n';               // add a new line after a print
+
+        this.offsetPC(1);   // increment because CALL is double length 
+        
+        // Move the scroll to the bottom
+        const console_box = document.getElementById('console');
+        console_box.scrollTop = console_box.scrollHeight;
+
+        this.cycles += 4;
+    }
+
+    printToConsole(start_address) {
+        let address = start_address;
+        let W_val = 0;  // stores the length of the string
+        let K_val = this.getDMEM(address);
+        let char = String.fromCharCode(K_val);
+
+        while (K_val !== 0) {   // break at a null character
+            address += 1;
+            W_val += 1;
+            document.getElementById('console').innerHTML += char;   // add it to the console
+
+            if (address > 0x8ff) break;                             // don't go beyond the end of memory
+
+            K_val = this.getDMEM(address);
+            char = String.fromCharCode(K_val);
+        }
+
+        return W_val;
+    }
+
+    bitInIO(clear_set) {
+        // 0 = clear, 1 = set
+        const A_val = this.getArgValue(0);
+        const b = this.getArgValue(1);
+        const dmem_val = this.getDMEM(A_val + 0x20);
+        const bit_val = (1 << b);
+        const Result = (clear_set) ? dmem_val | bit_val : dmem_val & (0xff - bit_val);
+        this.setDMEMValue(A_val + 0x20, Result);
+        this.cycles += 1;
     }
 
     incrementStepCount() {
@@ -2662,8 +2658,7 @@ class Interpreter {
 
         // If the number of steps is too large, terminate running the code
         if (this.step_count > 1000000) {
-            this.newError('Number of steps in code too large. Execution terminated.');
-            return;
+            return this.newError('Number of steps in code too large. Execution terminated.');
         } 
     }
 
@@ -2693,12 +2688,8 @@ class Interpreter {
         this.setSP(this.getSP() - 1);
     }
 
-    incPC() {
-        this.setPC(this.getPC() + 1);
-    }
-
-    decPC() {
-        this.setPC(this.getPC() - 1);
+    offsetPC(offset) {
+        this.setPC(this.getPC() + offset);
     }
 
     convertPmemToksToCode(toks) {
@@ -2735,12 +2726,19 @@ class Interpreter {
     getDMEM(loc = null) {
         // to get the registers as objects, use this.getDMEM()[i]
         if (loc === null) return this.dmem;
+        if (loc > 0x8ff) return this.newError('Illegal DMEM location. Execution terminated.');
         if (loc >= 0x100) return this.dmem[loc];
         return this.dmem[loc].getValue();
 
     }
 
-    setDMEM(loc, val) {
+    setDMEM(loc_arr, val_arr) {
+        for (let i = 0; i < loc_arr.length; i++) {
+            this.setDMEMValue(loc_arr[i], val_arr[i]);
+        }
+    }
+
+    setDMEMValue(loc, val) {
         if (loc >= 0x100) this.getDMEM()[loc] = val;
         else              this.getDMEM()[loc].setValue(val);
     }
@@ -2774,16 +2772,10 @@ class Interpreter {
         return 1 - this.getBit(value, bit);
     }
 
-    incWord(low_reg) {
-        const val = (this.getDMEM(low_reg + 1) << 8) + this.getDMEM(low_reg) + 1;
-        this.setDMEM(low_reg + 1, this.mod256(val >> 8));
-        this.setDMEM(low_reg, this.mod256(val));
-    }
+    offsetWord(low_reg, offset) {
+        const val = (this.getDMEM(low_reg + 1) << 8) + this.getDMEM(low_reg) + offset;
+        this.setDMEM([low_reg, low_reg + 1], [this.mod256(val), this.mod256(val >> 8)]);
 
-    decWord(low_reg) {
-        const val = (this.getDMEM(low_reg + 1) << 8) + this.getDMEM(low_reg) - 1;
-        this.setDMEM(low_reg + 1, this.mod256(val >> 8));
-        this.setDMEM(low_reg, this.mod256(val));
     }
 
     getWord(low_reg) {
@@ -2795,11 +2787,11 @@ class Interpreter {
     }
 
     incW() {
-        this.incWord(24);
+        this.offsetWord(24, 1);
     }
 
     decW() {
-        this.decWord(24);
+        this.offsetWord(24, -1);
     }
 
     getX() {
@@ -2807,11 +2799,11 @@ class Interpreter {
     }
 
     incX() {
-        this.incWord(26);
+        this.offsetWord(26, 1);
     }
 
     decX() {
-        this.decWord(26);
+        this.offsetWord(26, -1);
     }
 
     getY() {
@@ -2819,11 +2811,11 @@ class Interpreter {
     }
 
     incY() {
-        this.incWord(28);
+        this.offsetWord(28, 1);
     }
 
     decY() {
-        this.decWord(28);
+        this.offsetWord(28, -1);
     }
 
     getZ() {
@@ -2831,11 +2823,11 @@ class Interpreter {
     }
 
     incZ() {
-        this.incWord(30);
+        this.offsetWord(30, 1);
     }
 
     decZ() {
-        this.decWord(30);
+        this.offsetWord(30, -1);
     }
 
     getLine(offset = 0) {
