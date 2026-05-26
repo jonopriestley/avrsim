@@ -82,8 +82,18 @@ ret
                         <option value="25">25</option>
                         <option value="100">100</option>
                     </select>
-                    <button class="button button-step" type="button" onclick="app.stepBackButton()">Step Back</button>
-                    <button class="button button-base" type="button" id="button_base" onclick="app.changeBase()">Current Base: 16</button>
+                    <button class="button button-step" type="button" onclick="app.stepBack()">Step Back</button>
+                    <button class="button button-base" type="button" id="button_base" onclick="app.changeBase()">Display Base: 16</button>
+                    <br>
+                    <button class="button button-run-slowly" type="button" onclick="app.runSlowly()">Run Slowly</button>
+                    <select class="button select select-speed" name="run_speed" id="run_speed">
+                        <option value="1">1 / sec</option>
+                        <option value="3">3 / sec</option>
+                        <option value="5">5 / sec</option>
+                        <option value="20">20 / sec</option>
+                        <option value="50">50 / sec</option>
+                    </select>
+                    <button class="button button-pause" type="button" onclick="app.pauseRun()">Pause</button>
                     <br>
                     <br>
                     <p class="text-muted">Statistics</p>
