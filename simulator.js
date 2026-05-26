@@ -839,7 +839,7 @@ class ExpressionEvaluator {
             this.index += 1;
         }
 
-        if (this.expression.length == 0) return;
+        if (this.expression.length === 0) return;
         
         // Evaluate final expression
         this.evaluateExpression();
@@ -1303,7 +1303,7 @@ class Parser {
     }
 
     removeLabels(mem) {
-        const len = (mem == 'pmem') ? this.pmem.length : this.dmem.length;
+        const len = (mem === 'pmem') ? this.pmem.length : this.dmem.length;
         this.tok_num = 0;
         // Check for labels and remove them
         while (this.tok_num < this.line_length) {
@@ -1844,6 +1844,7 @@ class Interpreter {
         this.error = false;
         this.error_text = '';
         this.break_point = null;
+        this.print = true;
     }
 
     newData(pmem, dmem, txt, break_point) {
@@ -2395,7 +2396,7 @@ class Interpreter {
     }
 
     run() {
-        while (this.finished === false && this.error == false) {
+        while (!this.finished && !this.error) {
             this.step();
         }
     }
@@ -2438,8 +2439,8 @@ class Interpreter {
 
         this.branches_seen += 1;
 
-        if ((clear_set == 0) && ((Rd >> b) & 1)) return;    // return if it's set but should be cleared
-        if ((clear_set == 1) && !((Rd >> b) & 1)) return;   // return if it's cleared but should be set
+        if ((clear_set === 0) && ((Rd >> b) & 1)) return;    // return if it's set but should be cleared
+        if ((clear_set === 1) && !((Rd >> b) & 1)) return;   // return if it's cleared but should be set
 
         this.branches_taken += 1;
 
@@ -2624,7 +2625,8 @@ class Interpreter {
         while (K_val !== 0) {   // break at a null character
             address += 1;
             W_val += 1;
-            document.getElementById('console').innerHTML += char;   // add it to the console
+
+            if (this.print) document.getElementById('console').innerHTML += char;   // add it to the console
 
             if (address > 0x8ff) break;                             // don't go beyond the end of memory
 
@@ -2770,6 +2772,10 @@ class Interpreter {
         const val = (this.getDMEM(low_reg + 1) << 8) + this.getDMEM(low_reg) + offset;
         this.setDMEM([low_reg, low_reg + 1], [this.mod256(val), this.mod256(val >> 8)]);
 
+    }
+
+    setPrint(val) {
+        this.print = val;
     }
 
     getWord(low_reg) {
@@ -3252,6 +3258,8 @@ class App {
         this.interpreter = new Interpreter();
         this.inst_set = new InstructionSet();
 
+        this.pause = true;
+
         // Displays
         this.base = 16; // value base for display
         this.display_opcode = false;
@@ -3267,12 +3275,12 @@ class App {
 
     }
 
-    assemble() {
+    assemble(print = true) {
 
         // Getting text from the text window
         let txt = document.getElementById('code_box').value;
 
-        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.hideOpenPopup(); // hide any open popup
 
         // Stop if no text
         if (txt.length <= 0) this.newError('No code to parse. Please input code in the code box.');
@@ -3282,7 +3290,7 @@ class App {
 
         // Tokenizing
         this.lexer.newData(txt);
-        console.log(this.lexer.toString());
+        if (print) console.log(this.lexer.toString());
 
         // Parsing
         this.parser.newData(this.lexer.getTokens(), txt);
@@ -3296,38 +3304,35 @@ class App {
         // Populating Display with Data
         this.pmem_top = this.interpreter.getPC() - ( this.interpreter.getPC() % 8 );
         this.populateAll();
-        
-
     }
 
     progress(prog_type = 0) {
         // 0 = step, 1 = run slowly, 2 = run        
-        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.hideOpenPopup(); // hide any open popup
         
-        for (let i = 0; i < 0xff; i++) {
-            this.interpreter.getDMEM()[i].clearChange();    // set changed = 0 for all registers
-        }
+        this.clearRegChange();  // clear the change for all registers
 
-        // Step or Run Slowly
-        if (prog_type < 2) {
-            const stepsize = (prog_type) ? 1 : this.getStepSize();
+        // Run
+        if (prog_type === 2) this.interpreter.run();
 
+        else if (prog_type === 1) this.interpreter.step();
+        
+        // Step
+        else {
+            const stepsize = this.getStepSize();
             for (let i = 0; i < stepsize; i++) {
                 this.interpreter.step();
             }
         }
 
-        // Run
-        else this.interpreter.run();
-
         this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
+
+        if (this.interpreter.error) return this.newError(this.interpreter.error_text);
 
         if (this.interpreter.finished) {
             if (this.interpreter.break_point !== this.interpreter.getPC()) this.success('The code has run and exited successfully!');
             else this.success(`The code has run and exited successfully at the breakpoint on line ${this.parser.break_point_line}!`);
         }
-
-        else if (this.interpreter.error) this.newError(this.interpreter.error_text);
 
         else this.emptyStatus();
 
@@ -3338,12 +3343,25 @@ class App {
         this.progress(0);
     }
 
+    getRunTime() {
+        // Returns (in ms) how long each step should take 
+        const speed = this.getRunSpeed();
+        return Math.round(1000 / speed);
+    }
+
     async runSlowly() {
-        // runs as though clicking the step button every 100ms
+        // Runs as though clicking the step button 'speed' times per sec
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-        while (this.interpreter.finished === false && this.interpreter.error == false) {
+        this.unpauseRun();
+
+        let sleep_time;
+        let t0 = Date.now();
+        while (!this.interpreter.finished && !this.interpreter.error && !this.pause) {
+            sleep_time = this.getRunTime() - (Date.now() - t0);
+            if (sleep_time > 0) await sleep(sleep_time);
+
+            t0 = Date.now();
             this.progress(1);
-            await sleep(100);
         }
     }
 
@@ -3351,52 +3369,51 @@ class App {
         this.progress(2);
     }
 
-    stepBackButton() {
-        this.hideOpenPopup(this.current_popup); // hide any open popup
-        this.stepBack();
-    }
-
     stepBack() {
+
+        this.hideOpenPopup(); // hide any open popup
         
         const steps_back = this.getStepSize();
         const steps = this.interpreter.step_count - steps_back;       // the total number of steps to get to the point you want to go for
         
         if (steps < 0) {
-            // New error but doesnt stop code being run if you press enother button.
-            if (steps_back > 1) this.setinnerHTML('error', `Cannot go back ${steps_back} steps.`);
-            else                this.setinnerHTML('error', `Cannot go back ${steps_back} step.`);
-
-            this.setinnerHTML('output', null);
-            this.setinnerHTML('status', null);
+            this.assemble(false);
             return;
         }
 
-        this.assemble();
+        this.assemble(false);
         this.emptyStatus();
-        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.hideOpenPopup(); // hide any open popup
+
+        this.interpreter.setPrint(false);   // stop from printing
 
         for (let i = 0; i < (steps - 1); i++) {
             this.interpreter.step();    // do enough steps to get to the point you expect to be at
         }
-        
-        // Clear the change for all registers
-        for (let i = 0; i < 32; i++) {
-            this.interpreter.getDMEM()[i].clearChange();
-        }
 
-        if (steps > 0) {
-            this.interpreter.step();    // Take the step once the change has been cleared
-        }
+        this.clearRegChange();  // clear the change for all registers
+
+        if (steps > 0) this.interpreter.step();    // Take the step once the change has been cleared
 
         this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
 
         this.populateAll();
+
+        this.interpreter.setPrint(true);    // allow printing again
+    }
+
+    clearRegChange() {
+        // Clear the change for all registers
+        for (let i = 0; i < 0xff; i++) {
+            this.interpreter.getDMEM()[i].clearChange();
+        }
     }
 
     resetAll() {
         this.interpreter.emptyData();           // remove the data from the interpreter
-        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.hideOpenPopup(); // hide any open popup
         this.assembled = false;                 // reset the assembling
+        this.pauseRun();
 
         const normal_background_colour = '#ddd';
         const normal_text_colour = '#444';
@@ -3687,7 +3704,7 @@ class App {
 
     displayPMEMUp() {
 
-        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.hideOpenPopup(); // hide any open popup
 
         if (this.pmem_top < 8) return;
 
@@ -3697,7 +3714,7 @@ class App {
 
     displayPMEMDown() {
         
-        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.hideOpenPopup(); // hide any open popup
 
         if (this.pmem_top > (this.parser.flashend - 8)) return;
 
@@ -3707,7 +3724,7 @@ class App {
 
     displayDMEMUp() {
 
-        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.hideOpenPopup(); // hide any open popup
 
         if (this.dmem_top < 0x140) return;
 
@@ -3717,7 +3734,7 @@ class App {
 
     displayDMEMDown() {
 
-        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.hideOpenPopup(); // hide any open popup
 
         if (this.dmem_top > (this.parser.ramend - 0x40)) return;
 
@@ -3726,19 +3743,31 @@ class App {
     }
 
     displayDMEMTop() {
-        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.hideOpenPopup(); // hide any open popup
         this.dmem_top = 0x100;
         this.populateDMEM(this.dmem_top);
     }
 
     displayDMEMBottom() {
-        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.hideOpenPopup(); // hide any open popup
         this.dmem_top = (this.parser.ramend - 0x3f);
         this.populateDMEM(this.dmem_top);
     }
 
     getStepSize() {
         return parseInt(document.getElementById('step_size').value);
+    }
+
+    getRunSpeed() {
+        return parseInt(document.getElementById('run_speed').value);
+    }
+
+    pauseRun() {
+        this.pause = true;
+    }
+
+    unpauseRun() {
+        this.pause = false;
     }
 
     convertValueToBase(value, num_digits) {
@@ -3756,23 +3785,23 @@ class App {
 
     changeBase() {
 
-        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.hideOpenPopup(); // hide any open popup
 
         if (this.base === 16) {
             this.base = 10;
-            this.setinnerHTML('button_base', 'Current Base: 10');
+            this.setinnerHTML('button_base', 'Display Base: 10');
         }
 
         else {
             this.base = 16;
-            this.setinnerHTML('button_base', 'Current Base: 16');
+            this.setinnerHTML('button_base', 'Display Base: 16');
         }
 
         this.populateAll();
     }
 
     toggleOpcodeDisplay() {
-        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.hideOpenPopup(); // hide any open popup
         this.display_opcode = !(this.display_opcode);
 
         if (this.display_opcode) this.setinnerHTML('button-opcode', 'Opcode Off');
@@ -3782,7 +3811,7 @@ class App {
     }
 
     toggleAsciiDisplay() {
-        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.hideOpenPopup(); // hide any open popup
         this.display_ascii = !(this.display_ascii);
         if (this.display_ascii) this.setinnerHTML('button-ascii', 'Ascii Off');
         else                    this.setinnerHTML('button-ascii', 'Ascii On');
@@ -3790,13 +3819,13 @@ class App {
     }
 
     clearConsole() {
-        this.hideOpenPopup(this.current_popup); // hide any open popup
+        this.hideOpenPopup(); // hide any open popup
         this.setinnerHTML('console', '');
     }
 
     togglePopup(name) {
         // Remove any open popups 
-        if ( (this.current_popup !== null) && (this.current_popup !== name) ) this.hideOpenPopup(this.current_popup);
+        if ( (this.current_popup !== null) && (this.current_popup !== name) ) this.hideOpenPopup();
 
         const popup = document.getElementById(`popup-${name}`);
 
@@ -3817,10 +3846,10 @@ class App {
         else this.current_popup = null;
     }
 
-    hideOpenPopup(name) {
-        if (this.current_popup == null) return;
+    hideOpenPopup() {
+        if (this.current_popup === null) return;
         
-        const popup = document.getElementById(`popup-${name}`);
+        const popup = document.getElementById(`popup-${this.current_popup}`);
         popup.classList.toggle("show", false);
     }
 
