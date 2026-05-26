@@ -3359,7 +3359,7 @@ class App {
         while (!this.interpreter.finished && !this.interpreter.error && !this.pause) {
             sleep_time = this.getRunTime() - (Date.now() - t0);
             if (sleep_time > 0) await sleep(sleep_time);
-
+            if (this.pause) break;
             t0 = Date.now();
             this.progress(1);
         }
