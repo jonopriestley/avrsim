@@ -1,6 +1,7 @@
 :root {
     --fg: #444;
     --bg: #fff;
+    --bg-button: #fcfcfc;
     --color-text-muted: #777;
 }
 
@@ -188,7 +189,6 @@ textarea {
     border-bottom-left-radius: 0;
 }
 
-
 .console {
     margin-bottom: 10px;
     max-width: 95%;
@@ -198,7 +198,7 @@ textarea {
 
 .button {
     color: var(--fg);
-    background-color: var(--bg);
+    background-color: var(--bg-button);
     font-family: sans-serif;
     border: 1px solid #e0e0e0;
     font-size: 16px;

@@ -2181,7 +2181,7 @@ class Interpreter {
                 Rr = this.getArgValue(1);
                 this.writeResultToRd(Rr); // Rd <-- Rr
                 Rr = this.getDMEM(this.getRegNum(1) + 1);
-                this.setDMEMValue(this.getArgValue(0) + 1, Rr);   // Rd <-- Rr
+                this.writeResultToRd(Rr, 1);    // Rd <-- Rr
                 break;
             case 'MUL':
                 this.mul(0);
@@ -2217,19 +2217,13 @@ class Interpreter {
                 this.setDMEMValue(A_val + 0x20, Rr);   // I/O(A) <-- Rr
                 break;
             case 'POP':
-                if (this.getSP() >= this.ramend) {
-                    this.newError(`Bad stack pointer for POP on line ${this.line_in_file}.`);
-                    return;
-                }
+                if (this.getSP() >= this.ramend) return this.newError(`Bad stack pointer for POP on line ${this.line_in_file}.`);
                 this.incSP();                                               // increment the SP by 1
                 this.writeResultToRd(this.getDMEM(this.getSP()));  // Rd <-- popped value
                 this.cycles += 1;
                 break;
             case 'PUSH':
-                if (this.getSP() <= 0x100) {
-                    this.newError(`Stack overflow. Bad stack pointer for PUSH on line ${this.line_in_file}.`);
-                    return;
-                }
+                if (this.getSP() <= 0x100) return this.newError(`Stack overflow. Bad stack pointer for PUSH on line ${this.line_in_file}.`);
                 Rr = this.getArgValue(0);               // register held value
                 this.setDMEMValue(this.getSP(), Rr);    // set the value in DMEM
                 this.decSP();                           // decrement the SP by 1
@@ -2514,8 +2508,8 @@ class Interpreter {
         let Result = (is_sub) ? Rd - K_val : Rd + K_val;
         Result = Result & 0xffff;
 
-        this.writeResultToRd(Result & 0xff);
-        this.writeResultToRd((Result >> 8) & 0xff, 1);
+        this.writeResultToRd(this.mod256(Result));
+        this.writeResultToRd(this.mod256(Result >> 8), 1);
         
         const N_bit = (Result >= 0x8000);
 
@@ -3369,9 +3363,11 @@ class App {
         
         if (steps < 0) {
             // New error but doesnt stop code being run if you press enother button.
-            document.getElementById('error').innerHTML = (steps_back > 1) ? `Cannot go back ${steps_back} steps.` : `Cannot go back ${steps_back} step.`;
-            document.getElementById('output').innerHTML = null;
-            document.getElementById('status').innerHTML = null;
+            if (steps_back > 1) this.setinnerHTML('error', `Cannot go back ${steps_back} steps.`);
+            else                this.setinnerHTML('error', `Cannot go back ${steps_back} step.`);
+
+            this.setinnerHTML('output', null);
+            this.setinnerHTML('status', null);
             return;
         }
 
@@ -3407,42 +3403,42 @@ class App {
 
         // Registers
         for (let reg_num = 0; reg_num < 32; reg_num++) {
-            document.getElementById(`reg-${reg_num}`).innerHTML = '?';
-            document.getElementById(`reg-${reg_num}`).style.backgroundColor = normal_background_colour;
-            document.getElementById(`reg-${reg_num}`).style.color = normal_text_colour;
+            this.setinnerHTML(`reg-${reg_num}`, '?');
+            this.setBackgroundColour(`reg-${reg_num}`, normal_background_colour);
+            this.setColour(`reg-${reg_num}`, normal_text_colour);
         }
 
         // SREG
         const sreg_flags = ['C', 'Z', 'N', 'V', 'S', 'H', 'T', 'I'];
         for (let i = 0; i < 8; i++) {
-            document.getElementById(`sreg-${sreg_flags[i]}`).innerHTML = '?'; // set the inner HTML
-            document.getElementById(`sreg-${sreg_flags[i]}`).style.backgroundColor = normal_background_colour;
-            document.getElementById(`sreg-${sreg_flags[i]}`).style.color = normal_text_colour;
+            this.setinnerHTML(`sreg-${sreg_flags[i]}`, '?'); // set the inner HTML
+            this.setBackgroundColour(`sreg-${sreg_flags[i]}`, normal_background_colour);
+            this.setColour(`sreg-${sreg_flags[i]}`, normal_text_colour);
         }
 
         // Pointers
-        document.getElementById('reg-PC').innerHTML = '?';
-        document.getElementById('reg-SP').innerHTML = '?';
-        document.getElementById('reg-X').innerHTML = '?';
-        document.getElementById('reg-Y').innerHTML = '?';
-        document.getElementById('reg-Z').innerHTML = '?';
+        this.setinnerHTML('reg-PC', '?');
+        this.setinnerHTML('reg-SP', '?');
+        this.setinnerHTML('reg-X', '?');
+        this.setinnerHTML('reg-Y', '?');
+        this.setinnerHTML('reg-Z', '?');
 
         const pmem_line_num_normal_background_colour = '#bbb';
         const pmem_line_num_normal_text_colour = '#333';
 
         // PMEM
         for (let line = 0; line < 8; line++) {
-            document.getElementById(`pmem-line-${line}`).innerHTML = '?';
-            document.getElementById(`pmem-linenum-${line}`).style.backgroundColor = pmem_line_num_normal_background_colour;
-            document.getElementById(`pmem-linenum-${line}`).style.color = pmem_line_num_normal_text_colour;
+            this.setinnerHTML(`pmem-line-${line}`, '?');
+            this.setBackgroundColour(`pmem-linenum-${line}`, pmem_line_num_normal_background_colour);
+            this.setColour(`pmem-linenum-${line}`, pmem_line_num_normal_text_colour);
         }
         
         // DMEM
         for (let line = 0; line < 8; line++) {
             for (let row = 0; row < 8; row++) {
-                document.getElementById(`dmem-line-${line}${row}`).innerHTML = '?';
-                document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = normal_background_colour;
-                document.getElementById(`dmem-line-${line}${row}`).style.color = normal_text_colour;
+                this.setinnerHTML(`dmem-line-${line}${row}`, '?');
+                this.setBackgroundColour(`dmem-line-${line}${row}`, normal_background_colour);
+                this.setColour(`dmem-line-${line}${row}`, normal_text_colour);
 
             }
         }
@@ -3473,15 +3469,15 @@ class App {
         // Go through each reg in the line
         for (let reg_num = 0; reg_num < 32; reg_num++) {
             const reg_value = this.convertValueToBase(registers[reg_num].getValue(), 2);
-            document.getElementById(`reg-${reg_num}`).innerHTML = reg_value;
+            this.setinnerHTML(`reg-${reg_num}`, reg_value);
 
             // If it's changed, make the display different
             if (registers[reg_num].getChange()) {
-                document.getElementById(`reg-${reg_num}`).style.backgroundColor = change_background_colour;
-                document.getElementById(`reg-${reg_num}`).style.color = change_text_colour;
+                this.setBackgroundColour(`reg-${reg_num}`, change_background_colour);
+                this.setColour(`reg-${reg_num}`, change_text_colour);
             } else {
-                document.getElementById(`reg-${reg_num}`).style.backgroundColor = no_change_background_colour;
-                document.getElementById(`reg-${reg_num}`).style.color = no_change_text_colour;
+                this.setBackgroundColour(`reg-${reg_num}`, no_change_background_colour);
+                this.setColour(`reg-${reg_num}`, no_change_text_colour);
             }
         }
     }
@@ -3504,15 +3500,15 @@ class App {
 
             const flag_value = this.interpreter.sreg.getBit(i) ? '1' : '0';
             
-            document.getElementById(`sreg-${flag}`).innerHTML = flag_value; // set the inner HTML
+            this.setinnerHTML(`sreg-${flag}`, flag_value); // set the inner HTML
 
             // If it's changed, make the display different
             if (this.interpreter.sreg.getChange() && ((change >> i) & 1)) {
-                document.getElementById(`sreg-${flag}`).style.backgroundColor = change_background_colour;
-                document.getElementById(`sreg-${flag}`).style.color = change_text_colour;
+                this.setBackgroundColour(`sreg-${flag}`, change_background_colour);
+                this.setColour(`sreg-${flag}`, change_text_colour);
             } else {
-                document.getElementById(`sreg-${flag}`).style.backgroundColor = no_change_background_colour;
-                document.getElementById(`sreg-${flag}`).style.color = no_change_text_colour;
+                this.setBackgroundColour(`sreg-${flag}`, no_change_background_colour);
+                this.setColour(`sreg-${flag}`, no_change_text_colour);
             }
 
         }
@@ -3529,11 +3525,11 @@ class App {
         const y = this.convertValueToBase(this.interpreter.getY(), 4);
         const z = this.convertValueToBase(this.interpreter.getZ(), 4);
 
-        document.getElementById('reg-PC').innerHTML = pc;
-        document.getElementById('reg-SP').innerHTML = sp;
-        document.getElementById('reg-X').innerHTML = x;
-        document.getElementById('reg-Y').innerHTML = y;
-        document.getElementById('reg-Z').innerHTML = z;
+        this.setinnerHTML('reg-PC', pc);
+        this.setinnerHTML('reg-SP', sp);
+        this.setinnerHTML('reg-X', x);
+        this.setinnerHTML('reg-Y', y);
+        this.setinnerHTML('reg-Z', z);
 
     }
 
@@ -3552,7 +3548,7 @@ class App {
 
         for (let line = 0; line < num_lines; line++) {
             let real_line = start_cell + line;
-            document.getElementById(`pmem-linenum-${line}`).innerHTML = real_line.toString(this.base);
+            this.setinnerHTML(`pmem-linenum-${line}`, real_line.toString(this.base) );
 
             let line_value = this.interpreter.getPMEM(start_cell + line);  // get the line to print
 
@@ -3568,16 +3564,16 @@ class App {
                 else                     line_value = '(two line inst.)';
             }
 
-            document.getElementById(`pmem-line-${line}`).innerHTML = line_value;
+            this.setinnerHTML(`pmem-line-${line}`, line_value);
 
             // If it's the pc line
             // If it's changed, make the display different
             if ((start_cell + line) === pc) {
-                document.getElementById(`pmem-linenum-${line}`).style.backgroundColor = pc_background_colour;
-                document.getElementById(`pmem-linenum-${line}`).style.color = pc_text_colour;
+                this.setBackgroundColour(`pmem-linenum-${line}`, pc_background_colour);
+                this.setColour(`pmem-linenum-${line}`, pc_text_colour);
             } else {
-                document.getElementById(`pmem-linenum-${line}`).style.backgroundColor = normal_background_colour;
-                document.getElementById(`pmem-linenum-${line}`).style.color = normal_text_colour;
+                this.setBackgroundColour(`pmem-linenum-${line}`, normal_background_colour);
+                this.setColour(`pmem-linenum-${line}`, normal_text_colour);
             }
 
         }
@@ -3614,7 +3610,7 @@ class App {
             }
 
             // Put the line value in the html
-            document.getElementById(`dmem-linenum-${line}`).innerHTML = line_value;
+            this.setinnerHTML(`dmem-linenum-${line}`, line_value);
 
             // Put the cell values in the html
             for (let row = 0; row < num_rows; row++) {
@@ -3624,24 +3620,24 @@ class App {
                 cell_value = (this.display_ascii) ? this.getAscii(cell_value) : this.convertValueToBase(cell_value, 2);
 
                 // Assume it's not being pointed to by SP, X, Y, or Z
-                document.getElementById(`dmem-line-${line}${row}`).innerHTML = cell_value;
-                document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = normal_background_colour;
-                document.getElementById(`dmem-line-${line}${row}`).style.color = normal_text_colour;
+                this.setinnerHTML(`dmem-line-${line}${row}`, cell_value);
+                this.setBackgroundColour(`dmem-line-${line}${row}`, normal_background_colour);
+                this.setColour(`dmem-line-${line}${row}`, normal_text_colour);
 
                 
                 // Check if it's SP, X, Y, Z
                 if (cell_number === sp) {
-                    document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = sp_background_colour;
-                    document.getElementById(`dmem-line-${line}${row}`).style.color = pointer_text_colour;
+                    this.setBackgroundColour(`dmem-line-${line}${row}`, sp_background_colour);
+                    this.setColour(`dmem-line-${line}${row}`, pointer_text_colour);
                 } else if (cell_number === z) {
-                    document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = z_background_colour;
-                    document.getElementById(`dmem-line-${line}${row}`).style.color = pointer_text_colour;
+                    this.setBackgroundColour(`dmem-line-${line}${row}`, z_background_colour);
+                    this.setColour(`dmem-line-${line}${row}`, pointer_text_colour);
                 } else if (cell_number === y) {
-                    document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = y_background_colour;
-                    document.getElementById(`dmem-line-${line}${row}`).style.color = pointer_text_colour;
+                    this.setBackgroundColour(`dmem-line-${line}${row}`, y_background_colour);
+                    this.setColour(`dmem-line-${line}${row}`, pointer_text_colour);
                 } else if (cell_number === x) {
-                    document.getElementById(`dmem-line-${line}${row}`).style.backgroundColor = x_background_colour;
-                    document.getElementById(`dmem-line-${line}${row}`).style.color = pointer_text_colour;
+                    this.setBackgroundColour(`dmem-line-${line}${row}`, x_background_colour);
+                    this.setColour(`dmem-line-${line}${row}`, pointer_text_colour);
                 }
             }
         }
@@ -3650,31 +3646,43 @@ class App {
     populateStats() {
         if (!this.assembled) return;
 
-        document.getElementById('stats-instructions-executed').innerHTML = this.interpreter.step_count;
-        document.getElementById('stats-clock-cycles').innerHTML = this.interpreter.cycles;
-        document.getElementById('stats-branches-seen').innerHTML = this.interpreter.branches_seen;
-        document.getElementById('stats-branches-taken').innerHTML = this.interpreter.branches_taken;
+        this.setinnerHTML('stats-instructions-executed', this.interpreter.step_count);
+        this.setinnerHTML('stats-clock-cycles', this.interpreter.cycles);
+        this.setinnerHTML('stats-branches-seen', this.interpreter.branches_seen);
+        this.setinnerHTML('stats-branches-taken', this.interpreter.branches_taken);
     }
 
     success(text) {
         this.assembled = true;
-        document.getElementById('output').innerHTML = text;
-        document.getElementById('error').innerHTML = null;
-        document.getElementById('status').innerHTML = null;
+        this.setinnerHTML('error', null);
+        this.setinnerHTML('output', text);
+        this.setinnerHTML('status', null);
     }
 
     emptyStatus() {
-        document.getElementById('output').innerHTML = null;
-        document.getElementById('error').innerHTML = null;
-        document.getElementById('status').innerHTML = '---';
+        this.setinnerHTML('error', null);
+        this.setinnerHTML('output', null);
+        this.setinnerHTML('status', '---');
     }
 
     newError(text) {
         this.assembled = false;
-        document.getElementById('error').innerHTML = text;
-        document.getElementById('output').innerHTML = null;
-        document.getElementById('status').innerHTML = null;
+        this.setinnerHTML('error', text);
+        this.setinnerHTML('output', null);
+        this.setinnerHTML('status', null);
         throw new SyntaxError(text);
+    }
+
+    setBackgroundColour(elem_id, colour) {
+        document.getElementById(elem_id).style.backgroundColor = colour;
+    }
+
+    setColour(elem_id, colour) {
+        document.getElementById(elem_id).style.color = colour;
+    }
+
+    setinnerHTML(elem_id, txt) {
+        document.getElementById(elem_id).innerHTML = txt;
     }
 
     displayPMEMUp() {
@@ -3752,12 +3760,12 @@ class App {
 
         if (this.base === 16) {
             this.base = 10;
-            document.getElementById('button_base').innerHTML = 'Current Base: 10';
+            this.setinnerHTML('button_base', 'Current Base: 10');
         }
 
         else {
             this.base = 16;
-            document.getElementById('button_base').innerHTML = 'Current Base: 16';
+            this.setinnerHTML('button_base', 'Current Base: 16');
         }
 
         this.populateAll();
@@ -3766,28 +3774,24 @@ class App {
     toggleOpcodeDisplay() {
         this.hideOpenPopup(this.current_popup); // hide any open popup
         this.display_opcode = !(this.display_opcode);
-        if (this.display_opcode) {
-            document.getElementById('button-opcode').innerHTML = 'Opcode Off';
-        } else {
-            document.getElementById('button-opcode').innerHTML = 'Opcode On';
-        }
+
+        if (this.display_opcode) this.setinnerHTML('button-opcode', 'Opcode Off');
+        else                     this.setinnerHTML('button-opcode', 'Opcode On');
+
         this.populatePMEM(this.pmem_top);
     }
 
     toggleAsciiDisplay() {
         this.hideOpenPopup(this.current_popup); // hide any open popup
         this.display_ascii = !(this.display_ascii);
-        if (this.display_ascii) {
-            document.getElementById('button-ascii').innerHTML = 'Ascii Off';
-        } else {
-            document.getElementById('button-ascii').innerHTML = 'Ascii On';
-        }
+        if (this.display_ascii) this.setinnerHTML('button-ascii', 'Ascii Off');
+        else                    this.setinnerHTML('button-ascii', 'Ascii On');
         this.populateDMEM(this.dmem_top);
     }
 
     clearConsole() {
         this.hideOpenPopup(this.current_popup); // hide any open popup
-        document.getElementById('console').innerHTML = '';
+        this.setinnerHTML('console', '');
     }
 
     togglePopup(name) {
@@ -5024,13 +5028,14 @@ class App {
         borderThickness = '1px';
         border_radius = '10px';
 
-        document.getElementById('button_theme').innerHTML = (this.theme === 'dark') ? 'Theme: Dark' : 'Theme: Light';
+        if (this.theme === 'dark') this.setinnerHTML('button_theme', 'Theme: Dark');
+        else                     this.setinnerHTML('button_theme', 'Theme: Light');
 
         document.querySelector(':root').style.setProperty('--bg', bg);
         document.querySelector(':root').style.setProperty('--fg', fg);
         document.querySelector(':root').style.setProperty('--color-text-muted', muted_text_colour);
 
-        document.getElementById('status').style.backgroundColor = status_background_colour;
+        this.setBackgroundColour('status', status_background_colour);
         document.getElementById('status').style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
 
 
@@ -5044,8 +5049,8 @@ class App {
         for (let i = 0; i < buttons.length; i++) {
             //buttons[i].style.color = bg;  // was acting weird before so I kept these two lines just in case. Will reuse them if it acts up again.
             //buttons[i].style.color = fg;
-            buttons[i].style.backgroundColor = (this.theme === 'light') ? '#eee' : '#3e3e3e';
-            buttons[i].style.borderColor = (this.theme === 'light') ? '#d0d0d0' : '#5e5e5e';
+            buttons[i].style.backgroundColor = (this.theme === 'dark') ? '#333333' : '#fcfcfc';
+            buttons[i].style.borderColor = (this.theme === 'dark') ? '#5e5e5e' : '#d0d0d0';
             buttons[i].style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
         }
 

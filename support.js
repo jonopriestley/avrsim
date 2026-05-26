@@ -103,7 +103,7 @@ for (let i = 0; i < buttons.length; i++) {
 // Button mouse leave
 for (let i = 0; i < buttons.length; i++) {
   buttons[i].addEventListener('mouseleave', event => {
-    buttons[i].style.backgroundColor = (app.theme === 'light') ? '#fff' : '#2e2e2e';
+    buttons[i].style.backgroundColor = (app.theme === 'light') ? '#fcfcfc' : '#333333';
     buttons[i].style.borderColor = (app.theme === 'light') ? '#e0e0e0' : '#4e4e4e';
   });
 }
