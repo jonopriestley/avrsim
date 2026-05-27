@@ -287,7 +287,7 @@ textarea {
 
 .select {
     color: var(--fg);
-    background-color: var(--bg);
+    background-color: var(--bg-button);
     font-family: sans-serif;
     border: 1px solid #e0e0e0; 
 }

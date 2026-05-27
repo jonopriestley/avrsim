@@ -3273,6 +3273,21 @@ class App {
 
         this.theme = 'light';
 
+        this.borderStyle = 'solid';
+        this.borderThickness = '1px';
+
+        this.bg = '#fff';
+        this.fg = '#444';
+        this.border_color = '#e0e0e0';
+
+        this.table_heading_bg = '#bbb';
+        this.table_body_bg = '#ddd';
+        this.status_background_colour = '#eee';
+        this.muted_text_colour = '#777';
+
+        this.button_bg = '#fcfcfc';
+        this.button_border = '#d0d0d0';
+
     }
 
     assemble(print = true) {
@@ -5040,74 +5055,82 @@ class App {
 
     }
 
+    toggleThemeVariables() {
+        this.theme = (this.theme === 'dark') ? 'light' : 'dark';
+
+        this.bg = (this.theme === 'dark') ? '#2e2e2e' : '#fff';
+        this.fg = (this.theme === 'dark') ? '#fff' : '#444';
+        this.border_color = (this.theme === 'dark') ? '#4e4e4e' : '#e0e0e0';
+
+        this.table_heading_bg = (this.theme === 'dark') ? '#474747' : '#bbb';
+        this.table_body_bg = (this.theme === 'dark') ? '#7e7e7e' : '#ddd';
+        this.status_background_colour = (this.theme === 'dark') ? '#404040' : '#eee';
+        this.muted_text_colour = (this.theme === 'dark') ? '#aaa' : '#777';
+
+        this.button_bg = (this.theme === 'dark') ? '#333333' : '#fcfcfc';
+        this.button_border = (this.theme === 'dark') ? '#5e5e5e' : '#d0d0d0';
+    }
+
+    setRootProperties() {
+        document.querySelector(':root').style.setProperty('--bg', this.bg);
+        document.querySelector(':root').style.setProperty('--fg', this.fg);
+        document.querySelector(':root').style.setProperty('--color-text-muted', this.muted_text_colour);
+    }
+
+    getBorderString() {
+        return this.borderThickness + ' ' + this.borderStyle + ' ' + this.border_color;
+    }
+
     toggleTheme() {
 
-        let bg, fg, table_heading_bg, table_body_bg, borderColor, borderStyle, borderThickness, status_background_colour, border_radius, muted_text_colour;
-
-        this.theme = (this.theme === 'dark') ? 'light' : 'dark';
-        bg = (this.theme === 'dark') ? '#2e2e2e' : '#fff';
-        fg = (this.theme === 'dark') ? '#fff' : '#444';
-        table_heading_bg = (this.theme === 'dark') ? '#474747' : '#bbb';
-        table_body_bg = (this.theme === 'dark') ? '#7e7e7e' : '#ddd';
-        borderColor = (this.theme === 'dark') ? '#4e4e4e' : '#e0e0e0';
-        status_background_colour = (this.theme === 'dark') ? '#404040' : '#eee';
-        muted_text_colour = (this.theme === 'dark') ? '#aaa' : '#777';
-        
-        borderStyle = 'solid';
-        borderThickness = '1px';
-        border_radius = '10px';
+        this.toggleThemeVariables();
 
         if (this.theme === 'dark') this.setinnerHTML('button_theme', 'Theme: Dark');
-        else                     this.setinnerHTML('button_theme', 'Theme: Light');
+        else                       this.setinnerHTML('button_theme', 'Theme: Light');
 
-        document.querySelector(':root').style.setProperty('--bg', bg);
-        document.querySelector(':root').style.setProperty('--fg', fg);
-        document.querySelector(':root').style.setProperty('--color-text-muted', muted_text_colour);
+        this.setRootProperties();
 
-        this.setBackgroundColour('status', status_background_colour);
-        document.getElementById('status').style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
-
+        this.setBackgroundColour('status', this.status_background_colour);
+        document.getElementById('status').style.border = this.getBorderString();
 
         const panels = document.getElementsByClassName('panel');
         for (let i = 0; i < panels.length; i++) {
-            panels[i].style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
+            panels[i].style.border = this.getBorderString();
         }
 
         // Include the ISA link button and download link button
         const buttons = document.getElementsByClassName('button');
         for (let i = 0; i < buttons.length; i++) {
-            //buttons[i].style.color = bg;  // was acting weird before so I kept these two lines just in case. Will reuse them if it acts up again.
-            //buttons[i].style.color = fg;
-            buttons[i].style.backgroundColor = (this.theme === 'dark') ? '#333333' : '#fcfcfc';
-            buttons[i].style.borderColor = (this.theme === 'dark') ? '#5e5e5e' : '#d0d0d0';
-            buttons[i].style.border = borderThickness + ' ' + borderStyle + ' ' + borderColor;
+            buttons[i].style.backgroundColor = this.button_bg;
+            buttons[i].style.borderColor = this.button_border;
+            buttons[i].style.border = this.getBorderString();
         }
 
         const text_boxes = document.getElementsByTagName('textarea');
         for (let i = 0; i < text_boxes.length; i++) {
-            text_boxes[i].style.borderColor = borderColor;
+            text_boxes[i].style.borderColor = this.border_color;
         }
 
         const table_headings = document.getElementsByTagName('th');
         for (let i = 0; i < table_headings.length; i++) {
-            table_headings[i].style.backgroundColor = table_heading_bg;
+            table_headings[i].style.backgroundColor = this.table_heading_bg;
         }
 
         const table_bodies = document.getElementsByTagName('td');
         for (let i = 0; i < table_bodies.length; i++) {
-            table_bodies[i].style.backgroundColor = table_body_bg;
+            table_bodies[i].style.backgroundColor = this.table_body_bg;
         }
 
         const smalls_body = [...document.getElementsByClassName('table-reg-small'),
         ...document.getElementsByClassName('table-sreg-small'),
         ...document.getElementsByClassName('table-dmem-body-small')];
         for (let i = 0; i < smalls_body.length; i++) {
-            smalls_body[i].style.backgroundColor = table_body_bg;
+            smalls_body[i].style.backgroundColor = this.table_body_bg;
         }
 
         const smalls_headings = document.getElementsByClassName('table-pmem-heading-small');
         for (let i = 0; i < smalls_headings.length; i++) {
-            smalls_headings[i].style.backgroundColor = table_heading_bg;
+            smalls_headings[i].style.backgroundColor = this.table_heading_bg;
         }
 
         this.populateAll();
