@@ -1,6 +1,6 @@
 class Token {
-    constructor(type_, value = null, location = null) {
-        this.type = type_;
+    constructor(tok_type, value = null, location = null) {
+        this.type = tok_type;
         this.value = value;
         this.location = location;
         this.line = (location === null) ? 'NULL' : parseInt(location.split(':')[0]);
@@ -12,8 +12,8 @@ class Token {
     getValue() {
         return this.value;
     }
-    setType(type_) {
-        this.type = type_;
+    setType(tok_type) {
+        this.type = tok_type;
     }
     setValue(value) {
         this.value = value;
@@ -34,7 +34,6 @@ class Token {
         let space1 = ' '.repeat(11 - this.location.length);
         let space2 = ' '.repeat(10 - this.type.toLowerCase().length);
         return `Loc=<${this.location}>${space1}${this.type.toLowerCase()}${space2}\'${this.value}\'`;
-        //return `${this.type.toLowerCase()}\t\'${this.value}\'\tLoc=<${this.location}>`;
     }
 }
 
@@ -49,9 +48,7 @@ class Register {
         return `${this.name}: ${this.value}`
     }
     clearChange() {
-        `To be done at the start of
-        every new instruction.`
-
+        // To be done at the start of every new instruction.
         this.changed = 0;
         this.bits_changed = 0;
     }
@@ -77,7 +74,7 @@ class Register {
         this.bits_changed |= (1 << bit);
     }
     getBit(bit) {
-        // returns the value of a bit in a number
+        // Returns the value of a bit in a number
         return ((this.getValue() >> bit) & 1);
     }
     inc() {
@@ -96,70 +93,83 @@ class Argument {
         this.options_list = options_list;
         this.exact_value = exact_value;
     }
-    isLegalToken(tok, line_num) {
-        // Takes a token and checks if it matches with the argument.
+
+    isLegalArgument(tok, line_num) {
+        // CHECK IF IT'S A LEGAL ARGUMENT
         const legal_token_types = this.getTokenType(); // the legal token types for this argument
 
-        // CHECK IF IT'S A LEGAL ARGUMENT
-        if (!legal_token_types.includes(tok.getType())) {
-            if (tok.getType() !== 'REG') {
-                this.newError(`Illegal token '${tok.getValue()}' on line ${line_num}.`);
-            }
-            else {
-                this.newError(`Illegal token 'R${tok.getValue()}' on line ${line_num}.`);
-            }
-        }
-        // CHECK ITS LEGAL TOKEN TYPE AND WITHIN THE LEGAL BOUNDS
-        if (this.hasValueRange()) {
-            let val = tok.getValue(); // value of the token
-            if (tok.getType() === 'WORDPLUSQ') {
-                val = parseInt(val.substring(2)); // get rid of the Z+ or Y+ part
-            }   
-            if (tok.getType() !== 'REF' && !(this.getMinVal() <= val && val <= this.getMaxVal())) {
-                if (tok.getType() === 'REG') {
-                    tok.setValue(`R${tok.getValue()}`); // set it to register
-                }
-                this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
-            }
-        }
-        // CHECK ITS LEGAL TOKEN TYPE AND IN THE LEGAL LIST
-        if (this.hasOptionsList() && !this.getOptionsList().includes(tok.getValue())) {
-            if (tok.getType() === 'REG') {
-                this.newError(`Illegal argument 'R${tok.getValue()}' on line ${line_num}.`);
-            }
-            else if (tok.getType() !== 'INT') {
-                this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
-            }
-        }
-        // CHECK ITS LEGAL TOKEN TYPE AND IN THE LEGAL LIST
-        if (this.hasExactValue() && tok.getValue() !== this.getExactValue()) {
-            this.newError(`Illegal argument '${tok.getValue()}' on line ${line_num}.`);
-        }
+        if (legal_token_types.includes(tok.getType())) return;
+
+        const reg_str = (tok.getType() === 'REG') ? 'R' : '' ;
+        this.newError(`Illegal token '${reg_str}${tok.getValue()}' on line ${line_num}.`);
+        
     }
+
+    isWithinLegalBounds(tok, line_num) {
+        // CHECK ITS LEGAL TOKEN TYPE AND WITHIN THE LEGAL BOUNDS
+        if (!this.hasValueRange()) return true;
+
+        const val = (tok.getType() === 'WORDPLUSQ') ? parseInt(tok.getValue().substring(2)) : tok.getValue(); // get rid of the Z+ or Y+ part if needed
+        
+        if (tok.getType() === 'REF' || (this.getMinVal() <= val && val <= this.getMaxVal())) return true;
+            
+        const reg_str = (tok.getType() === 'REG') ? 'R' : '' ;
+        this.newError(`Illegal argument '${reg_str}${tok.getValue()}' on line ${line_num}.`);
+    }
+
+    isInLegalList(tok, line_num) {
+        // CHECK ITS LEGAL TOKEN TYPE AND IN THE LEGAL LIST
+        const val_not_in_opts = this.hasOptionsList() && !this.getOptionsList().includes(tok.getValue());
+        const has_wrong_val = this.hasExactValue() && (tok.getValue() !== this.getExactValue());
+        const has_illegal_val = has_wrong_val || (val_not_in_opts && !this.hasValueRange());
+
+        if (!has_illegal_val) return;
+
+        const reg_str = (tok.getType() === 'REG') ? 'R' : '' ;
+        this.newError(`Illegal argument '${reg_str}${tok.getValue()}' on line ${line_num}.`);
+    }
+
+
+
+    isLegalToken(tok, line_num) {
+        // Takes a token and checks if it matches with the argument.
+        this.isLegalArgument(tok, line_num);
+        this.isWithinLegalBounds(tok, line_num);
+        this.isInLegalList(tok, line_num); 
+    }
+
     getTokenType() {
         return this.token_type;
     }
+
     getMinVal() {
         return this.min_val;
     }
+
     getMaxVal() {
         return this.max_val;
     }
+
     getOptionsList() {
         return this.options_list;
     }
+
     getExactValue() {
         return this.exact_value;
     }
+
     hasValueRange() {
         return this.min_val !== null && this.max_val !== null;
     }
+
     hasOptionsList() {
         return this.options_list !== null;
     }
+
     hasExactValue() {
         return this.exact_value !== null;
     }
+
     newError(text) {
         document.getElementById('error').innerHTML = text;
         document.getElementById('output').innerHTML = null;
@@ -316,177 +326,129 @@ class Instruction {
     makeOpcode() {
         const inst = this.inst.getValue();
         const opcode_requirements = this.all_opcodes[inst];
-        // If it's a simple opcode
-        if (opcode_requirements !== null) {
-            // Return the opcode if it's always the same opcode
-            if (opcode_requirements.length === 1) return opcode_requirements[0];
 
-            let opcode = opcode_requirements[opcode_requirements.length - 1];
+        // More tricky opcodes
+        if (opcode_requirements === null) return this.makeComplexOpcode(inst);
+        
+        // Simple opcodes
+        return this.makeDefinedOpcode(opcode_requirements);
 
-            // GO THROUGH EACH ARGUMENT AND SYMBOL ASSOCIATED WITH IT AND REPLACE THEM IN THE GIVEN OPCODE
-            for (let arg_num = 0; arg_num < this.args.length; arg_num++) {
-                const symbol = opcode_requirements[arg_num];                //  the symbol for replacing in the opcode e.g. 'd'
-                const digit_count = this.countElements(opcode, symbol);     // number of digits the argument takes up in the opcode
-                
-                if (digit_count === 0) continue;                            // skip if it's an argument that doesnt matter (like Z in XCH)
+        
+    }
 
-                const arg = this.args[arg_num].getValue();                  // the argument value
-                const is_relative = this.inst_set.isRelativeControlFlowInstruction(this.inst.getValue());
-                
-                // either 2's comp, in functions, or just normal
-                const functions = new Functions();
-                const var_value = is_relative ? this.twosComp(arg, digit_count) : functions.isFunction(arg) ? '1111111111111111111111' : this.binLenDigits(arg, digit_count);
+    makeDefinedOpcode(opcode_requirements) {
+        // Return the opcode if it's always the same opcode
+        if (opcode_requirements.length === 1) return opcode_requirements[0];
 
-                for (let i = 0; i < digit_count; i++) {
-                    opcode = opcode.replace(symbol, var_value[i], 1);
-                }
+        let opcode = opcode_requirements[opcode_requirements.length - 1];
+
+        // GO THROUGH EACH ARGUMENT AND SYMBOL ASSOCIATED WITH IT AND REPLACE THEM IN THE GIVEN OPCODE
+        for (let arg_num = 0; arg_num < this.args.length; arg_num++) {
+            const symbol = opcode_requirements[arg_num];                //  the symbol for replacing in the opcode e.g. 'd'
+            const digit_count = this.countElements(opcode, symbol);     // number of digits the argument takes up in the opcode
+            
+            if (digit_count === 0) continue;                            // skip if it's an argument that doesnt matter (like Z in XCH)
+
+            const arg = this.args[arg_num].getValue();                  // the argument value
+            const is_relative = this.inst_set.isRelativeControlFlowInstruction(this.inst.getValue());
+            
+            // either 2's comp, in functions, or just normal
+            const functions = new Functions();
+            const var_value = is_relative ? this.twosComp(arg, digit_count) : functions.isFunction(arg) ? '1111111111111111111111' : this.binLenDigits(arg, digit_count);
+
+            for (let i = 0; i < digit_count; i++) {
+                opcode = opcode.replace(symbol, var_value[i], 1);
             }
-
-            return opcode;
         }
 
-        // Else if it's a more tricky opcode
+        return opcode;
+    }
 
-        let d, r, K, w, q;
+    makeComplexOpcode(inst) {
+        let d, r, K, w;
 
-        if (inst === 'ADIW') {
-            d = this.binLenDigits(((this.args[0].getValue() / 2) - 12), 2);
-            K = this.binLenDigits(this.args[1].getValue(), 6);
-            return `10010110${K.slice(0, 2)}${d}${K.slice(2)}`;
-        } else if (inst === 'CBR') {
-            d = this.binLenDigits(this.args[0].getValue(), 4);
-            K = this.binLenDigits((0xff - this.args[1].getValue()), 8);
-            return `0111${K.slice(0, 4)}${d}${K.slice(4)}`;
-        } else if (inst === 'CLR') {
-            d = this.binLenDigits(this.args[0].getValue(), 5);
-            return `001001${d.slice(0, 1)}${d}${d.slice(1)}`
-        } else if (inst === 'LD') {
-            d = this.binLenDigits(this.args[0].getValue(), 5);
-            w = this.args[1].getValue();
-            if (w === 'X') {
-                return `1001000${d}1100`;
-            } else if (w === 'X+') {
-                return `1001000${d}1101`;
-            } else if (w === '-X') {
-                return `1001000${d}1110`;
-            } else if (w === 'Y') {
-                return `1000000${d}1000`;
-            } else if (w === 'Y+') {
-                return `1001000${d}1001`;
-            } else if (w === '-Y') {
-                return `1001000${d}1010`;
-            } else if (w === 'Z') {
-                return `1000000${d}0000`;
-            } else if (w === 'Z+') {
-                return `1001000${d}0001`;
-            } else if (w === '-Z') {
-                return `1001000${d}0010`;
-            }
-        } else if (inst === 'LDD') {
-            d = this.binLenDigits(this.args[0].getValue(), 5);
-            w = this.args[1].getValue().slice(0, 1);
-            q = this.binLenDigits(parseInt(this.args[1].getValue().slice(2)), 6);
-            if (w === 'Y') {
-                return `10${q.slice(0, 1)}0${q.slice(1, 3)}0${d}1${q.slice(3)}`;
-            } else if (w === 'Z') {
-                return `10${q.slice(0, 1)}0${q.slice(1, 3)}0${d}0${q.slice(3)}`;
-            }
-        } else if (inst === 'LPM') {
-            if (this.getArgs().length === 0) {
-                return '1001010111001000';
-            }
-            w = this.args[1].getValue();
-            d = this.binLenDigits(this.args[0].getValue(), 5);
-            if (w === 'Z') {
-                return `1001000${d}0100`;
-            } else if (w === 'Z+') {
-                return `1001000${d}0101`;
-            }
-        } else if (inst === 'LSL') {
-            d = this.binLenDigits(this.args[0].getValue(), 5);
-            return `000011${d.slice(0, 1)}${d}${d.slice(1)}`
-        } else if (inst === 'MOVW') {
-            d = this.binLenDigits((this.args[0].getValue() / 2), 4);
-            r = this.binLenDigits((this.args[1].getValue() / 2), 4);
-            return `00000001${d}${r}`;
-        } else if (inst === 'ROL') {
-            d = this.binLenDigits(this.args[0].getValue(), 5);
-            return `000111${d.slice(0, 1)}${d}${d.slice(1)}`
-        } else if (inst === 'SBIW') {
-            d = this.binLenDigits(((this.args[0].getValue() / 2) - 12), 2);
-            K = this.binLenDigits(this.args[1].getValue(), 6);
-            return `10010111${K.slice(0, 2)}${d}${K.slice(2)}`;
-        } else if (inst === 'ST') {
-            r = this.binLenDigits(this.args[1].getValue(), 5);
-            w = this.args[0].getValue();
-            if (w === 'X') {
-                return `1001001${r}1100`;
-            } else if (w === 'X+') {
-                return `1001001${r}1101`;
-            } else if (w === '-X') {
-                return `1001001${r}1110`;
-            } else if (w === 'Y') {
-                return `1000001${r}1000`;
-            } else if (w === 'Y+') {
-                return `1001001${r}1001`;
-            } else if (w === '-Y') {
-                return `1001001${r}1010`;
-            } else if (w === 'Z') {
-                return `1000001${r}0000`;
-            } else if (w === 'Z+') {
-                return `1001001${r}0001`;
-            } else if (w === '-Z') {
-                return `1001001${r}0010`;
-            }
-        } else if (inst === 'STD') {
-            r = this.binLenDigits(this.args[1].getValue(), 5);
-            w = this.args[0].getValue().slice(0, 1);
-            q = this.binLenDigits(parseInt(this.args[0].getValue().slice(2)), 6);
-            if (w === 'Y') {
-                return `10${q.slice(0, 1)}0${q.slice(1, 3)}1${r}1${q.slice(3)}`;
-            } else if (w === 'Z') {
-                return `10${q.slice(0, 1)}0${q.slice(1, 3)}1${r}0${q.slice(3)}`;
-            }
-        } else if (inst === 'TST') {
-            d = this.binLenDigits(this.args[0].getValue(), 5);
-            return `001000${d.slice(0, 1)}${d}${d.slice(1)}`
+        switch (inst) {
+            case 'ADIW':
+                d = this.binLenDigits(((this.args[0].getValue() / 2) - 12), 2);
+                K = this.binLenDigits(this.args[1].getValue(), 6);
+                return `10010110${K.slice(0, 2)}${d}${K.slice(2)}`;
+            case 'CBR':
+                d = this.binLenDigits(this.args[0].getValue(), 4);
+                K = this.binLenDigits((0xff - this.args[1].getValue()), 8);
+                return `0111${K.slice(0, 4)}${d}${K.slice(4)}`;
+            case 'CLR':
+                d = this.binLenDigits(this.args[0].getValue(), 5);
+                return `001001${d.slice(0, 1)}${d}${d.slice(1)}`;
+            case 'LD':
+                this.makeDataTransferOpcode(0, 0);
+            case 'LDD':
+                this.makeDataTransferOpcode(0, 1);
+            case 'LPM':
+                if (this.getArgs().length === 0) return '1001010111001000';
+                w = this.args[1].getValue();
+                d = this.binLenDigits(this.args[0].getValue(), 5);
+                if      (w === 'Z')  return `1001000${d}0100`;
+                else if (w === 'Z+') return `1001000${d}0101`;
+            case 'LSL':
+                d = this.binLenDigits(this.args[0].getValue(), 5);
+                return `000011${d.slice(0, 1)}${d}${d.slice(1)}`;
+            case 'MOVW':
+                d = this.binLenDigits((this.args[0].getValue() / 2), 4);
+                r = this.binLenDigits((this.args[1].getValue() / 2), 4);
+            case 'ROL':
+                d = this.binLenDigits(this.args[0].getValue(), 5);
+                return `000111${d.slice(0, 1)}${d}${d.slice(1)}`;
+            case 'SBIW':
+                d = this.binLenDigits(((this.args[0].getValue() / 2) - 12), 2);
+                K = this.binLenDigits(this.args[1].getValue(), 6);
+                return `10010111${K.slice(0, 2)}${d}${K.slice(2)}`;
+            case 'ST':
+                this.makeDataTransferOpcode(1, 0);
+            case 'STD':
+                this.makeDataTransferOpcode(1, 1);
+            case 'TST':
+                d = this.binLenDigits(this.args[0].getValue(), 5);
+                return `001000${d.slice(0, 1)}${d}${d.slice(1)}`;
+            default:
+                return null;
         }
+    }
+
+    makeDataTransferOpcode(ld_st, has_displacement) {
+        const d = this.binLenDigits(this.args[ld_st].getValue(), 5);
+        const w = this.args[1 - ld_st].getValue();
+
+        if (has_displacement) {
+            const q = this.binLenDigits(parseInt(this.args[1 - ld_st].getValue().slice(2)), 6);
+            const yz = (w === 'Y') ? '1' : '0';
+            return `10${q.slice(0, 1)}0${q.slice(1, 3)}${ld_st}${d}${yz}${q.slice(3)}`;
+        }
+
+        const x_yz = (['Y', 'Z'].includes(w)) ? '0' : '1';                              // Y and Z have a 0 there, the rest have a 1
+        const word = (w.includes('X')) ? '11' : (w.includes('Y')) ? '10' : '00';        // X = 11, Y = 10, Z = 00
+        const plus_minus = (w.includes('+')) ? '01' : (w.includes('-')) ? '10' : '00';  // + = 01, - = 10, nothing = 00
+
+        return `100${x_yz}00${ld_st}${d}${word}${plus_minus}`;
     }
 
     toString(base) {
         // Always display numbers in base 10
         const inst = this.inst.getValue();
         const argsLen = this.args.length;
-
         
-        if (argsLen === 0) {
-            return inst;
-        }
-
+        if (argsLen === 0) return inst;
         
         let arg1 = this.args[0].getValue();
 
-        if (this.operands.getInstructionArg(inst, 0).getTokenType().includes('REG')) {
-            arg1 = `R${arg1}`;
-        }
+        if (this.operands.getInstructionArg(inst, 0).getTokenType().includes('REG')) arg1 = `R${arg1}`;
+        else if (this.args[0].getType() === 'INT')                                   arg1 = arg1.toString(base);
 
-        else if (this.args[0].getType() === 'INT') {
-            arg1 = arg1.toString(base);
-        }
-
-        if (argsLen === 1) {
-            return `${inst} ${arg1}`;
-        }
+        if (argsLen === 1) return `${inst} ${arg1}`;
 
         let arg2 = this.args[1].getValue();
 
-        if (this.operands.getOperands(inst)[1].getTokenType().includes('REG')) {
-            arg2 = `R${arg2}`;
-        }
-
-        else if (this.args[1].getType() === 'INT') {
-            arg2 = arg2.toString(base);
-        }
+        if (this.operands.getOperands(inst)[1].getTokenType().includes('REG')) arg2 = `R${arg2}`;
+        else if (this.args[1].getType() === 'INT')                             arg2 = arg2.toString(base);
 
         return `${inst} ${arg1}, ${arg2}`;
     }
@@ -513,31 +475,32 @@ class Lexer {
     constructor() {
         this.math = new MathTokens();
         this.directives = new Directives();
-        this.patterns = [
+        this.patterns = this.getPatterns();
+    }
+
+    getPatterns() {
+        return [
             [/^;.*$/, null],                    // comments
             [/^\s+/, null],                     // whitespace
-            [/^\.(section|text|data|global|end)/, 'DIR'],      // directives
-            [/^\.(byte|word|string|ascii|asciz|space|equ|set)/, 'DIR'],      // directives
+            [/^\.(section|text|data|global|end)/, 'DIR'],               // directives
+            [/^\.(byte|word|string|ascii|asciz|space|equ|set)/, 'DIR'], // directives
             [/^[\w_\.]{1}[^;\s,\.]*:/, 'LABEL'],    // labels
             [/^lo8(?=[(])/, 'LO8'],             // lo8
             [/^LO8(?=[(])/, 'LO8'],             // lo8
             [/^hi8(?=[(])/, 'HI8'],             // hi8
             [/^HI8(?=[(])/, 'HI8'],             // hi8
             [/^[rR]\d+(?=[,;\s])/, 'REG'],      // registers
-            [/^-{0,1}0[xX][\dA-Fa-f]+/, 'INT'], // numbers CAN BE EXPRESSIONS?
-            [/^-{0,1}\$[\dA-Fa-f]+/, 'INT'],    // numbers
-            [/^-{0,1}0[oO][0-7]+/, 'INT'],      // numbers
-            [/^-{0,1}0[bB][01]+/, 'INT'],       // numbers
-            [/^-{0,1}\d+/, 'INT'],              // numbers
-            [/^[a-zA-Z]{2,6}/, 'INST'],         // instructions → CAN TURN REFS USED IN AN INSTRUCTION INTO INST TYPE
+            [/^-{0,1}\$[\dA-Fa-f]+/, 'INTHEX1'],    // numbers
+            [/^-{0,1}0[xX][\dA-Fa-f]+/, 'INTHEX2'], // numbers
+            [/^-{0,1}0[oO][0-7]+/, 'INTOCT'],       // numbers
+            [/^-{0,1}0[bB][01]+/, 'INTBIN'],        // numbers
+            [/^-{0,1}\d+/, 'INT'],                  // numbers
+            [/^[a-zA-Z]{2,6}/, 'REF'],         // instructions → CAN TURN REFS USED IN AN INSTRUCTION INTO INST TYPE
             [/^\".*?\"/, 'STR'],                // string
             [/^\'.*?\'/, 'STR'],                // string
             [/^“.*?”/, 'STR'],                  // string
             [/^‘.*?’/, 'STR'],                  // string
-            // [/^\.[^\.\s]+/, 'DIR'],          // directives. .ORG WORKS WHAT OTHER DIRECTIVES? NO DEF no UNDEF
-            // [/^\.[\w\.]+(?=[;\s])/, 'DIR'],      // directives
             [/^[YZ][ \t]*\+[ \t]*\d{1,2}/, 'WORDPLUSQ'],        // word+q
-            [/^[X][ \t]*\+[ \t]*\d{1,2}/, 'XPLUSQ'],            // X+q
             [/^[XYZ]\+/, 'WORDPLUS'],           // word+
             [/^-[XYZ]/, 'MINUSWORD'],           // -word
             [/^[XYZ]/, 'WORD'],                 // word
@@ -582,10 +545,10 @@ class Lexer {
         this.current_type = null;
         this.current_value = null;
 
-        this.tokenize();
+        this.tokenise();
     }
 
-    tokenize() {
+    tokenise() {
         /**
          * Takes the code as raw text and returns the tokens as a list of
          * lists where each list is a single line as its tokens.
@@ -596,18 +559,17 @@ class Lexer {
 
         // Go over every line of code and move through the line making tokens
         for (this.line_number = 0; this.line_number < this.code_arr.length; this.line_number++) {
-            this.tokenizeLine();
+            this.tokeniseLine();
             this.fixBadTokens();
 
-            if (this.line_tokens.length !== 0) {           // Add to the tokens list if the line isnt empty
-                this.tokens.push(this.line_tokens);
-            }
-
+            if (this.line_tokens.length === 0) continue;          
+            
+            this.tokens.push(this.line_tokens);  // add to the tokens list if the line isnt empty
+            
         }
-
     }
 
-    tokenizeLine() {
+    tokeniseLine() {
         // Creates tokens from a line
 
         this.pos = 0;
@@ -636,9 +598,10 @@ class Lexer {
             return;
         }
 
-        if (!this.match) {
-            this.newError(`Invalid syntax on line ${this.line_number + 1} starting at position ${this.pos}.`);
-        }
+        if (this.match) return;
+        
+        this.newError(`Invalid syntax on line ${this.line_number + 1} starting at position ${this.pos}.`);
+        
     }
 
     createNewToken(tag) {
@@ -655,100 +618,103 @@ class Lexer {
         while (i < this.line_tokens.length) {
             this.getCurrentToken(i);
 
-            // Turn REG:Rn into REG:n
-            if (this.current_type === 'REG') {
-                this.setCurrentTokenValue(parseInt(this.current_value.substring(1)));
-            }
+            this.makeInstructionTokens(i);
+            this.makeRegTokens();
+            this.trimLabels();
+            this.capitaliseDirectives();
+            this.tokeniseInt();
 
-            // Turn bad 'INST' back into 'REF' (unless it's actually an instruction behind a label)
-            else if (i > 0 && this.current_type === 'INST' && !(i === 1 && this.line_tokens[i - 1].getType() === 'LABEL')) {
-                this.setCurrentTokenType('REF');
-            }
-
-            if (this.current_type === 'LABEL') {
-                this.setCurrentTokenValue(this.current_value.slice(0, (this.current_value.length - 1)).trim()); // remove the colon at the end
-            }
-
-            else if (this.current_type === 'DIR') {
-                if (!this.directives.isDirective(this.current_value.toUpperCase())) {
-                    this.newError(`Invalid directive \'${this.current_value}\'.`);
-                }
-                this.setCurrentTokenValue(this.current_value.toUpperCase());
-            }
-
-            // If both the current and previous tokens should be 1 REF token combine them
-            if (i > 0 && !['COMMA', 'SYMBOL'].includes(this.current_type) && !this.math.isValidSymbol(this.current_type) && this.line_tokens[i - 1].getType() === 'REF') {
-                this.line_tokens[i - 1].setValue(this.line_tokens[i - 1].getValue() + this.current_value);
-                this.line_tokens.splice(i, 1); // Virtually advancing
-                i -= 1;
-                this.getCurrentToken(i);
-            }
-
-            // Check INST and make upper case
-            if (this.current_type === 'INST') {
-                this.setCurrentTokenValue(this.current_value.toUpperCase()); // make all directives upper case
-            }
-
-            // Check REG are valid numbers
-            else if (this.current_type === 'REG') {
-                if (this.current_value > 31) {
-                    this.newError(`Illegal register \'R${this.current_value}\' on line ${this.current_tok.getLine()}.`);
-                }
-            }
-
-            // Support ASCII character literals 
-            else if (this.current_type === 'STR') {
-                const val = this.current_value;
-                if (val.length === 3 && ((val.startsWith("'") && val.endsWith("'")) || (val.startsWith("\"") && val.endsWith("\"")))) {
-                    const charCode = val.charCodeAt(1);
-                    this.setCurrentTokenType('INT');           
-                    this.setCurrentTokenValue(charCode);      
-                }
-                /*
-                else {
-                    this.newError(`Illegal character literal ${val} on line ${this.current_tok.getLine()}.`);
-                }
-                */
-            }
-
-            // Convert integers to base 10
-            else if (this.current_type === 'INT') {
-
-                let int_value = 0;
-
-                // Remove negative and store as multiplier for down the bottom of the function
-                let neg = 1;
-                if (this.current_value.includes('-')) {
-                    neg = -1;
-                    this.setCurrentTokenValue(this.current_value.slice(1));
-                }
-
-                // this line is technically irrelevant since parseInt deals with 0x already
-                if (this.current_value.includes('x') || this.current_value.includes('X')) {
-                    int_value = parseInt(this.current_value.slice(2), 16);
-                }
-
-                else if (this.current_value.includes('$')) {
-                    int_value = parseInt(this.current_value.slice(1), 16);
-                }
-
-                else if (this.current_value.includes('o') || this.current_value.includes('O')) {
-                    int_value = parseInt(this.current_value.slice(2), 8);
-                }
-
-                else if (this.current_value.includes('b') || this.current_value.includes('B')) {
-                    int_value = parseInt(this.current_value.slice(2), 2);
-                }
-
-                else {
-                    int_value = parseInt(this.current_value);
-                }
-
-                this.setCurrentTokenValue(neg * int_value);
-            }
+            i = this.combineRefs(i);
 
             i += 1;
         }
+    }
+
+    tokeniseInt() {
+        // Convert integers to base 10
+        if (!this.current_type.includes('INT')) return;
+
+        const base = this.getIntBase();
+        const slice_loc = (this.current_type === 'INT') ? 0 : (this.current_type === 'INTHEX1') ? 1 : 2;
+        const is_neg = (this.current_value.includes('-'));
+        
+        // Remove negative and store as multiplier for down the bottom of the function
+        if (is_neg) this.setCurrentTokenValue(this.current_value.slice(1));
+        
+        const neg = is_neg ? -1 : 1;
+        const int_value = parseInt(this.current_value.slice(slice_loc), base);
+
+        this.setCurrentTokenValue(neg * int_value);
+        this.setCurrentTokenType('INT');
+    }
+
+    getIntBase() {
+        const bases = {
+            'INT':      10,
+            'INTHEX1':  16,
+            'INTHEX2':  16,
+            'INTOCT':    8,
+            'INTBIN':    2
+        };
+
+        return bases[this.current_type];
+        
+    }
+
+    trimLabels() {
+        if (this.current_type !== 'LABEL') return;
+        
+        const label_end = this.current_value.length - 1;
+        const new_value = this.current_value.slice(0, label_end).trim(); // remove the colon at the end (and any whitespace)
+        this.setCurrentTokenValue(new_value); 
+    }
+
+    capitaliseDirectives() {
+        if (this.current_type !== 'DIR') return;
+
+        const directive = this.current_value.toUpperCase();
+        const is_valid_directive = this.directives.isDirective(directive);
+
+        if (!is_valid_directive) this.newError(`Invalid directive \'${this.current_value}\'.`);
+
+        this.setCurrentTokenValue(this.current_value.toUpperCase());
+    }
+
+    makeInstructionTokens(i) {
+        if (this.current_type !== 'REF') return;
+        
+        const insts = new InstructionSet();
+        const upper_string = this.current_value.toUpperCase();
+        const is_inst = insts.inst_set.includes(upper_string);
+        if (!is_inst) return;
+
+        const is_after_label = (i === 1 && this.line_tokens[0].getType() === 'LABEL');
+        if (i !== 0 && !is_after_label) return;
+        
+        this.setCurrentTokenType('INST');
+        this.setCurrentTokenValue(upper_string);
+    }
+
+    makeRegTokens() {
+        if (this.current_type !== 'REG') return;
+        
+        this.setCurrentTokenValue(parseInt(this.current_value.substring(1)));   // turn REG:Rn into REG:n
+        if (this.current_value <= 31) return;
+
+        this.newError(`Illegal register \'R${this.current_value}\' on line ${this.current_tok.getLine()}.`);
+    }
+
+    combineRefs(i) {
+        if (i === 0) return i;
+        if (this.line_tokens[i - 1].getType() !== 'REF') return i;
+        if (['COMMA', 'SYMBOL'].includes(this.current_type)) return i;
+        if (this.math.isValidSymbol(this.current_type)) return i;
+
+        const combined_value = this.line_tokens[i - 1].getValue() + this.current_value;
+
+        this.line_tokens[i - 1].setValue(combined_value); // put them together
+        this.line_tokens.splice(i, 1); // remove the current one
+        return i - 1;   // counter the later shift forward
     }
 
     getCurrentToken(n) {
@@ -961,28 +927,22 @@ class Parser {
         * to be read by an interpreter and returns None.
         */
 
-        //////////////////////////////////////////////
         ////////// CHECK SECTION DIRECTIVES //////////
-        //////////////////////////////////////////////
 
         this.checkSectionDirectives();
 
-        //////////////////////////////////////////////
         //////////////// CHECK TOKENS ////////////////
-        //////////////////////////////////////////////
 
         // Check all instructions are valid instructions
         this.validateInstructions();
 
-        //////////////////////////////////////////////
         //////////////// DATA SECTION ////////////////
-        //////////////////////////////////////////////
 
         // Check data section exists
 
         this.defineVars();
 
-        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////
         // Fill in text section info and nulls, etc
         
         
@@ -999,15 +959,14 @@ class Parser {
         
         this.checkGlobalFunctions();
 
-        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //////////////////////////////
 
         this.checkDataSection();
 
         // Should be at .SECTION .text line now
 
-        //////////////////////////////////////////////
+
         //////////////// TEXT SECTION ////////////////
-        //////////////////////////////////////////////
 
         this.checkInstructionSyntax();
     }
@@ -1110,6 +1069,14 @@ class Parser {
     lo8(val) {
         return val & 0xff;
         // return (val % 0x100);
+    }
+
+    getTokValue() {
+        return this.current_tok.getValue();
+    }
+
+    getTokType() {
+        return this.current_tok.getType();
     }
 
     getLine(line_num) {
@@ -1257,8 +1224,6 @@ class Parser {
             'PINA': 0x00,
         };
 
-        //const existing_equs = {};
-
         for (let [key, value] of Object.entries(existing_equs)) {
             this.newEqu(key, value, 0);
         }
@@ -1310,7 +1275,7 @@ class Parser {
 
             this.current_tok = this.line[this.tok_num]; // current token
 
-            if (this.current_tok.getType() !== 'LABEL') {
+            if (this.getTokType() !== 'LABEL') {
                 this.tok_num += 1;
                 continue;
             }
@@ -1326,7 +1291,7 @@ class Parser {
         // Label can only be at the start
         if (this.tok_num !== 0) this.newError(`Illegal label location on line ${this.line_in_file}.`);
 
-        const label = this.current_tok.getValue(); // remove the colon from the end
+        const label = this.getTokValue(); // remove the colon from the end
         this.newLabel(label, len, this.line_in_file);
 
         // Remove the label
@@ -1498,165 +1463,208 @@ class Parser {
         while (this.tok_num < this.line_length) {
             this.current_tok = this.line[this.tok_num];
 
-            //const parity_of_tokens_left = (this.line_length - 1 - tok_num) & 1; // used for calculating comma placement
-            const parity_of_current_tok = this.tok_num & 1;
-
             ///// EXECUTE THE DIRECTIVES /////
-
-            // Byte directive
-            if (parity_of_current_tok === 1 && ['.BYTE','.WORD'].includes(this.line_directive)) {
-
-                if (this.current_tok.getType() !== 'INT') {
-                    this.newError(`Bad token \'${this.current_tok.getValue()}\' on line ${this.line_in_file} at position ${this.current_tok.getStart()}.`);
-                }
-                this.dmem.push(this.lo8(this.current_tok.getValue()));
-                if (this.line_directive === '.WORD') this.dmem.push(this.hi8(this.current_tok.getValue()));
-            
-            }
-
-            // String, Ascii, Asciz directives
-            else if (parity_of_current_tok === 1 && ['.STRING', '.ASCII', '.ASCIZ'].includes(this.line_directive)) {
-
-                if (this.current_tok.getType() !== 'STR') {
-                    this.newError(`Bad token \'${this.current_tok.getValue()}\' on line ${this.line_in_file}.`);
-                }
-
-                let string_text = this.current_tok.getValue();
-                string_text = string_text.slice(1, (string_text.length - 1));   // remove quotation marks from either side
-
-                let char_ascii_value;
-                let char;
-
-                let escape = false; // if the last char was an escape character 
-                const escape_chars = {
-                    '\\': 0x5c,
-                    'n': 0x0a,
-                    't': 0x09,
-                    '\"': 0x22,
-                    '\'': 0x27,
-                    'r': 0x0d,
-                    'a': 0x07,
-                    'b': 0x08,
-                    'f': 0x0c,
-                    'v': 0x0b,
-                    '0': 0x00
-                }; // I have chosen not to add \o and \x for oct and hex numbers
-
-                // Go through each character and add it's ascii code to the data
-                for (let i = 0; i < string_text.length; i++) {
-                    char = string_text[i];
-
-                    if (!escape) {
-                        char_ascii_value = char.charCodeAt(0); // get ascii code
-                        
-                        if (char === '\\') {
-                            escape = true;
-                            if (i + 1 === string_text.length) {
-                                this.newError(`Invalid escape character \'${char}\' on line ${this.line_in_file}.`);
-                            }
-                            continue;
-                        }
-                    }
-
-                    // Make the escape character ascii value
-                    else {
-                        // Check if it's a valid escape character
-                        if (!Object.keys(escape_chars).includes(char)) {
-                            this.newError(`Invalid escape character \'\\${char}\' on line ${this.line_in_file}.`);
-                        }
-
-                        char_ascii_value = escape_chars[char]; // get ascii code
-                        escape = false;
-                    }
-                    
-                    this.dmem.push(this.lo8(char_ascii_value));           // add to data
-                }
-
-                if (['.STRING', '.ASCIZ'].includes(this.line_directive)) this.dmem.push(0);                                  // add NULL to data
-            }
-
-            // Space directive
-            else if (parity_of_current_tok === 1 && this.line_directive === '.SPACE') {
-
-                if (this.current_tok.getType() !== 'INT') { // expecting integer
-                    this.newError(`Bad token \'${this.current_tok.getValue()}\' on line ${this.line_in_file}.`);
-                }
-
-                // Check if it's the number of spaces or the content of the spaces
-                // Check if the previous token is the directive
-                // If so, it's the number of spaces
-
-                if (this.line[this.tok_num - 1].getType() === 'DIR') {              // if this integer is the number of values
-
-                    const number_of_spaces = this.current_tok.getValue();        // the number of spaces we're making
-
-                    if ((this.tok_num + 1) === this.line_length) {                // if there is no space value given, make them 0
-                        for (let i = 0; i < number_of_spaces; i++) {
-                            this.dmem.push(0);                            // add 0's for as many spaces as needed
-                        }
-                    }
-                }
-
-                // Otherwise check it's the final token
-                else if ((this.tok_num + 1) !== this.line_length) { // if it's the second argument given it must be the last
-                    this.newError(`Too many arguments given for .string on line ${this.line_in_file}.`);
-                }
-
-                // If it is the final token
-                else {
-                    const space_value = this.current_tok.getValue();             // value of the spaces
-                    const number_of_spaces = this.line[this.tok_num - 2].getValue();  // the number of spaces we're making
-                    for (let i = 0; i < number_of_spaces; i++) {
-                        this.dmem.push(this.lo8(space_value));                // add the value for as many spaces as needed
-                    }
-                }
-
-
-            }
-
-            else if (['.EQU','.SET'].includes(this.line_directive)) {
-
-                // Check the number of arguments
-                if ((this.line_length - this.tok_num) !== 3) { // if there's too many arguments
-                    this.newError(`Wrong number of arguments given for .equ on line ${this.line_in_file}.`);
-                }
-
-                // if it's the 3rd last argument (expecting REF)
-                if (this.current_tok.getType() !== 'REF') {
-                    this.newError(`Bad argument \'${this.current_tok.getValue()}\' on line ${this.line_in_file}.`);
-                }
-
-                // Move to next token
-                this.tok_num += 1;
-                this.current_tok = this.line[this.tok_num];
-
-                // Raise error if 2nd last token is not a comma
-                if (this.current_tok.getType() !== 'COMMA') {
-                    this.newError(`Bad argument \'${this.current_tok.getValue()}\' on line ${this.line_in_file}.`);
-                }
-
-                // Move to next token
-                this.tok_num += 1;
-                this.current_tok = this.line[this.tok_num];
-
-                if (this.current_tok.getType() !== 'INT') {
-                    this.newError(`Bad argument \'${this.current_tok.getValue()}\' on line ${this.line_in_file}.`);
-                }
-
-                const equ_word = this.line[this.tok_num - 2].getValue();  // get the equ name for the labels list
-                this.newEqu(equ_word, this.current_tok.getValue(), this.line_in_file);
-            }
-
-            // Should be comma if there are even number of tokens left. Raise error.
-            else if (parity_of_current_tok === 0 && this.current_tok.getType() !== 'COMMA') {
-                this.newError(`Missing comma on line ${this.line_in_file} at position ${this.current_tok.getStart()}.`);
-            }
-
-            else if ((this.tok_num + 1 === this.line.length) && this.current_tok.getType() === 'COMMA') {
-                this.newError(`Illegal comma on line ${this.line_in_file}  at position ${this.current_tok.getStart()}.`);
-            }
+            this.executeByteDirective();
+            this.executeAsciiDirectives();  // String, Ascii, Asciz directives
+            this.executeSpaceDirective();
+            this.executeSetDirectives();    // Set, Equ directives
+            this.checkDirectiveCommas();
 
             this.tok_num += 1;
+        }
+    }
+
+    executeByteDirective() {
+        const parity_of_current_tok = this.tok_num & 1;
+
+        if (parity_of_current_tok !== 1 || !['.BYTE','.WORD'].includes(this.line_directive)) {
+            return;
+        }
+
+        if (this.getTokType() !== 'INT') {
+            this.newError(`Bad token \'${this.getTokValue()}\' on line ${this.line_in_file} at position ${this.current_tok.getStart()}.`);
+        }
+
+        this.dmem.push(this.lo8(this.getTokValue()));
+
+        if (this.line_directive === '.WORD') {
+            this.dmem.push(this.hi8(this.getTokValue()));
+        }    
+    }
+
+    executeAsciiDirectives() {
+        // String, Ascii, Asciz directives
+        const parity_of_current_tok = this.tok_num & 1;
+        const is_ascii = ['.STRING', '.ASCII', '.ASCIZ'].includes(this.line_directive)
+        
+        if (parity_of_current_tok !== 1 || !is_ascii) return;
+
+        if (this.getTokType() !== 'STR') {
+            this.newError(`Bad token \'${this.getTokValue()}\' on line ${this.line_in_file}.`);
+        }
+
+        let string_text = this.getTokValue();
+        string_text = string_text.slice(1, (string_text.length - 1));   // remove quotation marks from either side
+
+        let char_ascii_value;
+        let char;
+
+        let escape = false; // if the last char was an escape character 
+        const escape_chars = {
+            '\\': 0x5c,
+            'n': 0x0a,
+            't': 0x09,
+            '\"': 0x22,
+            '\'': 0x27,
+            'r': 0x0d,
+            'a': 0x07,
+            'b': 0x08,
+            'f': 0x0c,
+            'v': 0x0b,
+            '0': 0x00
+        }; // I have chosen not to add \o and \x for oct and hex numbers
+
+        // Go through each character and add it's ascii code to the data
+        for (let i = 0; i < string_text.length; i++) {
+            char = string_text[i];
+
+            if (!escape) {
+                char_ascii_value = char.charCodeAt(0); // get ascii code
+                
+                if (char === '\\') {
+                    escape = true;
+                    if (i + 1 === string_text.length) {
+                        this.newError(`Invalid escape character \'${char}\' on line ${this.line_in_file}.`);
+                    }
+                    continue;
+                }
+            }
+
+            // Make the escape character ascii value
+            else {
+                // Check if it's a valid escape character
+                if (!Object.keys(escape_chars).includes(char)) {
+                    this.newError(`Invalid escape character \'\\${char}\' on line ${this.line_in_file}.`);
+                }
+
+                char_ascii_value = escape_chars[char]; // get ascii code
+                escape = false;
+            }
+            
+            this.dmem.push(this.lo8(char_ascii_value));           // add to data
+        }
+
+        if (['.STRING', '.ASCIZ'].includes(this.line_directive)) this.dmem.push(0);                                  // add NULL to data        
+    }
+
+    executeSpaceDirective() {
+        // Space directive
+        const parity_of_current_tok = this.tok_num & 1;
+
+        if (parity_of_current_tok !== 1 || this.line_directive !== '.SPACE') {
+            return;
+        }
+
+        if (this.getTokType() !== 'INT') { // expecting integer
+            this.newError(`Bad token \'${this.getTokValue()}\' on line ${this.line_in_file}.`);
+        }
+
+        // Check if it's the number of spaces or the content of the spaces
+        // Check if the previous token is the directive
+        // If so, it's the number of spaces
+
+        if (this.line[this.tok_num - 1].getType() === 'DIR') {              // if this integer is the number of values
+
+            const number_of_spaces = this.getTokValue();        // the number of spaces we're making
+
+            if ((this.tok_num + 1) === this.line_length) {                // if there is no space value given, make them 0
+                for (let i = 0; i < number_of_spaces; i++) {
+                    this.dmem.push(0);                            // add 0's for as many spaces as needed
+                }
+            }
+        }
+
+        // Otherwise check it's the final token
+        else if ((this.tok_num + 1) !== this.line_length) { // if it's the second argument given it must be the last
+            this.newError(`Too many arguments given for .string on line ${this.line_in_file}.`);
+        }
+
+        // If it is the final token
+        else {
+            const space_value = this.getTokValue();             // value of the spaces
+            const number_of_spaces = this.line[this.tok_num - 2].getValue();  // the number of spaces we're making
+            for (let i = 0; i < number_of_spaces; i++) {
+                this.dmem.push(this.lo8(space_value));                // add the value for as many spaces as needed
+            }
+        }
+    }
+
+    executeSetDirectives() {
+        const parity_of_current_tok = this.tok_num & 1;
+
+        if (!['.EQU','.SET'].includes(this.line_directive)) return;
+
+        // Check the number of arguments
+        if ((this.line_length - this.tok_num) !== 3) { // if there's too many arguments
+            this.newError(`Wrong number of arguments given for .equ on line ${this.line_in_file}.`);
+        }
+
+        // if it's the 3rd last argument (expecting REF)
+        if (this.getTokType() !== 'REF') {
+            this.newError(`Bad argument \'${this.getTokValue()}\' on line ${this.line_in_file}.`);
+        }
+
+        // Move to next token
+        this.tok_num += 1;
+        this.current_tok = this.line[this.tok_num];
+
+        // Raise error if 2nd last token is not a comma
+        if (this.getTokType() !== 'COMMA') {
+            this.newError(`Bad argument \'${this.getTokValue()}\' on line ${this.line_in_file}.`);
+        }
+
+        // Move to next token
+        this.tok_num += 1;
+        this.current_tok = this.line[this.tok_num];
+
+        this.asciiCharacterLiteral();
+
+        if (this.getTokType() !== 'INT') {
+            this.newError(`Bad argument \'${this.getTokValue()}\' on line ${this.line_in_file}.`);
+        }
+
+        const equ_word = this.line[this.tok_num - 2].getValue();  // get the equ name for the labels list
+        this.newEqu(equ_word, this.getTokValue(), this.line_in_file);
+    }
+
+    asciiCharacterLiteral() {
+        // Support ASCII character literals
+        if (this.getTokType() !== 'STR') return;
+
+        const val = this.getTokValue();
+
+        if (val.length !== 3 || val[0] !== val[2]) return;
+
+        const str_matcher = /^[\"\'“‘].*?[\"\'”’]/;
+        const match = str_matcher.exec(val);
+
+        if (!match) this.newError(`Bad argument \'${this.getTokValue()}\' on line ${this.line_in_file}.`);;
+
+        const charCode = val.charCodeAt(1);
+        this.current_tok.setType('INT');
+        this.current_tok.setValue(charCode); 
+    }
+
+    checkDirectiveCommas() {
+        // Should be comma if there are even number of tokens left. Raise error.
+        const parity_of_current_tok = this.tok_num & 1;
+
+        if (parity_of_current_tok === 0 && this.getTokType() !== 'COMMA') {
+            this.newError(`Missing comma on line ${this.line_in_file} at position ${this.current_tok.getStart()}.`);
+        }
+
+        else if ((this.tok_num + 1 === this.line.length) && this.getTokType() === 'COMMA') {
+            this.newError(`Illegal comma on line ${this.line_in_file}  at position ${this.current_tok.getStart()}.`);
         }
     }
 
@@ -1679,8 +1687,8 @@ class Parser {
         for (this.tok_num = 0; this.tok_num < this.line_length; this.tok_num++) {
             this.current_tok = this.line[this.tok_num];
 
-            let isRef = (this.current_tok.getType() === 'REF');
-            let isHiLo = (['HI8', 'LO8'].includes(this.current_tok.getType()));
+            let isRef = (this.getTokType() === 'REF');
+            let isHiLo = (['HI8', 'LO8'].includes(this.getTokType()));
 
             // Replace hi8/lo8 with its value
             if (isHiLo) this.evaluateHiLo();
@@ -1693,18 +1701,18 @@ class Parser {
     }
 
     evaluateHiLo() {
-        const fnct = this.current_tok.getType(); // store the function name while you're pointed at it so you can use it later
+        const fnct = this.getTokType(); // store the function name while you're pointed at it so you can use it later
 
         // Check there's enough room
         if (this.line.length <= this.tok_num + 3) {
-            this.newError(`Bad syntax on line ${this.line_in_file}. Not enough tokens given for a valid ${this.current_tok.getType()} function.`); 
+            this.newError(`Bad syntax on line ${this.line_in_file}. Not enough tokens given for a valid ${this.getTokType()} function.`); 
         }
 
         this.tok_num += 1;
 
         // Check the token we expect to be the left bracket
         if (this.line[this.tok_num].getType() !== 'LPAR') {
-            this.newError(`Illegal ${this.current_tok.getValue()} left bracket on line ${this.line_in_file}.`);
+            this.newError(`Illegal ${this.getTokValue()} left bracket on line ${this.line_in_file}.`);
         }
 
         this.tok_num += 1;
@@ -1732,7 +1740,7 @@ class Parser {
 
     evaluateRef() {
         let tok_type = 'INT';
-        let tok_val = this.current_tok.getValue();
+        let tok_val = this.getTokValue();
 
         const first_tok_val = this.line[0].getValue();  // first token in the line
 
@@ -1784,7 +1792,7 @@ class Parser {
             if (bracket_level === 0) break;
             
             this.current_tok = this.line[this.tok_num];
-            bracket_level += (this.current_tok.getType() === 'LPAR') ? 1 : (this.current_tok.getType() === 'RPAR') ? -1 : 0;
+            bracket_level += (this.getTokType() === 'LPAR') ? 1 : (this.getTokType() === 'RPAR') ? -1 : 0;
             this.tok_num += 1;
         }
 
@@ -2406,7 +2414,7 @@ class Interpreter {
         if (this.getPC() === this.break_point) this.finished = true;
 
         // Do nothing if it's finished running
-        if (this.finished | this.error) return true;        
+        if (this.finished || this.error) return true;        
 
         // If it should be finished, set it to finished then return
         if (this.getPC() >= this.flashend) {
@@ -2867,21 +2875,24 @@ class Interpreter {
         document.getElementById('status').innerHTML = null;
         throw new SyntaxError(text);
     }
-
 }
 
 class Operands {
     constructor() {
         const reg_0_31 = new Argument(['REG','INT'], 0, 31);
         const reg_16_31 = new Argument(['REG','INT'], 16, 31);
+        const reg_16_23 = new Argument(['REG','INT'], 16, 23);
         const reg_word_low = new Argument(['REG','INT'], null, null, [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]);
         const int_0_7 = new Argument('INT', 0, 7);
         const int_0_31 = new Argument('INT', 0, 31);
         const int_0_63 = new Argument('INT', 0, 63);
         const int_0_255 = new Argument('INT', 0, 255);
         const int_n64_63 = new Argument('INT', -64, 63);
+        const int_n2048_2047 = new Argument('INT', -2048, 2047);
         const word_plus_q_0_63 = new Argument('WORDPLUSQ', 0, 63);
         const word_wxyz = new Argument(['REG','INT'], null, null, [24, 26, 28, 30]);
+        const word_var = new Argument(['WORD', 'MINUSWORD', 'WORDPLUS']);
+        const ram_val = new Argument('INT', 0x100, 0x8ff); // ramend = 0x8ff
 
         this.functions = new Functions();
 
@@ -2917,7 +2928,7 @@ class Operands {
             'BRVS': [int_n64_63],
             'BSET': [int_0_7],
             'BST': [reg_0_31, int_0_7],
-            'CALL': [new Argument(['INT', 'REF'], 0, 16383, this.functions.getFunctions())], // 16383 because flashend = 0x3fff
+            'CALL': [new Argument(['INT', 'REF'], 0, 0x3fff, this.functions.getFunctions())], // flashend = 0x3fff
             'CBI': [int_0_31, int_0_7],
             'CBR': [reg_16_31, int_0_255],
             'CLC': null,
@@ -2936,18 +2947,18 @@ class Operands {
             'CPSE': [reg_0_31, reg_0_31],
             'DEC': [reg_0_31],
             'EOR': [reg_0_31, reg_0_31],
-            'FMUL': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
-            'FMULS': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
-            'FMULSU': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
+            'FMUL': [reg_16_23, reg_16_23],
+            'FMULS': [reg_16_23, reg_16_23],
+            'FMULSU': [reg_16_23, reg_16_23],
             'ICALL': null,
             'IJMP': null,
             'IN': [reg_0_31, int_0_63],
             'INC': [reg_0_31],
             'JMP': [new Argument('INT', 0, 16383)], // 16383 because flashend = 0x3fff
-            'LD': [reg_0_31, new Argument(['WORD', 'MINUSWORD', 'WORDPLUS'])],
+            'LD': [reg_0_31, word_var],
             'LDD': [reg_0_31, word_plus_q_0_63],
             'LDI': [reg_16_31, int_0_255],
-            'LDS': [reg_0_31, new Argument('INT', 256, 2303)],  // 2303 because ramend = 0x8ff
+            'LDS': [reg_0_31, ram_val],  
             'LPM': [reg_0_31, new Argument(['WORD', 'WORDPLUS'])],
             'LSL': [reg_0_31],
             'LSR': [reg_0_31],
@@ -2955,7 +2966,7 @@ class Operands {
             'MOVW': [reg_word_low, reg_word_low],
             'MUL': [reg_0_31, reg_0_31],
             'MULS': [reg_16_31, reg_16_31],
-            'MULSU': [new Argument(['REG','INT'], 16, 23), new Argument(['REG','INT'], 16, 23)],
+            'MULSU': [reg_16_23, reg_16_23],
             'NEG': [reg_0_31],
             'NOP': null,
             'OR': [reg_0_31, reg_0_31],
@@ -2963,9 +2974,9 @@ class Operands {
             'OUT': [int_0_63, reg_0_31],
             'POP': [reg_0_31],
             'PUSH': [reg_0_31],
-            'RCALL': [new Argument('INT', -2048, 2047)],
+            'RCALL': [int_n2048_2047],
             'RET': null,
-            'RJMP': [new Argument('INT', -2048, 2047)],
+            'RJMP': [int_n2048_2047],
             'ROL': [reg_0_31],
             'ROR': [reg_0_31],
             'SBC': [reg_0_31, reg_0_31],
@@ -2984,9 +2995,9 @@ class Operands {
             'SET': null,
             'SEV': null,
             'SEZ': null,
-            'ST': [new Argument(['WORD', 'MINUSWORD', 'WORDPLUS']), reg_0_31],
+            'ST': [word_var, reg_0_31],
             'STD': [word_plus_q_0_63, reg_0_31],
-            'STS': [new Argument('INT', 256, 2303), reg_0_31],  // 2303 because ramend = 0x8ff
+            'STS': [ram_val, reg_0_31],
             'SUB': [reg_0_31, reg_0_31],
             'SUBI': [reg_16_31, int_0_255],
             'SWAP': [reg_0_31],
@@ -3303,7 +3314,7 @@ class App {
         // Clear the current data for if there's an error
         this.resetAll();
 
-        // Tokenizing
+        // Tokenising
         this.lexer.newData(txt);
         if (print) console.log(this.lexer.toString());
 
