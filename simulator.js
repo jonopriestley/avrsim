@@ -171,10 +171,8 @@ class Argument {
     }
 
     newError(text) {
-        document.getElementById('error').innerHTML = text;
-        document.getElementById('output').innerHTML = null;
-        document.getElementById('status').innerHTML = null;
-        throw new SyntaxError(text);
+        const s = new StatusHandler();
+        s.newError(text);
     }
 }
 
@@ -754,10 +752,8 @@ class Lexer {
     }
 
     newError(text) {
-        document.getElementById('error').innerHTML = text;
-        document.getElementById('output').innerHTML = null;
-        document.getElementById('status').innerHTML = null;
-        throw new SyntaxError(text);
+        const s = new StatusHandler();
+        s.newError(text);
     }
 
 }
@@ -851,10 +847,8 @@ class ExpressionEvaluator {
     }
 
     newError(text) {
-        document.getElementById('error').innerHTML = text;
-        document.getElementById('output').innerHTML = null;
-        document.getElementById('status').innerHTML = null;
-        throw new SyntaxError(text);
+        const s = new StatusHandler();
+        s.newError(text);
     }
 }
 
@@ -1817,10 +1811,8 @@ class Parser {
     }
 
     newError(text) {
-        document.getElementById('error').innerHTML = text;
-        document.getElementById('output').innerHTML = null;
-        document.getElementById('status').innerHTML = null;
-        throw new SyntaxError(text);
+        const s = new StatusHandler();
+        s.newError(text);
     }
 
 }
@@ -1850,7 +1842,7 @@ class Interpreter {
         this.branches_seen = 0;
         this.finished = false;
         this.error = false;
-        this.error_text = '';
+        //this.error_text = '';
         this.break_point = null;
         this.print = true;
     }
@@ -1865,7 +1857,7 @@ class Interpreter {
         this.lines = this.txt.split('\n');
         this.finished = false;
         this.error = false;
-        this.error_text = '';
+        //this.error_text = '';
         this.step_count = 0;
         this.cycles = 0;
         this.branches_taken = 0;
@@ -2868,12 +2860,10 @@ class Interpreter {
     }
 
     newError(text) {
-        this.error = true;
-        this.error_text = text;
-        document.getElementById('error').innerHTML = text;
-        document.getElementById('output').innerHTML = null;
-        document.getElementById('status').innerHTML = null;
-        throw new SyntaxError(text);
+        //this.error = true;
+        //this.error_text = text;
+        const s = new StatusHandler();
+        s.newError(text);
     }
 }
 
@@ -3230,6 +3220,257 @@ class Directives {
     }
 }
 
+class StatusHandler {
+    constructor() {
+    }
+
+    success(text) {
+        this.assembled = true;
+        this.setinnerHTML('error', null);
+        this.setinnerHTML('output', text);
+        this.setinnerHTML('status', null);
+        this.flash("#b0f0b0", 700);
+    }
+
+    emptyStatus() {
+        this.setinnerHTML('error', null);
+        this.setinnerHTML('output', null);
+        this.setinnerHTML('status', '---');
+    }
+
+    newError(text) {
+        this.setinnerHTML('error', text);
+        this.setinnerHTML('output', null);
+        this.setinnerHTML('status', null);
+        this.flash("#f0b0b0", 700);
+        throw new SyntaxError(text);
+    }
+
+    interpolate(form, start, end, t) {
+        // form -> linear = 0, smooth = 1, smoother = 2
+        let val;
+        if (form === 0) val = t;    // linear
+        else if (form === 1) val = (t * t * (3 - 2 * t));  // 3x^2 - 2x^3
+        else if (form === 2) val = (t * t * t * (t * (6 * t - 15) + 10)) // 6x^5 - 15x^4 + 10x^3
+
+        return Math.round(start * (1 - val) + end * val);
+    }
+
+    setBackgroundColour(elem_id, colour) {
+        document.getElementById(elem_id).style.backgroundColor = colour;
+    }
+
+    setinnerHTML(elem_id, txt) {
+        document.getElementById(elem_id).innerHTML = txt;
+    }
+
+    toHex(val) {
+        return val.toString(16).padStart(2, '0');
+    }
+
+    async flash(bg_colour, length_ms = 1000) {
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        
+        const sleep_time = 10;
+        const iterations = Math.round(length_ms / sleep_time);
+        
+        const start = bg_colour.replace('#', '');
+        const end_val = window.getComputedStyle(document.documentElement).getPropertyValue('--bg-button').trim();
+        const end = end_val.replace('#', '');
+        
+        const r1 = parseInt(start.substring(0, 2), 16);
+        const g1 = parseInt(start.substring(2, 4), 16);
+        const b1 = parseInt(start.substring(4, 6), 16);
+        
+        const r2 = parseInt(end.substring(0, 2), 16);
+        const g2 = parseInt(end.substring(2, 4), 16);
+        const b2 = parseInt(end.substring(4, 6), 16);
+        
+        this.setBackgroundColour('code_box', bg_colour);
+        this.setBackgroundColour('lines_box', bg_colour);
+        //document.documentElement.style.setProperty('--bg', bg_colour);
+
+        let r, g, b, t, colour;
+        for (let i = 0; i <= iterations; i++) {
+            t = i / iterations;
+
+            r = this.interpolate(2, r1, r2, t);
+            g = this.interpolate(2, g1, g2, t);
+            b = this.interpolate(2, b1, b2, t);
+
+            colour = `#${this.toHex(r)}${this.toHex(g)}${this.toHex(b)}`;
+            this.setBackgroundColour('code_box', colour);
+            this.setBackgroundColour('lines_box', colour);
+            //document.documentElement.style.setProperty('--bg', colour);
+
+            await sleep(sleep_time);
+        }
+
+        this.setBackgroundColour('code_box', 'var(--bg)');
+        this.setBackgroundColour('lines_box', 'var(--bg)');
+    }
+
+}
+
+class EventListeners {
+    constructor() {
+        this.theme = null;
+        this.button_over_colour = null;
+    }
+
+    run(theme, button_over_colour) {
+        this.theme = theme;
+        this.button_over_colour = button_over_colour;
+        this.assignSupports();
+    }
+
+    updateTheme(theme) {
+        this.theme = theme;
+    }
+
+    updateButtonOverColour(button_over_colour) {
+        this.button_over_colour = button_over_colour;
+    }
+
+    assignSupports() {
+        // Add script support
+        this.codeBoxSupports();
+        this.buttonSupports();
+    }
+
+    codeBoxSupports() {
+        const code_box = document.getElementById('code_box');
+        const keys_down = [];
+
+
+        // Let tab be '\t' instead of move to next element
+        code_box.addEventListener('keydown', event => {
+            // Add key to list of key's down
+            if (!keys_down.includes(event.key)) {
+                keys_down.push(event.key);
+            }
+
+            // Update max value for break point
+            document.getElementById('break_point').max = `${code_box.value.split('\n').length + 1}`;
+
+            if (event.key === 'Enter') this.codeBoxEnter(event, code_box);
+            if (event.key === 'Tab') this.codeBoxTab(event, code_box);
+        });
+
+        document.addEventListener('keyup', event => {
+            // Remove key from list of key's down
+            const k = keys_down.indexOf(event.key);
+            if (k !== -1) {
+                keys_down.splice(k,1);
+            }
+        });
+
+        // Make the line numbers on keyup
+        code_box.addEventListener('keyup', event => {
+            // count lines and make the line counter display that many lines
+            const line_count = code_box.value.split('\n').length;
+            const lines_box = document.getElementById('lines_box');
+            lines_box.innerHTML = '';
+            
+            for (let i = 1; i < line_count + 1; i++) {
+                lines_box.innerHTML += `${i}\n`;
+            }
+        });
+
+
+        // Scroll both boxes
+        code_box.addEventListener('scroll', event => {
+            const lines_box = document.getElementById('lines_box');
+            lines_box.scrollTop = code_box.scrollTop;
+        });
+    }
+
+    codeBoxEnter(event, code_box) {
+        // When enter key is pressed update the line number of the breakpoint if it has changed
+        if (document.getElementById('break_point').value === '') return;
+
+        const bp_value = parseInt(document.getElementById('break_point').value, 10);
+
+        const start_of_break_point_line = code_box.value.split('\n').slice(0, bp_value - 1).toString().replaceAll(',', '').length + bp_value - 1;
+
+        if (code_box.selectionStart > start_of_break_point_line) return;
+
+        document.getElementById('break_point').value = `${bp_value + 1}`;   
+    }
+
+    codeBoxTab(event, code_box) {
+        // allowing tab to work in a text section
+        event.preventDefault();
+        const start = code_box.selectionStart;
+        const end = code_box.selectionEnd;
+
+        // single line tab
+        if (!code_box.value.substring(start, end).includes('\n')) {
+            code_box.value = code_box.value.substring(0, start) + '\t' + code_box.value.substring(end);
+            code_box.selectionEnd = end + 1;  // move the text caret to the tab point
+            return;
+        }
+
+        // go back to the start OR to the previous \n
+        let i = start;
+        while (i > 0) {
+            if (code_box.value[i - 1] === '\n') break;
+            i = i - 1;
+        }
+
+        // add \t if you're at index 0 (since you can't go back any further)
+        if (i === 0) {
+            code_box.value = '\t' + code_box.value;
+            i = i + 1;
+        }
+        
+        // add \t after each \n
+        while (i < end) {
+            if (code_box.value[i - 1] === '\n') {
+            code_box.value = code_box.value.substring(0, i) + '\t' + code_box.value.substring(i);
+            }
+            i = i + 1;
+        }
+
+        code_box.selectionEnd = end + 1;  // move the text caret to the tab point
+    }
+
+    buttonSupports() {
+        const buttons = document.getElementsByClassName('button');
+
+        // Button mouse enter
+        for (let i = 0; i < buttons.length; i++) {
+            buttons[i].addEventListener('mouseenter', event => {
+                buttons[i].style.backgroundColor = this.button_over_colour;
+                buttons[i].style.borderColor = (this.theme === 'light') ? '#d0d0d0' : '#5e5e5e';
+            });
+        }
+
+        // Button mouse leave
+        for (let i = 0; i < buttons.length; i++) {
+            buttons[i].addEventListener('mouseleave', event => {
+                buttons[i].style.backgroundColor = 'var(--bg-button)';
+                buttons[i].style.borderColor = 'var(--border-colour)';
+            });
+        }
+
+        // Button mouse down
+        for (let i = 0; i < buttons.length; i++) {
+            buttons[i].addEventListener('mousedown', event => {
+                buttons[i].style.backgroundColor = (this.theme === 'light') ? '#ddd' : '#4e4e4e';
+                buttons[i].style.borderColor = (this.theme === 'light') ? '#c0c0c0' : '#6e6e6e';
+            });
+        }
+
+        // Button mouse up
+        for (let i = 0; i < buttons.length; i++) {
+            buttons[i].addEventListener('mouseup', event => {
+                buttons[i].style.backgroundColor = this.button_over_colour;
+                buttons[i].style.borderColor = (this.theme === 'light') ? '#d0d0d0' : '#5e5e5e';
+            });
+        }
+    }
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // # AN EASTER EGG - POEM                                                                                            /
@@ -3267,7 +3508,10 @@ class App {
         this.lexer = new Lexer();
         this.parser = new Parser();
         this.interpreter = new Interpreter();
+
         this.inst_set = new InstructionSet();
+        this.status_handler = new StatusHandler();
+        this.event_listeners = new EventListeners();
 
         this.pause = true;
 
@@ -3298,7 +3542,9 @@ class App {
 
         this.button_bg = '#fcfcfc';
         this.button_border = '#d0d0d0';
+        this.button_over_colour = '#eee';
 
+        this.event_listeners.run(this.theme, this.button_over_colour);
     }
 
     assemble(print = true) {
@@ -3325,7 +3571,7 @@ class App {
         this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), txt, this.parser.break_point);
 
         // Success!
-        this.success('Success! Your code can be run.');
+        if (print) this.success('Success! Your code can be run.');
 
         // Populating Display with Data
         this.pmem_top = this.interpreter.getPC() - ( this.interpreter.getPC() % 8 );
@@ -3341,6 +3587,7 @@ class App {
         // Run
         if (prog_type === 2) this.interpreter.run();
 
+        // Run slowly
         else if (prog_type === 1) this.interpreter.step();
         
         // Step
@@ -3351,12 +3598,13 @@ class App {
             }
         }
 
-        this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
+        const current_pc = this.interpreter.getPC();
+        this.pmem_top = current_pc - (current_pc % 8); // move pmem display to the line
 
-        if (this.interpreter.error) return this.newError(this.interpreter.error_text);
+        //if (this.interpreter.error) return this.newError(this.interpreter.error_text);
 
         if (this.interpreter.finished) {
-            if (this.interpreter.break_point !== this.interpreter.getPC()) this.success('The code has run and exited successfully!');
+            if (this.interpreter.break_point !== current_pc) this.success('The code has run and exited successfully!');
             else this.success(`The code has run and exited successfully at the breakpoint on line ${this.parser.break_point_line}!`);
         }
 
@@ -3441,22 +3689,15 @@ class App {
         this.assembled = false;                 // reset the assembling
         this.pauseRun();
 
-        const normal_background_colour = '#ddd';
-        const normal_text_colour = '#444';
-
         // Registers
         for (let reg_num = 0; reg_num < 32; reg_num++) {
             this.setinnerHTML(`reg-${reg_num}`, '?');
-            this.setBackgroundColour(`reg-${reg_num}`, normal_background_colour);
-            this.setColour(`reg-${reg_num}`, normal_text_colour);
         }
 
         // SREG
         const sreg_flags = ['C', 'Z', 'N', 'V', 'S', 'H', 'T', 'I'];
         for (let i = 0; i < 8; i++) {
             this.setinnerHTML(`sreg-${sreg_flags[i]}`, '?'); // set the inner HTML
-            this.setBackgroundColour(`sreg-${sreg_flags[i]}`, normal_background_colour);
-            this.setColour(`sreg-${sreg_flags[i]}`, normal_text_colour);
         }
 
         // Pointers
@@ -3466,26 +3707,17 @@ class App {
         this.setinnerHTML('reg-Y', '?');
         this.setinnerHTML('reg-Z', '?');
 
-        const pmem_line_num_normal_background_colour = '#bbb';
-        const pmem_line_num_normal_text_colour = '#333';
-
         // PMEM
         for (let line = 0; line < 8; line++) {
             this.setinnerHTML(`pmem-line-${line}`, '?');
-            this.setBackgroundColour(`pmem-linenum-${line}`, pmem_line_num_normal_background_colour);
-            this.setColour(`pmem-linenum-${line}`, pmem_line_num_normal_text_colour);
         }
         
         // DMEM
         for (let line = 0; line < 8; line++) {
             for (let row = 0; row < 8; row++) {
                 this.setinnerHTML(`dmem-line-${line}${row}`, '?');
-                this.setBackgroundColour(`dmem-line-${line}${row}`, normal_background_colour);
-                this.setColour(`dmem-line-${line}${row}`, normal_text_colour);
-
             }
         }
-        
     }
 
     populateAll() {
@@ -3697,23 +3929,16 @@ class App {
 
     success(text) {
         this.assembled = true;
-        this.setinnerHTML('error', null);
-        this.setinnerHTML('output', text);
-        this.setinnerHTML('status', null);
+        this.status_handler.success(text);
     }
 
     emptyStatus() {
-        this.setinnerHTML('error', null);
-        this.setinnerHTML('output', null);
-        this.setinnerHTML('status', '---');
+        this.status_handler.emptyStatus();
     }
 
     newError(text) {
         this.assembled = false;
-        this.setinnerHTML('error', text);
-        this.setinnerHTML('output', null);
-        this.setinnerHTML('status', null);
-        throw new SyntaxError(text);
+        this.status_handler.newError(text);
     }
 
     setBackgroundColour(elem_id, colour) {
@@ -5076,73 +5301,45 @@ class App {
         this.table_heading_bg = (this.theme === 'dark') ? '#474747' : '#bbb';
         this.table_body_bg = (this.theme === 'dark') ? '#7e7e7e' : '#ddd';
         this.status_background_colour = (this.theme === 'dark') ? '#404040' : '#eee';
+        this.status_border_colour = (this.theme === 'dark') ? '#4e4e4e' : '#ccc';
         this.muted_text_colour = (this.theme === 'dark') ? '#aaa' : '#777';
 
         this.button_bg = (this.theme === 'dark') ? '#333333' : '#fcfcfc';
         this.button_border = (this.theme === 'dark') ? '#5e5e5e' : '#d0d0d0';
+        this.button_over_colour = (this.theme === 'dark') ? '#3e3e3e' : '#eee';
+
+        this.updateEventListeners();
+    }
+
+    updateEventListeners() {
+        this.event_listeners.updateTheme(this.theme);
+        this.event_listeners.updateButtonOverColour(this.button_over_colour);
     }
 
     setRootProperties() {
-        document.querySelector(':root').style.setProperty('--bg', this.bg);
-        document.querySelector(':root').style.setProperty('--fg', this.fg);
-        document.querySelector(':root').style.setProperty('--color-text-muted', this.muted_text_colour);
-    }
+        document.documentElement.style.setProperty('--bg', this.bg);
+        document.documentElement.style.setProperty('--fg', this.fg);
+        document.documentElement.style.setProperty('--border-colour', this.border_color);
 
-    getBorderString() {
-        return this.borderThickness + ' ' + this.borderStyle + ' ' + this.border_color;
+        document.documentElement.style.setProperty('--table-body-bg', this.table_body_bg);
+        document.documentElement.style.setProperty('--table-heading-bg', this.table_heading_bg);
+        document.documentElement.style.setProperty('--color-text-muted', this.muted_text_colour);
+        
+        document.documentElement.style.setProperty('--bg-button', this.button_bg);
+        document.documentElement.style.setProperty('--border-button', this.button_border);
+        
+        document.documentElement.style.setProperty('--status-background-colour', this.status_background_colour);
+        document.documentElement.style.setProperty('--status-border-colour', this.status_border_colour);
     }
 
     toggleTheme() {
 
         this.toggleThemeVariables();
 
-        if (this.theme === 'dark') this.setinnerHTML('button_theme', 'Theme: Dark');
-        else                       this.setinnerHTML('button_theme', 'Theme: Light');
+        const theme_name = this.theme.charAt(0).toUpperCase() + this.theme.slice(1);
+        this.setinnerHTML('button_theme', `Theme: ${theme_name}`);
 
         this.setRootProperties();
-
-        this.setBackgroundColour('status', this.status_background_colour);
-        document.getElementById('status').style.border = this.getBorderString();
-
-        const panels = document.getElementsByClassName('panel');
-        for (let i = 0; i < panels.length; i++) {
-            panels[i].style.border = this.getBorderString();
-        }
-
-        // Include the ISA link button and download link button
-        const buttons = document.getElementsByClassName('button');
-        for (let i = 0; i < buttons.length; i++) {
-            buttons[i].style.backgroundColor = this.button_bg;
-            buttons[i].style.borderColor = this.button_border;
-            buttons[i].style.border = this.getBorderString();
-        }
-
-        const text_boxes = document.getElementsByTagName('textarea');
-        for (let i = 0; i < text_boxes.length; i++) {
-            text_boxes[i].style.borderColor = this.border_color;
-        }
-
-        const table_headings = document.getElementsByTagName('th');
-        for (let i = 0; i < table_headings.length; i++) {
-            table_headings[i].style.backgroundColor = this.table_heading_bg;
-        }
-
-        const table_bodies = document.getElementsByTagName('td');
-        for (let i = 0; i < table_bodies.length; i++) {
-            table_bodies[i].style.backgroundColor = this.table_body_bg;
-        }
-
-        const smalls_body = [...document.getElementsByClassName('table-reg-small'),
-        ...document.getElementsByClassName('table-sreg-small'),
-        ...document.getElementsByClassName('table-dmem-body-small')];
-        for (let i = 0; i < smalls_body.length; i++) {
-            smalls_body[i].style.backgroundColor = this.table_body_bg;
-        }
-
-        const smalls_headings = document.getElementsByClassName('table-pmem-heading-small');
-        for (let i = 0; i < smalls_headings.length; i++) {
-            smalls_headings[i].style.backgroundColor = this.table_heading_bg;
-        }
 
         this.populateAll();
     }

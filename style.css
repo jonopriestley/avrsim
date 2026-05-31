@@ -1,8 +1,19 @@
 :root {
     --fg: #444;
     --bg: #fff;
-    --bg-button: #fcfcfc;
+
+    --border-colour: #e0e0e0;
+
     --color-text-muted: #777;
+    --table-heading-bg: #bbb;
+    --table-body-bg: #ddd;
+
+    --status-background-colour: #eee;
+    --status-border-colour: #ccc;
+
+    --bg-button: #fcfcfc;
+    --border-button: #d0d0d0;
+    
 }
 
 body {
@@ -79,10 +90,12 @@ h1 {
 
 .status {
     color: var(--fg);
-    background-color: #eee;
+    background-color: var(--status-background-colour);
     font-family: Arial, Helvetica, sans-serif; 
     font-weight: 100;
-    border: 1px solid #ccc;
+    border-width: 1px;
+    border-style: solid;
+    border-color: var(--status-border-colour);
     border-radius: 5px;
     padding: 15px 20px;
     margin-bottom: 10px;
@@ -102,10 +115,11 @@ h1 {
 
 .panel {
     background-color: var(--bg);
-    border: 1px solid transparent;
+    border-width: 1px;
+    border-style: solid;
+    border-color: var(--border-colour);
     border-radius: 10px;
     box-shadow: 0 1px 2px -1px black;
-    border-color: #e0e0e0;
     margin-bottom: 10px;
 }
 
@@ -148,7 +162,9 @@ textarea {
     background-color: var(--bg);
     font-size: 16px;
     font-family: 'Source Code Pro', 'Courier New', Courier, sans-serif;
-    border: 1px solid #e0e0e0;
+    border-width: 1px;
+    border-style: solid;
+    border-color: var(--border-colour);
     border-radius: 10px;
     padding: 10px;
     align-self: center;
@@ -200,7 +216,9 @@ textarea {
     color: var(--fg);
     background-color: var(--bg-button);
     font-family: sans-serif;
-    border: 1px solid #e0e0e0;
+    border-width: 1px;
+    border-style: solid;
+    border-color: var(--border-button);
     font-size: 16px;
     border-radius: 10px;
     margin-bottom: 5px;
@@ -289,7 +307,6 @@ textarea {
     color: var(--fg);
     background-color: var(--bg-button);
     font-family: sans-serif;
-    border: 1px solid #e0e0e0; 
 }
 
 .select-step {
@@ -317,14 +334,14 @@ th {
     font-size: 15px;
     font-family: Arial, Helvetica, sans-serif;
     font-weight: bold;
-    background-color: #bbb;
+    background-color: var(--table-heading-bg);
 }
 
 td {
     color: var(--fg);
     font-size: 18px;
     font-family: 'Source Code Pro', 'Courier New', Courier, monospace;
-    background-color: #ddd;
+    background-color: var(--table-body-bg);
 }
 
 .table-reg {
