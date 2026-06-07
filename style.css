@@ -12,7 +12,12 @@
     --status-border-colour: #ccc;
 
     --bg-button: #fcfcfc;
+    --bg-button-hover: #eee;
+    --bg-button-active: #ddd;
+    
     --border-button: #d0d0d0;
+    --border-button-hover: #d0d0d0;
+    --border-button-active: #c0c0c0;
     
 }
 
@@ -222,6 +227,16 @@ textarea {
     font-size: 16px;
     border-radius: 10px;
     margin-bottom: 5px;
+}
+
+.button:hover {
+    background-color: var(--bg-button-hover);
+    border-color: var(--border-button-hover);
+}
+
+.button:active {
+    background-color: var(--bg-button-active);
+    border-color: var(--border-button-active);
 }
 
 .button-theme {

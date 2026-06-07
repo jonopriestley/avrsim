@@ -3288,7 +3288,6 @@ class StatusHandler {
         
         this.setBackgroundColour('code_box', bg_colour);
         this.setBackgroundColour('lines_box', bg_colour);
-        //document.documentElement.style.setProperty('--bg', bg_colour);
 
         let r, g, b, t, colour;
         for (let i = 0; i <= iterations; i++) {
@@ -3301,7 +3300,6 @@ class StatusHandler {
             colour = `#${this.toHex(r)}${this.toHex(g)}${this.toHex(b)}`;
             this.setBackgroundColour('code_box', colour);
             this.setBackgroundColour('lines_box', colour);
-            //document.documentElement.style.setProperty('--bg', colour);
 
             await sleep(sleep_time);
         }
@@ -3314,28 +3312,6 @@ class StatusHandler {
 
 class EventListeners {
     constructor() {
-        this.theme = null;
-        this.button_over_colour = null;
-    }
-
-    run(theme, button_over_colour) {
-        this.theme = theme;
-        this.button_over_colour = button_over_colour;
-        this.assignSupports();
-    }
-
-    updateTheme(theme) {
-        this.theme = theme;
-    }
-
-    updateButtonOverColour(button_over_colour) {
-        this.button_over_colour = button_over_colour;
-    }
-
-    assignSupports() {
-        // Add script support
-        this.codeBoxSupports();
-        this.buttonSupports();
     }
 
     codeBoxSupports() {
@@ -3434,41 +3410,86 @@ class EventListeners {
 
         code_box.selectionEnd = end + 1;  // move the text caret to the tab point
     }
+}
 
-    buttonSupports() {
-        const buttons = document.getElementsByClassName('button');
+class ThemeHandler {
+    constructor() {
+        this.theme = 'light';
 
-        // Button mouse enter
-        for (let i = 0; i < buttons.length; i++) {
-            buttons[i].addEventListener('mouseenter', event => {
-                buttons[i].style.backgroundColor = this.button_over_colour;
-                buttons[i].style.borderColor = (this.theme === 'light') ? '#d0d0d0' : '#5e5e5e';
-            });
+        this.bg = '#fff';
+        this.fg = '#444';
+        this.border_color = '#e0e0e0';
+
+        this.table_heading_bg = '#bbb';
+        this.table_body_bg = '#ddd';
+        this.status_background_colour = '#eee';
+        this.muted_text_colour = '#777';
+
+        this.button_bg = '#fcfcfc';
+        this.button_bg_hover = '#eee';
+        this.button_bg_active = '#ddd';
+
+        this.button_border = '#d0d0d0';
+        this.button_border_hover = '#d0d0d0';
+        this.button_border_active = '#c0c0c0';
+    }
+
+    getTheme() {
+        return this.theme;
+    }
+
+    toggleThemeVariables() {
+        this.theme = (this.theme === 'dark') ? 'light' : 'dark';
+
+        this.bg = (this.theme === 'dark') ? '#2e2e2e' : '#fff';
+        this.fg = (this.theme === 'dark') ? '#fff' : '#444';
+        this.border_color = (this.theme === 'dark') ? '#4e4e4e' : '#e0e0e0';
+
+        this.table_heading_bg = (this.theme === 'dark') ? '#474747' : '#bbb';
+        this.table_body_bg = (this.theme === 'dark') ? '#7e7e7e' : '#ddd';
+        this.status_background_colour = (this.theme === 'dark') ? '#404040' : '#eee';
+        this.status_border_colour = (this.theme === 'dark') ? '#4e4e4e' : '#ccc';
+        this.muted_text_colour = (this.theme === 'dark') ? '#aaa' : '#777';
+
+        this.button_bg = (this.theme === 'dark') ? '#333333' : '#fcfcfc';
+        this.button_bg_hover = (this.theme === 'dark') ? '#3e3e3e' : '#eee';
+        this.button_bg_active = (this.theme === 'dark') ? '#4e4e4e' : '#ddd';
+
+        this.button_border = (this.theme === 'dark') ? '#5e5e5e' : '#d0d0d0';
+        this.button_border_hover = (this.theme === 'dark') ? '#5e5e5e' : '#d0d0d0';
+        this.button_border_active = (this.theme === 'dark') ? '#6e6e6e' : '#c0c0c0';
+    }
+
+    setRootProperties() {
+        const style_variables = {
+            '--bg': this.bg,
+            '--fg': this.fg,
+            '--border-colour': this.border_color,
+            '--table-body-bg': this.table_body_bg,
+            '--table-heading-bg': this.table_heading_bg,
+            '--color-text-muted': this.muted_text_colour,
+            '--bg-button': this.button_bg,
+            '--border-button': this.button_border,
+            '--bg-button-hover': this.button_bg_hover,
+            '--border-button-hover': this.button_border_hover,
+            '--bg-button-active': this.button_bg_active,
+            '--border-button-active': this.button_border_active,
+            '--status-background-colour': this.status_background_colour,
+            '--status-border-colour': this.status_border_colour
+        };
+
+        const entries = Object.entries(style_variables);
+        let entry;
+
+        for (let i = 0; i < entries.length; i++) {
+            entry = entries[i];
+            this.setStyleVariable(entry[0], entry[1]);
         }
 
-        // Button mouse leave
-        for (let i = 0; i < buttons.length; i++) {
-            buttons[i].addEventListener('mouseleave', event => {
-                buttons[i].style.backgroundColor = 'var(--bg-button)';
-                buttons[i].style.borderColor = 'var(--border-colour)';
-            });
-        }
+    }
 
-        // Button mouse down
-        for (let i = 0; i < buttons.length; i++) {
-            buttons[i].addEventListener('mousedown', event => {
-                buttons[i].style.backgroundColor = (this.theme === 'light') ? '#ddd' : '#4e4e4e';
-                buttons[i].style.borderColor = (this.theme === 'light') ? '#c0c0c0' : '#6e6e6e';
-            });
-        }
-
-        // Button mouse up
-        for (let i = 0; i < buttons.length; i++) {
-            buttons[i].addEventListener('mouseup', event => {
-                buttons[i].style.backgroundColor = this.button_over_colour;
-                buttons[i].style.borderColor = (this.theme === 'light') ? '#d0d0d0' : '#5e5e5e';
-            });
-        }
+    setStyleVariable(var_name, value) {
+        document.documentElement.style.setProperty(var_name, value);
     }
 }
 
@@ -3510,8 +3531,12 @@ class App {
         this.interpreter = new Interpreter();
 
         this.inst_set = new InstructionSet();
+
         this.status_handler = new StatusHandler();
+        this.theme_handler = new ThemeHandler();
         this.event_listeners = new EventListeners();
+
+        this.event_listeners.codeBoxSupports();
 
         this.pause = true;
 
@@ -3525,26 +3550,6 @@ class App {
         this.current_popup = null; 
 
         this.ascii_table = this.makeAsciiTable();
-
-        this.theme = 'light';
-
-        this.borderStyle = 'solid';
-        this.borderThickness = '1px';
-
-        this.bg = '#fff';
-        this.fg = '#444';
-        this.border_color = '#e0e0e0';
-
-        this.table_heading_bg = '#bbb';
-        this.table_body_bg = '#ddd';
-        this.status_background_colour = '#eee';
-        this.muted_text_colour = '#777';
-
-        this.button_bg = '#fcfcfc';
-        this.button_border = '#d0d0d0';
-        this.button_over_colour = '#eee';
-
-        this.event_listeners.run(this.theme, this.button_over_colour);
     }
 
     assemble(print = true) {
@@ -3571,7 +3576,7 @@ class App {
         this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), txt, this.parser.break_point);
 
         // Success!
-        if (print) this.success('Success! Your code can be run.');
+        this.success('Success! Your code can be run.', print);
 
         // Populating Display with Data
         this.pmem_top = this.interpreter.getPC() - ( this.interpreter.getPC() % 8 );
@@ -3650,12 +3655,10 @@ class App {
         const steps_back = this.getStepSize();
         const steps = this.interpreter.step_count - steps_back;       // the total number of steps to get to the point you want to go for
         
-        if (steps < 0) {
-            this.assemble(false);
-            return;
-        }
-
         this.assemble(false);
+
+        if (steps < 0) return;
+
         this.emptyStatus();
         this.hideOpenPopup(); // hide any open popup
 
@@ -3670,10 +3673,10 @@ class App {
         if (steps > 0) this.interpreter.step();    // Take the step once the change has been cleared
 
         this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
+        
+        this.interpreter.setPrint(true);    // allow printing again
 
         this.populateAll();
-
-        this.interpreter.setPrint(true);    // allow printing again
     }
 
     clearRegChange() {
@@ -3730,13 +3733,20 @@ class App {
         this.fillPopup();
     }
 
+    setFgBG(elem_id, colour_fg, colour_bg) {
+        this.setBackgroundColour(elem_id, colour_bg);
+        this.setColour(elem_id, colour_fg);
+    }
+
     populateRegisters() {
         if (!this.assembled) return;
 
         const registers = this.interpreter.getDMEM().slice(0, 32);
 
-        const no_change_background_colour = (this.theme === 'light') ? '#ddd' : '#7e7e7e';
-        const no_change_text_colour = (this.theme === 'light') ? '#444' : '#fff';
+        const is_light = (this.theme_handler.getTheme() === 'light');
+
+        const no_change_background_colour = (is_light) ? '#ddd' : '#7e7e7e';
+        const no_change_text_colour = (is_light) ? '#444' : '#fff';
 
         const change_background_colour = '#fd0002';
         const change_text_colour = '#fff';
@@ -3748,11 +3758,9 @@ class App {
 
             // If it's changed, make the display different
             if (registers[reg_num].getChange()) {
-                this.setBackgroundColour(`reg-${reg_num}`, change_background_colour);
-                this.setColour(`reg-${reg_num}`, change_text_colour);
+                this.setFgBG(`reg-${reg_num}`, change_text_colour, change_background_colour);
             } else {
-                this.setBackgroundColour(`reg-${reg_num}`, no_change_background_colour);
-                this.setColour(`reg-${reg_num}`, no_change_text_colour);
+                this.setFgBG(`reg-${reg_num}`, no_change_text_colour, no_change_background_colour);
             }
         }
     }
@@ -3761,8 +3769,10 @@ class App {
         // Don't populate before assembling code
         if (!this.assembled) return;
 
-        const no_change_background_colour = (this.theme === 'light') ? '#ddd' : '#7e7e7e';
-        const no_change_text_colour = (this.theme === 'light') ? '#444' : '#fff';
+        const is_light = (this.theme_handler.getTheme() === 'light');
+
+        const no_change_background_colour = (is_light) ? '#ddd' : '#7e7e7e';
+        const no_change_text_colour = (is_light) ? '#444' : '#fff';
 
         const change_background_colour = '#fd0002';
         const change_text_colour = '#fff';
@@ -3779,11 +3789,9 @@ class App {
 
             // If it's changed, make the display different
             if (this.interpreter.sreg.getChange() && ((change >> i) & 1)) {
-                this.setBackgroundColour(`sreg-${flag}`, change_background_colour);
-                this.setColour(`sreg-${flag}`, change_text_colour);
+                this.setFgBG(`sreg-${flag}`, change_text_colour, change_background_colour);
             } else {
-                this.setBackgroundColour(`sreg-${flag}`, no_change_background_colour);
-                this.setColour(`sreg-${flag}`, no_change_text_colour);
+                this.setFgBG(`sreg-${flag}`, no_change_text_colour, no_change_background_colour);
             }
 
         }
@@ -3815,8 +3823,10 @@ class App {
 
         const pc = this.interpreter.getPC();
 
-        const normal_background_colour = (this.theme === 'light') ? '#bbb' : '#474747';
-        const normal_text_colour = (this.theme === 'light') ? '#333' : '#fff';
+        const is_light = (this.theme_handler.getTheme() === 'light');
+
+        const normal_background_colour = (is_light) ? '#bbb' : '#474747';
+        const normal_text_colour = (is_light) ? '#333' : '#fff';
 
         const pc_background_colour = '#4a5cff';
         const pc_text_colour = '#fff';
@@ -3844,11 +3854,9 @@ class App {
             // If it's the pc line
             // If it's changed, make the display different
             if ((start_cell + line) === pc) {
-                this.setBackgroundColour(`pmem-linenum-${line}`, pc_background_colour);
-                this.setColour(`pmem-linenum-${line}`, pc_text_colour);
+                this.setFgBG(`pmem-linenum-${line}`, pc_text_colour, pc_background_colour);
             } else {
-                this.setBackgroundColour(`pmem-linenum-${line}`, normal_background_colour);
-                this.setColour(`pmem-linenum-${line}`, normal_text_colour);
+                this.setFgBG(`pmem-linenum-${line}`, normal_text_colour, normal_background_colour);
             }
 
         }
@@ -3866,8 +3874,10 @@ class App {
         const y = this.interpreter.getY();
         const z = this.interpreter.getZ();
 
-        const normal_background_colour = (this.theme === 'light') ? '#ddd' : '#7e7e7e';
-        const normal_text_colour = (this.theme === 'light') ? '#444' : '#fff';
+        const is_light = (this.theme_handler.getTheme() === 'light');
+
+        const normal_background_colour = (is_light) ? '#ddd' : '#7e7e7e';
+        const normal_text_colour = (is_light) ? '#444' : '#fff';
 
         const sp_background_colour = '#da920d';
         const x_background_colour = '#32bd32';
@@ -3896,23 +3906,18 @@ class App {
 
                 // Assume it's not being pointed to by SP, X, Y, or Z
                 this.setinnerHTML(`dmem-line-${line}${row}`, cell_value);
-                this.setBackgroundColour(`dmem-line-${line}${row}`, normal_background_colour);
-                this.setColour(`dmem-line-${line}${row}`, normal_text_colour);
+                this.setFgBG(`dmem-line-${line}${row}`, normal_text_colour, normal_background_colour);
 
                 
                 // Check if it's SP, X, Y, Z
                 if (cell_number === sp) {
-                    this.setBackgroundColour(`dmem-line-${line}${row}`, sp_background_colour);
-                    this.setColour(`dmem-line-${line}${row}`, pointer_text_colour);
+                    this.setFgBG(`dmem-line-${line}${row}`, pointer_text_colour, sp_background_colour);
                 } else if (cell_number === z) {
-                    this.setBackgroundColour(`dmem-line-${line}${row}`, z_background_colour);
-                    this.setColour(`dmem-line-${line}${row}`, pointer_text_colour);
+                    this.setFgBG(`dmem-line-${line}${row}`, pointer_text_colour, z_background_colour);
                 } else if (cell_number === y) {
-                    this.setBackgroundColour(`dmem-line-${line}${row}`, y_background_colour);
-                    this.setColour(`dmem-line-${line}${row}`, pointer_text_colour);
+                    this.setFgBG(`dmem-line-${line}${row}`, pointer_text_colour, y_background_colour);
                 } else if (cell_number === x) {
-                    this.setBackgroundColour(`dmem-line-${line}${row}`, x_background_colour);
-                    this.setColour(`dmem-line-${line}${row}`, pointer_text_colour);
+                    this.setFgBG(`dmem-line-${line}${row}`, pointer_text_colour, x_background_colour);
                 }
             }
         }
@@ -3927,9 +3932,9 @@ class App {
         this.setinnerHTML('stats-branches-taken', this.interpreter.branches_taken);
     }
 
-    success(text) {
+    success(text, print = true) {
         this.assembled = true;
-        this.status_handler.success(text);
+        if (print) this.status_handler.success(text);
     }
 
     emptyStatus() {
@@ -5291,55 +5296,16 @@ class App {
 
     }
 
-    toggleThemeVariables() {
-        this.theme = (this.theme === 'dark') ? 'light' : 'dark';
-
-        this.bg = (this.theme === 'dark') ? '#2e2e2e' : '#fff';
-        this.fg = (this.theme === 'dark') ? '#fff' : '#444';
-        this.border_color = (this.theme === 'dark') ? '#4e4e4e' : '#e0e0e0';
-
-        this.table_heading_bg = (this.theme === 'dark') ? '#474747' : '#bbb';
-        this.table_body_bg = (this.theme === 'dark') ? '#7e7e7e' : '#ddd';
-        this.status_background_colour = (this.theme === 'dark') ? '#404040' : '#eee';
-        this.status_border_colour = (this.theme === 'dark') ? '#4e4e4e' : '#ccc';
-        this.muted_text_colour = (this.theme === 'dark') ? '#aaa' : '#777';
-
-        this.button_bg = (this.theme === 'dark') ? '#333333' : '#fcfcfc';
-        this.button_border = (this.theme === 'dark') ? '#5e5e5e' : '#d0d0d0';
-        this.button_over_colour = (this.theme === 'dark') ? '#3e3e3e' : '#eee';
-
-        this.updateEventListeners();
-    }
-
-    updateEventListeners() {
-        this.event_listeners.updateTheme(this.theme);
-        this.event_listeners.updateButtonOverColour(this.button_over_colour);
-    }
-
-    setRootProperties() {
-        document.documentElement.style.setProperty('--bg', this.bg);
-        document.documentElement.style.setProperty('--fg', this.fg);
-        document.documentElement.style.setProperty('--border-colour', this.border_color);
-
-        document.documentElement.style.setProperty('--table-body-bg', this.table_body_bg);
-        document.documentElement.style.setProperty('--table-heading-bg', this.table_heading_bg);
-        document.documentElement.style.setProperty('--color-text-muted', this.muted_text_colour);
-        
-        document.documentElement.style.setProperty('--bg-button', this.button_bg);
-        document.documentElement.style.setProperty('--border-button', this.button_border);
-        
-        document.documentElement.style.setProperty('--status-background-colour', this.status_background_colour);
-        document.documentElement.style.setProperty('--status-border-colour', this.status_border_colour);
-    }
-
     toggleTheme() {
 
-        this.toggleThemeVariables();
+        this.theme_handler.toggleThemeVariables();
 
-        const theme_name = this.theme.charAt(0).toUpperCase() + this.theme.slice(1);
+        const theme = this.theme_handler.getTheme();
+
+        const theme_name = theme.charAt(0).toUpperCase() + theme.slice(1);    // make first letter upper case
         this.setinnerHTML('button_theme', `Theme: ${theme_name}`);
 
-        this.setRootProperties();
+        this.theme_handler.setRootProperties();
 
         this.populateAll();
     }
