@@ -856,8 +856,8 @@ class Parser {
     
     constructor() {
         this.token_lines = [];
-        this.pmem = new Pmem();
-        this.dmem = new Dmem();
+        this.pmem = new PMEM();
+        this.dmem = new DMEM();
 
         // DEFINING THE SIZE OF DMEM AND PMEM
         this.evaluator = new ExpressionEvaluator();
@@ -887,14 +887,14 @@ class Parser {
         this.tok_num = 0;
         this.pc = 0;
 
-        this.dmem = new Dmem();
+        this.dmem = new DMEM();
         // Add registers to dmem
         for (let i = 0; i < 256; i++) {
             let reg = new Register(`R${i}`);
             this.getDMEM().push(reg);
         }
 
-        this.pmem = new Pmem();
+        this.pmem = new PMEM();
 
         this.parse();
 
@@ -1811,10 +1811,12 @@ class Interpreter {
     }
 
     emptyData() {
-        this.pmem = new Pmem();
-        this.dmem = new Dmem();
-        this.pcl = new Token('REG', 0); // PC lo8
-        this.pch = new Token('REG', 0); // PC hi8
+        this.pmem = new PMEM();
+        this.dmem = new DMEM();
+
+        const pcl = new Register('PCL', 0); // PC lo8
+        const pch = new Register('PCH', 0); // PC hi8
+        this.pc = new PC(pcl, pch);
 
         this.operands = new Operands();
 
@@ -1827,7 +1829,7 @@ class Interpreter {
         this.break_point = null;
         this.print = true;
     }
-    
+
     newData(pmem, dmem, txt, break_point) {
         // DATA & PROGRAM MEMORY
         this.pmem = pmem;
@@ -1843,14 +1845,14 @@ class Interpreter {
         this.branches_taken = 0;
         this.branches_seen = 0;
 
-        // DEFINING PC, SP AND SREG
-        this.pcl = new Register('PCL', this.getDMEM(0x5b));
-        this.pch = new Register('PCH', this.getDMEM(0x5c));
+        // DEFINING PC
+        const pcl = new Register('PCL', this.getDMEM().getValue(0x5b));
+        const pch = new Register('PCH', this.getDMEM().getValue(0x5c));
         this.getDMEM().setValue(0x5b, 0); // PC was stored in these two previously to easily transfer the information
         this.getDMEM().setValue(0x5c, 0);
+        this.pc = new PC(pcl, pch);
 
-        // SETTING PC = 0 & SREG = RAMEND
-        this.setPC((this.pch.getValue() << 8) + this.pcl.getValue());
+        // SETTING SREG = RAMEND
         this.getDMEM().setSP(this.getDMEM().getRAMEnd()); 
     }
 
@@ -2048,12 +2050,12 @@ class Interpreter {
                 if (Rd !== Rr) break;
 
                 this.branches_taken += 1;
-                this.offsetPC(1);
+                this.getPC().offsetValue(1);
                 this.cycles += 1;
 
                 if (this.getLine(1) !== null) break;    // break if the next inst is 16 bit not 32 bit
 
-                this.offsetPC(1);
+                this.getPC().offsetValue(1);
                 this.cycles += 1;
                 break;
             case 'DEC':
@@ -2075,19 +2077,19 @@ class Interpreter {
                 this.call(1);
                 break;
             case 'IJMP':
-                this.setPC(this.getDMEM().getWord(30) - 1);
+                this.getPC().setValue(this.getDMEM().getWord(30) - 1);
                 this.cycles += 1;
                 break;
             case 'IN':
                 A_val = this.getArgValue(1);
-                Result = this.getDMEM(A_val + 0x20);
+                Result = this.getDMEM().getValue(A_val + 0x20);
                 this.writeResultToRd(Result);   // Rd <-- I/O(A)
                 break;
             case 'INC':
                 this.incDec();
                 break;
             case 'JMP':
-                this.setPC(this.getArgValue(0) - 1);
+                this.getPC().setValue(this.getArgValue(0) - 1);
                 this.cycles += 2;
                 break;
             case 'LD':
@@ -2103,7 +2105,7 @@ class Interpreter {
                 if (plusminus === 1) this.getDMEM().offsetWord(low_byte, 1);
                 
                 this.cycles += ( (3 * plusminus * plusminus) - plusminus) >> 1; // +2 for -1, +1 for 1, +0 for 0
-                this.writeResultToRd(this.getDMEM(k));  // Rd <-- (k)
+                this.writeResultToRd(this.getDMEM().getValue(k));  // Rd <-- (k)
                 break;
             case 'LDD':
                 w = this.getArgValue(1)[0]; // TODO check this out
@@ -2112,7 +2114,7 @@ class Interpreter {
                 if (w === 'Y') k = this.getDMEM().getWord(28) + q;
                 else if (w === 'Z') k = this.getDMEM().getWord(30) + q;
                 if (k < 0x100 || k > this.getDMEM().getRAMEnd()) this.newError(`Illegal value \'${k}\' for ${w}+${q} on line ${this.line_in_file}.`);
-                this.writeResultToRd(this.getDMEM(k));  // Rd <-- (k)
+                this.writeResultToRd(this.getDMEM().getValue(k));  // Rd <-- (k)
                 this.cycles += 1;
                 break;
             case 'LDI':
@@ -2121,8 +2123,8 @@ class Interpreter {
                 break;
             case 'LDS':
                 k = this.getArgValue(1);
-                this.writeResultToRd(this.getDMEM(k));  // Rd <-- (k)
-                this.offsetPC(1); // increment once now cause total needs to be + 2
+                this.writeResultToRd(this.getDMEM().getValue(k));  // Rd <-- (k)
+                this.getPC().offsetValue(1); // increment once now cause total needs to be + 2
                 this.cycles += 1;
                 break;
             case 'LPM':
@@ -2131,7 +2133,7 @@ class Interpreter {
                 if (this.line.getArgs().length !== 0 && this.getArgValue(1).includes('+')) this.getDMEM().offsetWord(30, 1);
 
                 const inst_location = (k >> 1) & 0xffff;
-                const inst_opcode = this.getPMEM(inst_location).getOpcode();
+                const inst_opcode = this.getPMEM().getValue(inst_location).getOpcode();
                 const start = 8 * !(k & 1); // slicing at 0 gives the most significant 8 bits, so k = 1 returns 0
                 const opcode_slice = inst_opcode.slice(start, start + 8);
 
@@ -2156,7 +2158,7 @@ class Interpreter {
             case 'MOVW':
                 Rr = this.getArgValue(1);
                 this.writeResultToRd(Rr); // Rd <-- Rr
-                Rr = this.getDMEM(this.getRegNum(1) + 1);
+                Rr = this.getDMEM().getValue(this.getRegNum(1) + 1);
                 this.writeResultToRd(Rr, 1);    // Rd <-- Rr
                 break;
             case 'MUL':
@@ -2195,7 +2197,7 @@ class Interpreter {
             case 'POP':
                 if (this.getDMEM().getWord(0x5d) >= this.getDMEM().getRAMEnd()) return this.newError(`Bad stack pointer for POP on line ${this.line_in_file}.`);
                 this.getDMEM().incSP();                                               // increment the SP by 1
-                this.writeResultToRd(this.getDMEM(this.getDMEM().getWord(0x5d)));  // Rd <-- popped value
+                this.writeResultToRd(this.getDMEM().getValue(this.getDMEM().getWord(0x5d)));  // Rd <-- popped value
                 this.cycles += 1;
                 break;
             case 'PUSH':
@@ -2224,14 +2226,14 @@ class Interpreter {
 
                 // Get the return line and move the SP
                 this.getDMEM().incSP();
-                let ret_line = (this.getDMEM(this.getDMEM().getWord(0x5d)) << 8); // get the ret high value
+                let ret_line = (this.getDMEM().getValue(this.getDMEM().getWord(0x5d)) << 8); // get the ret high value
                 this.getDMEM().incSP();
-                ret_line += this.getDMEM(this.getDMEM().getWord(0x5d)); // add the ret low value to the ret high value
-                this.setPC(ret_line - 1);
+                ret_line += this.getDMEM().getValue(this.getDMEM().getWord(0x5d)); // add the ret low value to the ret high value
+                this.getPC().setValue(ret_line - 1);
                 this.cycles += 4;
                 break;
             case 'RJMP':
-                this.offsetPC(this.getArgValue(0));
+                this.getPC().offsetValue(this.getArgValue(0));
                 this.cycles += 1;
                 break;
             case 'ROL':
@@ -2330,7 +2332,7 @@ class Interpreter {
                 k = this.getArgValue(0);
                 Rd = this.getArgValue(1);
                 this.getDMEM().setValue(k, Rd);   // (k) <-- Rd
-                this.offsetPC(1); // increment once now cause total needs to be + 2
+                this.getPC().offsetValue(1); // increment once now cause total needs to be + 2
                 this.cycles += 1;
                 break;
             case 'SUB':
@@ -2355,7 +2357,7 @@ class Interpreter {
 
                 Rd = this.getArgValue(1);
                 const reg_num = this.getRegNum(1);
-                const k_val = this.getDMEM(k);
+                const k_val = this.getDMEM().getValue(k);
          
                 this.getDMEM().setValue(k, Rd); // (Z) <-- Rd   and    Rd <-- (Z)
                 this.getDMEM().setValue(reg_num, k_val);
@@ -2366,7 +2368,7 @@ class Interpreter {
         }
 
         // almost every instruction does this, so its easier to counterract it if you don't want to do exactly that
-        this.offsetPC(1);
+        this.getPC().offsetValue(1);
 
         this.incrementStepCount();
     }
@@ -2379,16 +2381,16 @@ class Interpreter {
 
     checkFinished() {
         // If breakpoint is reached
-        if (this.getPC() === this.break_point) this.finished = true;
+        if (this.getPC().getValue() === this.break_point) this.finished = true;
 
         // Do nothing if it's finished running
         if (this.finished || this.error) return true;        
 
         // If it should be finished, set it to finished then return
-        if (this.getPC() >= this.getPMEM().getFlashEnd()) {
+        if (this.getPC().getValue() >= this.getPMEM().getFlashEnd()) {
             console.log(`PC value too large. Number of steps taken: ${this.step_count}`);
             this.finished = true;
-            this.setPC(this.getPMEM().getFlashEnd());
+            this.getPC().setValue(this.getPMEM().getFlashEnd());
             return true;
         }
 
@@ -2404,7 +2406,7 @@ class Interpreter {
         if (this.getDMEM().getSREGBit(s) !== clear_set) return;
 
         let k = this.getArgValue(branch_arg); // branch_arg is 0 unless inst is BRBC/BRBS
-        this.setPC(this.getPC() + k);
+        this.getPC().offsetValue(k);
         this.cycles += 1;
         this.branches_taken += 1;
     }
@@ -2423,7 +2425,7 @@ class Interpreter {
         let incs = (this.getLine(2) === null) ? 2 : 1;  // increment twice if the next instruction is double size
 
         for (let i = 0; i < incs; i++) {
-            this.offsetPC(1);
+            this.getPC().offsetValue(1);
             this.cycles += 1;
         }
     }
@@ -2480,7 +2482,7 @@ class Interpreter {
     }
 
     immediateWithWord(is_sub = 0) {
-        const Rd = this.getArgValue(0) + (this.getDMEM(this.getRegNum(0) + 1) << 8);
+        const Rd = this.getArgValue(0) + (this.getDMEM().getValue(this.getRegNum(0) + 1) << 8);
         const K_val = this.getArgValue(1);
         let Result = (is_sub) ? Rd - K_val : Rd + K_val;
         Result = Result & 0xffff;
@@ -2530,8 +2532,8 @@ class Interpreter {
 
     call(call_type = 0) {
         // 0 = CALL, 1 = ICALL, 2 = RCALL
-        this.offsetPC(1);
-        if (!call_type) this.offsetPC(1);   // CALL is a 32 bit instruction
+        this.getPC().offsetValue(1);
+        if (!call_type) this.getPC().offsetValue(1);   // CALL is a 32 bit instruction
 
         // If SP <= 0x101
         if (this.getDMEM().getWord(0x5d) <= 0x101) return this.newError(`Bad stack pointer for CALL on line ${this.line_in_file}.`);
@@ -2540,17 +2542,17 @@ class Interpreter {
 
         const k = (call_type === 1) ? this.getDMEM().getWord(30) : this.getArgValue(0);
 
-        if (call_type === 2) this.offsetPC(k - 1);
-        else this.setPC(k - 1);
+        if (call_type === 2) this.getPC().offsetValue(k - 1);
+        else this.getPC().setValue(k - 1);
 
         this.cycles += 3;
         if (!call_type) this.cycles += 1;   // CALL takes 1 more cycle than the others
     }
 
     pushPCToStack() {
-        this.getDMEM().setValue(this.getDMEM().getWord(0x5d), this.pcl.getValue());               // push pcl in STACK
+        this.getDMEM().setValue(this.getDMEM().getWord(0x5d), this.getPC().getPCL().getValue());               // push pcl in STACK
         this.getDMEM().decSP();
-        this.getDMEM().setValue(this.getDMEM().getWord(0x5d), this.pch.getValue());     // push pch in STACK
+        this.getDMEM().setValue(this.getDMEM().getWord(0x5d), this.getPC().getPCH().getValue());     // push pch in STACK
         this.getDMEM().decSP();
     }
 
@@ -2574,7 +2576,7 @@ class Interpreter {
         const can_pop_twice = (sp <= this.getDMEM().getRAMEnd() - 2);
         if (!can_pop_twice) return this.newError(`Bad stack pointer for CALL on line ${this.line_in_file}.`);
         
-        let address = this.getDMEM(sp + 1) + ( this.getDMEM(sp + 2) << 8);
+        let address = this.getDMEM().getValue(sp + 1) + ( this.getDMEM().getValue(sp + 2) << 8);
 
         // Printf just does this
         this.getDMEM().setMultipleValues([26, 27, 30, 31], [0xff, 0x08, 0x02, 0x01]);
@@ -2586,7 +2588,7 @@ class Interpreter {
         this.getDMEM().setValue(25, this.mod256(W_val >> 8));
         //document.getElementById('console').innerHTML += '\n';               // add a new line after a print
 
-        this.offsetPC(1);   // increment because CALL is double length 
+        this.getPC().offsetValue(1);   // increment because CALL is double length 
         
         // Move the scroll to the bottom
         const console_box = document.getElementById('console');
@@ -2598,7 +2600,7 @@ class Interpreter {
     printToConsole(start_address) {
         let address = start_address;
         let W_val = 0;  // stores the length of the string
-        let K_val = this.getDMEM(address);
+        let K_val = this.getDMEM().getValue(address);
         let char = String.fromCharCode(K_val);
 
         while (K_val !== 0) {   // break at a null character
@@ -2609,7 +2611,7 @@ class Interpreter {
 
             if (address > 0x8ff) break;                             // don't go beyond the end of memory
 
-            K_val = this.getDMEM(address);
+            K_val = this.getDMEM().getValue(address);
             char = String.fromCharCode(K_val);
         }
 
@@ -2620,7 +2622,7 @@ class Interpreter {
         // 0 = clear, 1 = set
         const A_val = this.getArgValue(0);
         const b = this.getArgValue(1);
-        const dmem_val = this.getDMEM(A_val + 0x20);
+        const dmem_val = this.getDMEM().getValue(A_val + 0x20);
         const bit_val = (1 << b);
         const Result = (clear_set) ? dmem_val | bit_val : dmem_val & (0xff - bit_val);
         this.getDMEM().setValue(A_val + 0x20, Result);
@@ -2635,19 +2637,6 @@ class Interpreter {
         if (this.step_count > 1000000) {
             return this.newError('Number of steps in code too large. Execution terminated.');
         } 
-    }
-
-    getPC() {
-        return (this.pch.getValue() << 8) + this.pcl.getValue();
-    }
-
-    setPC(new_value) {
-        this.pch.setValue(this.mod256(new_value >> 8));
-        this.pcl.setValue(this.mod256(new_value));
-    }
-
-    offsetPC(offset) {
-        this.setPC(this.getPC() + offset);
     }
 
     convertPmemToksToCode(toks) {
@@ -2676,14 +2665,16 @@ class Interpreter {
         return `${inst} ${arg1}, ${arg2}`;
     }
 
-    getPMEM(loc = null) {
-        if (loc === null) return this.pmem;
-        return this.pmem.getPMEM(loc);
+    getPC() {
+        return this.pc;
     }
 
-    getDMEM(loc = null) {
-        if (loc === null) return this.dmem;
-        return this.dmem.getValue(loc);
+    getPMEM() {
+        return this.pmem;
+    }
+
+    getDMEM() {
+        return this.dmem;
     }
 
     getBit(value, bit) {
@@ -2701,7 +2692,7 @@ class Interpreter {
     }
 
     getLine(offset = 0) {
-        return this.getPMEM(this.getPC() + offset);
+        return this.getPMEM().getValue(this.getPC().getValue() + offset);
     }
 
     getRegNum(arg_num) {
@@ -2713,7 +2704,7 @@ class Interpreter {
         const arg = this.line.getArgs()[arg_num];
         const inst = this.line.getInst().getValue();
         const reqs = this.operands.getOperands(inst)[arg_num].getTokenType();
-        if (reqs.includes('REG')) return this.getDMEM(arg.getValue());
+        if (reqs.includes('REG')) return this.getDMEM().getValue(arg.getValue());
         return arg.getValue();
     }
 
@@ -2735,7 +2726,7 @@ class Interpreter {
     }
 }
 
-class Dmem {
+class DMEM {
     constructor() {
         this.memory = [];
         this.ramend = 0x8ff;
@@ -2828,7 +2819,7 @@ class Dmem {
 
 }
 
-class Pmem {
+class PMEM {
     constructor() {
         this.memory = [];
         this.flashend = 0x3fff;
@@ -2859,6 +2850,38 @@ class Pmem {
         this.memory[loc] = val;
     }
 
+}
+
+class PC {
+    constructor(pcl, pch) {
+        this.pcl = pcl;
+        this.pch = pch;
+    }
+
+    getValue() {
+        return (this.pch.getValue() << 8) + this.pcl.getValue();
+    }
+
+    getPCL() {
+        return this.pcl;
+    }
+
+    getPCH() {
+        return this.pch;
+    }
+
+    setValue(new_value) {
+        this.pch.setValue(this.mod256(new_value >> 8));
+        this.pcl.setValue(this.mod256(new_value));
+    }
+
+    offsetValue(offset) {
+        this.setValue(this.getValue() + offset);
+    }
+
+    mod256(val) {
+        return val & 0xff;
+    }
 }
 
 class Operands {
@@ -3575,7 +3598,7 @@ class App {
         this.success('Success! Your code can be run.', print);
 
         // Populating Display with Data
-        this.pmem_top = this.interpreter.getPC() - ( this.interpreter.getPC() % 8 );
+        this.pmem_top = this.interpreter.getPC().getValue() - ( this.interpreter.getPC().getValue() % 8 );
         this.populateAll();
     }
 
@@ -3599,7 +3622,7 @@ class App {
             }
         }
 
-        const current_pc = this.interpreter.getPC();
+        const current_pc = this.interpreter.getPC().getValue();
         this.pmem_top = current_pc - (current_pc % 8); // move pmem display to the line
 
         //if (this.interpreter.error) return this.newError(this.interpreter.error_text);
@@ -3668,7 +3691,7 @@ class App {
 
         if (steps > 0) this.interpreter.step();    // Take the step once the change has been cleared
 
-        this.pmem_top = this.interpreter.getPC() - (this.interpreter.getPC() % 8); // move pmem display to the line
+        this.pmem_top = this.interpreter.getPC().getValue() - (this.interpreter.getPC().getValue() % 8); // move pmem display to the line
         
         this.interpreter.setPrint(true);    // allow printing again
 
@@ -3798,7 +3821,7 @@ class App {
 
         if (!this.assembled) return;
 
-        const pc = this.convertValueToBase(this.interpreter.getPC(), 4);
+        const pc = this.convertValueToBase(this.interpreter.getPC().getValue(), 4);
         const sp = this.convertValueToBase(this.interpreter.getDMEM().getWord(0x5d), 4);
         const x = this.convertValueToBase(this.interpreter.getDMEM().getWord(26), 4);
         const y = this.convertValueToBase(this.interpreter.getDMEM().getWord(28), 4);
@@ -3817,7 +3840,7 @@ class App {
 
         const num_lines = 8; // number of lines in the table
 
-        const pc = this.interpreter.getPC();
+        const pc = this.interpreter.getPC().getValue();
 
         const is_light = (this.theme_handler.getTheme() === 'light');
 
@@ -3831,12 +3854,12 @@ class App {
             let real_line = start_cell + line;
             this.setinnerHTML(`pmem-linenum-${line}`, real_line.toString(this.base) );
 
-            let line_value = this.interpreter.getPMEM(start_cell + line);  // get the line to print
+            let line_value = this.interpreter.getPMEM().getValue(start_cell + line);  // get the line to print
 
             // If the opcode display = true 
             if (this.display_opcode) {
                 if (line_value !== null) line_value = line_value.getOpcode().slice(0, 16);              // replace null lines with (two line inst.)
-                else                     line_value = this.interpreter.getPMEM(start_cell + line - 1).getOpcode().slice(16);  
+                else                     line_value = this.interpreter.getPMEM().getValue(start_cell + line - 1).getOpcode().slice(16);  
             }
 
             // If the instruction is to be display, not the opcode
@@ -3897,7 +3920,7 @@ class App {
             for (let row = 0; row < num_rows; row++) {
                 const cell_number = start_cell + row + (num_rows * line);
 
-                let cell_value = this.interpreter.getDMEM(cell_number);
+                let cell_value = this.interpreter.getDMEM().getValue(cell_number);
                 cell_value = (this.display_ascii) ? this.getAscii(cell_value) : this.convertValueToBase(cell_value, 2);
 
                 // Assume it's not being pointed to by SP, X, Y, or Z
