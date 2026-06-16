@@ -266,6 +266,8 @@ class Instruction {
             'SBC': ['d', 'r', '000010rdddddrrrr'],
             'SBCI': ['d', 'K', '0100KKKKddddKKKK'],
             'SBI': ['A', 'b', '10011010AAAAAbbb'],
+            'SBIC': ['A', 'b', '10011001AAAAAbbb'],
+            'SBIS': ['A', 'b', '10011011AAAAAbbb'],
             'SBIW': null,
             'SBR': ['d', 'K', '0110KKKKddddKKKK'],
             'SBRC': ['r', 'b', '1111110rrrrr0bbb'],
@@ -868,24 +870,20 @@ class Parser {
 
     newData(token_lines, txt) {
         this.token_lines = token_lines;
-        this.txt = txt;
-        this.lines = this.txt.split('\n');
+        this.lines = txt.split('\n');
 
-        this.labels = Object.create(null);
-        this.defs = Object.create(null);
-        this.equs = Object.create(null);
-
-        this.break_point = null;    // for stopping the interpreter run() method at
-        this.break_point_line = parseInt(document.getElementById('break_point').value);
+        this.defs = new ProgramDefinitions(); 
+        this.break_point = new BreakPoint();
 
         this.text_section_start = null;
+        
         this.line = null;
         this.line_in_file = null;
         this.line_length = null;
-        this.current_tok = null;
         this.line_num = 0;
+
+        this.current_tok = null;
         this.tok_num = 0;
-        this.pc = 0;
 
         this.dmem = new DMEM();
         // Add registers to dmem
@@ -954,61 +952,6 @@ class Parser {
         this.checkInstructionSyntax();
     }
 
-    newLabel(label, value, line_in_file) {
-        if ( this.labels[label] !== undefined ) {
-            this.newError(`Previous definition of \'${label}\'. Duplicate label \'${label}\' on line ${line_in_file}.`);
-        }
-
-        if ( this.equs[label] !== undefined ) {
-            this.newError(`Previous definition of \'${label}\'. Illegal attempt to re-use \'${label}\' as label on line ${line_in_file}.`);
-        }
-
-        if ( this.defs[label] !== undefined ) {
-            this.newError(`Previous definition of \'${label}\'. Illegal use of register \'${label}\' as label on line ${line_in_file}.`);
-        }
-        
-        if (this.inst_set.isInstruction(this.labels[label])) {
-            this.newError(`Illegal re-use of instruction \'${label}\' as label on line ${line_in_file}.`);
-        }
-
-        this.labels[label] = value;
-    }
-
-    newEqu(label, value, line_in_file) {
-        if ( this.labels[label] !== undefined ) {
-            this.newError(`Previous definition of \'${label}\'. Invalid redefinition of label \'${label}\' as variable on line ${line_in_file}.`);
-        }
-
-        // Allow redefinition of variables already in this.equs
-
-        if ( this.defs[label] !== undefined ) {
-            this.newError(`Previous definition of \'${label}\'. Illegal use of register \'${label}\' as variable on line ${line_in_file}.`);
-        }
-        
-        if (this.inst_set.isInstruction(this.labels[label])) {
-            this.newError(`Attempt to redefine keyword \'${label}\' on line ${line_in_file}.`);
-        }
-
-        this.equs[label] = value;
-    }
-
-    newDef(label, value, line_in_file) {
-        // If its already a label or .equ
-        if ( this.labels[label] !== undefined || this.equs[label] !== undefined ) {
-            this.newError(`Previous definition of \'${label}\'. Cannot use .def: ${label} redefinition on line ${line_in_file}.`);
-        }
-
-        // Allow redefinition of defs already in this.defs
-
-        // Dont allow definitions that are already instructions
-        
-        if (this.inst_set.isInstruction(this.labels[label])) {
-            this.newError(`Illegal re-use of instruction \'${label}\' as definition on line ${line_in_file}.`);
-        }
-
-        this.defs[label] = value;
-    }
-
     replaceRefs(line) {
         let current_tok;
         // Go through the tokens once first and replace refs with ints
@@ -1028,8 +971,8 @@ class Parser {
 
     setRefToInt(current_tok) {
         // Replace it in the line
-        if (this.labels[current_tok.getValue()] !== undefined) current_tok.setValue(this.labels[current_tok.getValue()]);
-        else if (this.equs[current_tok.getValue()] !== undefined) current_tok.setValue(this.equs[current_tok.getValue()]);
+        if (this.getProgDefs().getLabels()[current_tok.getValue()] !== undefined) current_tok.setValue(this.getProgDefs().getLabels()[current_tok.getValue()]);
+        else if (this.getProgDefs().getEqus()[current_tok.getValue()] !== undefined) current_tok.setValue(this.getProgDefs().getEqus()[current_tok.getValue()]);
         else this.newError(`Invalid reference \'${current_tok.getValue()}\' on line ${this.line_in_file}.`);
 
         current_tok.setType('INT');
@@ -1102,17 +1045,18 @@ class Parser {
             this.getLine(this.line_num);
 
             // If you find a .SECTION directive check it
-            if (this.line[0].getValue() === '.SECTION' && this.line[0].getType() === 'DIR') {
+            if (this.line[0].getValue() !== '.SECTION' || this.line[0].getType() !== 'DIR') {
+                continue;
+            }
                 
-                if (this.line.length !== 2 || this.line[1].getType() !== 'DIR' || !['.DATA', '.TEXT'].includes(this.line[1].getValue())) {
-                    this.newError(`Invalid '.section' directive on line ${this.line_in_file}.`);
-                }
+            if (this.line.length !== 2 || this.line[1].getType() !== 'DIR' || !['.DATA', '.TEXT'].includes(this.line[1].getValue())) {
+                this.newError(`Invalid '.section' directive on line ${this.line_in_file}.`);
+            }
 
-                // If you find the text section then stop looking
-                if (this.line[1].getValue() === '.TEXT') {
-                    this.text_section_start = this.line_num;
-                    break;
-                }
+            // If you find the text section then stop looking
+            if (this.line[1].getValue() === '.TEXT') {
+                this.text_section_start = this.line_num;
+                break;
             }
         }
 
@@ -1156,7 +1100,7 @@ class Parser {
         };
 
         for (let [key, value] of Object.entries(existing_defs)) {
-            this.newDef(key, value, 0);
+            this.getProgDefs().newDef(key, value, 0);
         }
     }
 
@@ -1208,7 +1152,7 @@ class Parser {
         };
 
         for (let [key, value] of Object.entries(existing_equs)) {
-            this.newEqu(key, value, 0);
+            this.getProgDefs().newEqu(key, value, 0);
         }
     }
 
@@ -1239,8 +1183,8 @@ class Parser {
             // If theyre not instructions, it's illegal
             if (this.line[0].getType() !== 'INST') this.newError(`Illegal token \'${this.line[0].getValue()}\' on line ${this.line_in_file}.`);
 
-            // set the break point to be the line equal about to be put in
-            if (this.break_point_line !== NaN) this.defineBreakPoint();
+            // Set the break point to be the line equal about to be put in
+            this.getBreakPoint().defineBreakPoint( this.getPMEM().getLength(), this.line_in_file );
 
             this.getPMEM().push(this.line); // push the line without any label
             const inst = this.line[0].getValue();
@@ -1279,14 +1223,14 @@ class Parser {
         if (this.tok_num !== 0) this.newError(`Illegal label location on line ${this.line_in_file}.`);
 
         const label = this.getTokValue(); // remove the colon from the end
-        this.newLabel(label, len, this.line_in_file);
+        this.getProgDefs().newLabel(label, len, this.line_in_file);
 
         // Remove the label
         this.line.shift();
         this.line_length -= 1;                
 
         // Check the global function label when you get to it
-        if (label === this.global_funct_names[0]) this.pc = this.getPMEM().getLength();
+        // if (label === this.global_funct_names[0]) this.pc = this.getPMEM().getLength();
     }
 
     defineGlobalFunctions() {
@@ -1311,17 +1255,12 @@ class Parser {
         
     }
 
-    defineBreakPoint() {
-        // If the break point should be here set the break point to be the line about to be put in
-        if (this.line_in_file >= this.break_point_line && this.break_point === null) this.break_point = this.getPMEM().getLength();
-    }
-
     checkGlobalFunctions() {
         let global_funct_name;
         // Check you've found the global function name
         for (let i = 0; i < this.global_funct_names.length; i++) {
             global_funct_name = this.global_funct_names[i];
-            if (this.labels[global_funct_name] === undefined) this.newError(`Cannot find the global label \'${global_funct_name}\' in the program. Check spelling if unsure.`);    
+            if (this.getProgDefs().getLabels()[global_funct_name] === undefined) this.newError(`Cannot find the global label \'${global_funct_name}\' in the program. Check spelling if unsure.`);    
         }
     }
 
@@ -1434,7 +1373,7 @@ class Parser {
             this.line_num += 1;
         }
 
-        // Cannot hold more data than 0x8ff
+        // Cannot hold more data than RamEnd
         if (this.getDMEM().getLength() > this.getDMEM().getRAMEnd()) this.newError(`Too much data to put into the data memory in the .data section.`);
     }
 
@@ -1613,7 +1552,7 @@ class Parser {
         }
 
         const equ_word = this.line[this.tok_num - 2].getValue();  // get the equ name for the labels list
-        this.newEqu(equ_word, this.getTokValue(), this.line_in_file);
+        this.getProgDefs().newEqu(equ_word, this.getTokValue(), this.line_in_file);
     }
 
     asciiCharacterLiteral() {
@@ -1725,28 +1664,28 @@ class Parser {
 
         // If it's a non relative control flow instruction and it's not a function
         if (this.inst_set.isNonrelativeControlFlowInstruction(first_tok_val) && !this.functions.isFunction(tok_val)) {
-            tok_val = this.labels[tok_val];      // Get k for label
+            tok_val = this.getProgDefs().getLabels()[tok_val];      // Get k for label
         }
 
         // If it's a relative control flow instruction
         else if (this.inst_set.isRelativeControlFlowInstruction(first_tok_val)) {
-            tok_val = this.labels[tok_val] - 1 - this.line_num;
+            tok_val = this.getProgDefs().getLabels()[tok_val] - 1 - this.line_num;
         }
 
         // If it's in data labels
-        else if (this.labels[tok_val] !== undefined) {
-            tok_val = this.labels[tok_val];
+        else if (this.getProgDefs().getLabels()[tok_val] !== undefined) {
+            tok_val = this.getProgDefs().getLabels()[tok_val];
         }
 
         // If it's a REG definition
-        else if (this.defs[tok_val] !== undefined) {
+        else if (this.getProgDefs().getDefs()[tok_val] !== undefined) {
             tok_type = 'REG';
-            tok_val = this.defs[tok_val];
+            tok_val = this.getProgDefs().getDefs()[tok_val];
         }
 
         // If it's a REG definition
-        else if (this.equs[tok_val] !== undefined) {
-            tok_val = this.equs[tok_val];
+        else if (this.getProgDefs().getEqus()[tok_val] !== undefined) {
+            tok_val = this.getProgDefs().getEqus()[tok_val];
         }
 
         // Check if it's a function call?
@@ -1795,6 +1734,14 @@ class Parser {
         return this.dmem;
     }
 
+    getProgDefs() {
+        return this.defs;
+    }
+
+    getBreakPoint() {
+        return this.break_point;
+    }
+
     newError(text) {
         const s = new StatusHandler();
         s.newError(text);
@@ -1807,43 +1754,26 @@ class Interpreter {
 
     constructor() {
         this.emptyData();
-        
     }
 
     emptyData() {
         this.pmem = new PMEM();
         this.dmem = new DMEM();
+        this.prog_data = new ProgramData();
+        this.operands = new Operands();
 
         const pcl = new Register('PCL', 0); // PC lo8
         const pch = new Register('PCH', 0); // PC hi8
         this.pc = new PC(pcl, pch);
 
-        this.operands = new Operands();
-
-        this.step_count = 0;
-        this.cycles = 0;
-        this.branches_taken = 0;
-        this.branches_seen = 0;
-        this.finished = false;
-        this.error = false;
-        this.break_point = null;
-        this.print = true;
     }
 
-    newData(pmem, dmem, txt, break_point) {
+    newData(pmem, dmem, break_point) {
         // DATA & PROGRAM MEMORY
         this.pmem = pmem;
         this.dmem = dmem;
-        this.txt = txt;
-        this.break_point = break_point;
+        this.prog_data = new ProgramData(break_point);
 
-        this.lines = this.txt.split('\n');
-        this.finished = false;
-        this.error = false;
-        this.step_count = 0;
-        this.cycles = 0;
-        this.branches_taken = 0;
-        this.branches_seen = 0;
 
         // DEFINING PC
         const pcl = new Register('PCL', this.getDMEM().getValue(0x5b));
@@ -1885,16 +1815,7 @@ class Interpreter {
                 this.bitwiseOperation('AND');
                 break;
             case 'ASR':
-                Rd = this.getArgValue(0);
-                Result = this.mod256(Rd >> 1);
-                if (Rd >= 128) Result += 128;
-
-                this.writeResultToRd(Result);
-
-                N_bit = this.getBit(Result, 7);
-                C_bit = Rd & 1;
-                V_bit = N_bit ^ C_bit;
-                this.getDMEM().updateSREG(null, null, null, N_bit ^ V_bit, V_bit, N_bit, !Result, C_bit);
+                this.shiftRight(1);
                 break;
             case 'BCLR':
                 s = this.getArgValue(0);
@@ -1984,20 +1905,8 @@ class Interpreter {
                 if (type_arg0 === 'INT') this.call();
                 if (this.getArgValue(0) === 'printf') this.printf();    // OTHERWISE IF IT'S PRINTF
                 break;
-
-                    // Printf takes the top two values from the stack
-                    // Puts them into X low byte then high byte (must push high byte first to call printf)
-                    // Assumes that it is pointing at the string you want to print
-                    // Prints characters with X+ until it hits a null character
-                    // Returns
-
-                    // W, X, and Z are changed
-                    // The string is printed
-                    // Next instruction is after
-                
-                
             case 'CBI':
-                this.bitInIO(0);
+                this.bitInIO(0, 0);
                 break;
             case 'CBR':
                 this.bitwiseOperation('CBR');
@@ -2045,18 +1954,10 @@ class Interpreter {
             case 'CPSE':
                 Rd = this.getArgValue(0);
                 Rr = this.getArgValue(1);
-                this.branches_seen += 1;
-
+                this.getProgramData().offsetBranchesSeen(1);
                 if (Rd !== Rr) break;
-
-                this.branches_taken += 1;
-                this.getPC().offsetValue(1);
-                this.cycles += 1;
-
-                if (this.getLine(1) !== null) break;    // break if the next inst is 16 bit not 32 bit
-
-                this.getPC().offsetValue(1);
-                this.cycles += 1;
+                this.getProgramData().offsetBranchesTaken(1);   // branches taken += 1
+                this.skip();
                 break;
             case 'DEC':
                 this.incDec(1);
@@ -2078,7 +1979,7 @@ class Interpreter {
                 break;
             case 'IJMP':
                 this.getPC().setValue(this.getDMEM().getWord(30) - 1);
-                this.cycles += 1;
+                this.getProgramData().offsetCycles(1);
                 break;
             case 'IN':
                 A_val = this.getArgValue(1);
@@ -2090,42 +1991,20 @@ class Interpreter {
                 break;
             case 'JMP':
                 this.getPC().setValue(this.getArgValue(0) - 1);
-                this.cycles += 2;
+                this.getProgramData().offsetCycles(2);
                 break;
             case 'LD':
-                w = this.getArgValue(1);
-                plusminus = -1 * w.includes('-') + w.includes('+'); // get if it's got a + or -
-                w = w.replace('-', '').replace('+', '');            // make it X, Y, or Z only
-                low_byte = (['X', 'Y', 'Z'].indexOf(w) * 2) + 26;   // convert it to a number
-
-                if (plusminus === -1) this.getDMEM().offsetWord(low_byte, -1);
-                
-                k = this.getDMEM().getWord(low_byte);
-                if (k < 0x100 || k > this.getDMEM().getRAMEnd()) this.newError(`Illegal value \'${k}\' for ${w} on line ${this.line_in_file}.`);
-                if (plusminus === 1) this.getDMEM().offsetWord(low_byte, 1);
-                
-                this.cycles += ( (3 * plusminus * plusminus) - plusminus) >> 1; // +2 for -1, +1 for 1, +0 for 0
-                this.writeResultToRd(this.getDMEM().getValue(k));  // Rd <-- (k)
+                this.loadStore(0);
                 break;
             case 'LDD':
-                w = this.getArgValue(1)[0]; // TODO check this out
-                q = parseInt(this.getArgValue(1).slice(2)); // TODO check this out
-
-                if (w === 'Y') k = this.getDMEM().getWord(28) + q;
-                else if (w === 'Z') k = this.getDMEM().getWord(30) + q;
-                if (k < 0x100 || k > this.getDMEM().getRAMEnd()) this.newError(`Illegal value \'${k}\' for ${w}+${q} on line ${this.line_in_file}.`);
-                this.writeResultToRd(this.getDMEM().getValue(k));  // Rd <-- (k)
-                this.cycles += 1;
+                this.loadStoreDisplacement(0);
                 break;
             case 'LDI':
                 K_val = this.getArgValue(1);
                 this.writeResultToRd(K_val);  // Rd <-- K
                 break;
             case 'LDS':
-                k = this.getArgValue(1);
-                this.writeResultToRd(this.getDMEM().getValue(k));  // Rd <-- (k)
-                this.getPC().offsetValue(1); // increment once now cause total needs to be + 2
-                this.cycles += 1;
+                this.loadStoreDataSpace(0);
                 break;
             case 'LPM':
                 k = this.getDMEM().getWord(30);
@@ -2138,28 +2017,19 @@ class Interpreter {
                 const opcode_slice = inst_opcode.slice(start, start + 8);
 
                 this.getDMEM().setValue(Rd, parseInt(opcode_slice, 2));
-                this.cycles += 2;
+                this.getProgramData().offsetCycles(2);
                 break;
             case 'LSL':
                 this.add(0, 1);
                 break;
             case 'LSR':
-                Rd = this.getArgValue(0);
-                Result = this.mod256(Rd >> 1);
-                this.writeResultToRd(Result);   // Rd <-- Rd >> 1
-
-                C_bit = Rd & 1;
-                this.getDMEM().updateSREG(null, null, null, C_bit, C_bit, 0, !Result, C_bit);
+                this.shiftRight(0);
                 break;
             case 'MOV':
-                Rr = this.getArgValue(1);
-                this.writeResultToRd(Rr); // Rd <-- Rr
+                this.mov(0);
                 break;
             case 'MOVW':
-                Rr = this.getArgValue(1);
-                this.writeResultToRd(Rr); // Rd <-- Rr
-                Rr = this.getDMEM().getValue(this.getRegNum(1) + 1);
-                this.writeResultToRd(Rr, 1);    // Rd <-- Rr
+                this.mov(1);
                 break;
             case 'MUL':
                 this.mul(0);
@@ -2198,58 +2068,30 @@ class Interpreter {
                 if (this.getDMEM().getWord(0x5d) >= this.getDMEM().getRAMEnd()) return this.newError(`Bad stack pointer for POP on line ${this.line_in_file}.`);
                 this.getDMEM().incSP();                                               // increment the SP by 1
                 this.writeResultToRd(this.getDMEM().getValue(this.getDMEM().getWord(0x5d)));  // Rd <-- popped value
-                this.cycles += 1;
+                this.getProgramData().offsetCycles(1);
                 break;
             case 'PUSH':
                 if (this.getDMEM().getWord(0x5d) <= 0x100) return this.newError(`Stack overflow. Bad stack pointer for PUSH on line ${this.line_in_file}.`);
                 Rr = this.getArgValue(0);               // register held value
                 this.getDMEM().setValue(this.getDMEM().getWord(0x5d), Rr);    // set the value in DMEM
                 this.getDMEM().decSP();                           // decrement the SP by 1
-                this.cycles += 1;
+                this.getProgramData().offsetCycles(1);
                 break;
             case 'RCALL':
                 this.call(2);
                 break;
             case 'RET':
-                if (this.getDMEM().getWord(0x5d) === this.getDMEM().getRAMEnd()) {
-                    this.finished = true;
-                    this.step_count += 1;
-                    this.cycles += 5;
-                    console.log(`Number of steps taken: ${this.step_count}`);
-                    return;
-                }
-
-                if ((this.getDMEM().getWord(0x5d) < 0x100) || (this.getDMEM().getWord(0x5d) > (this.getDMEM().getRAMEnd() - 2))) {
-                    this.newError(`Bad stack pointer for RET on line ${this.line_in_file}.`);
-                    return;
-                }
-
-                // Get the return line and move the SP
-                this.getDMEM().incSP();
-                let ret_line = (this.getDMEM().getValue(this.getDMEM().getWord(0x5d)) << 8); // get the ret high value
-                this.getDMEM().incSP();
-                ret_line += this.getDMEM().getValue(this.getDMEM().getWord(0x5d)); // add the ret low value to the ret high value
-                this.getPC().setValue(ret_line - 1);
-                this.cycles += 4;
+                if (this.ret()) return;
                 break;
             case 'RJMP':
                 this.getPC().offsetValue(this.getArgValue(0));
-                this.cycles += 1;
+                this.getProgramData().offsetCycles(1);
                 break;
             case 'ROL':
                 this.add(1, 1);
                 break;
             case 'ROR':
-                Rd = this.getArgValue(0);
-                C_bit = this.getDMEM().getSREGBit(0);
-                Result = this.mod256(Rd >> 1) + (C_bit << 7);
-
-                this.writeResultToRd(Result);   // Rd <-- (Rd >> 1) + (C << 7)
-
-                N_bit = this.getBit(Result, 7);
-                C_bit = Rd & 1;
-                V_bit = N_bit ^ C_bit;
-                this.getDMEM().updateSREG(null, null, null, N_bit ^ V_bit, V_bit, N_bit, !Result, C_bit);
+                this.shiftRight(2);
                 break;
             case 'SBC':
                 this.sub(1);
@@ -2258,8 +2100,14 @@ class Interpreter {
                 this.sub(1);
                 break;
             case 'SBI':
-                this.bitInIO(1);
+                this.bitInIO(1, 0);
                 break;
+            case 'SBIC':
+                this.bitInIO(0, 1);
+                break;
+            case 'SBIS':
+                this.bitInIO(1, 1);
+                break; 
             case 'SBIW':
                 this.immediateWithWord(1);
                 break;
@@ -2300,40 +2148,13 @@ class Interpreter {
                 this.getDMEM().updateSREGBit(1, 1);
                 break;
             case 'ST':
-                w = this.getArgValue(0);
-                plusminus = -1 * w.includes('-') + w.includes('+'); // get if it's got a + or -
-                w = w.replace('-', '').replace('+', '');            // make it X, Y, or Z only
-                low_byte = (['X', 'Y', 'Z'].indexOf(w) * 2) + 26;   // convert it to a number
-
-                // Decrement X/Y/Z
-                if (plusminus === -1) this.getDMEM().offsetWord(low_byte, -1);
-
-                k = this.getDMEM().getWord(low_byte);
-                
-                if (k < 0x100 || k > this.getDMEM().getRAMEnd()) this.newError(`Illegal value \'${k}\' for ${w} on line ${this.line_in_file}.`);
-                
-                this.getDMEM().setValue(k, this.getArgValue(1));  // (k) <-- Rr
-                
-                if (plusminus === 1) this.getDMEM().offsetWord(low_byte, 1);
-                
-                this.cycles += ( (3 * plusminus * plusminus) - plusminus) >> 1; // +2 for -1, +1 for 1, +0 for 0
+                this.loadStore(1);
                 break;
             case 'STD':
-                w = this.getRegNum(0)[0]; // TODO check this
-                q = parseInt(this.getRegNum(0).slice(2)); // TODO check this
-                Rd = this.getArgValue(1);
-                if (w === 'Y') k = this.getDMEM().getWord(28) + q;
-                else if (w === 'Z') k = this.getDMEM().getWord(30) + q;
-                if (k < 0x100 || k > this.getDMEM().getRAMEnd()) this.newError(`Illegal value \'${k}\' for ${w}+${q} on line ${this.line_in_file}.`);
-                this.getDMEM().setValue(k, Rd);   // (k) <-- Rd
-                this.cycles += 1;
+                this.loadStoreDisplacement(1);
                 break;
             case 'STS':
-                k = this.getArgValue(0);
-                Rd = this.getArgValue(1);
-                this.getDMEM().setValue(k, Rd);   // (k) <-- Rd
-                this.getPC().offsetValue(1); // increment once now cause total needs to be + 2
-                this.cycles += 1;
+                this.loadStoreDataSpace(1);
                 break;
             case 'SUB':
                 this.sub();
@@ -2353,7 +2174,7 @@ class Interpreter {
                 break;
             case 'XCH':
                 k = this.getDMEM().getWord(30);
-                if ((k < 0x100) || (k > 0x8ff)) this.newError(`Illegal value of Z pointer \'${k}\' on line ${this.line_in_file}.`);
+                if ((k < 0x100) || (k > this.getDMEM().getRAMEnd())) this.newError(`Illegal value of Z pointer \'${k}\' on line ${this.line_in_file}.`);
 
                 Rd = this.getArgValue(1);
                 const reg_num = this.getRegNum(1);
@@ -2361,7 +2182,7 @@ class Interpreter {
          
                 this.getDMEM().setValue(k, Rd); // (Z) <-- Rd   and    Rd <-- (Z)
                 this.getDMEM().setValue(reg_num, k_val);
-                this.cycles += 1;
+                this.getProgramData().offsetCycles(1);
                 break;
             default:
                 break;
@@ -2374,22 +2195,22 @@ class Interpreter {
     }
 
     run() {
-        while (!this.finished && !this.error) {
+        while (!this.getProgramData().isFinished()) {
             this.step();
         }
     }
 
     checkFinished() {
         // If breakpoint is reached
-        if (this.getPC().getValue() === this.break_point) this.finished = true;
+        if (this.getPC().getValue() === this.getProgramData().getBreakPoint()) this.getProgramData().setFinish(true);
 
         // Do nothing if it's finished running
-        if (this.finished || this.error) return true;        
+        if (this.getProgramData().isFinished()) return true;        
 
         // If it should be finished, set it to finished then return
         if (this.getPC().getValue() >= this.getPMEM().getFlashEnd()) {
-            console.log(`PC value too large. Number of steps taken: ${this.step_count}`);
-            this.finished = true;
+            console.log(`PC value too large. Number of steps taken: ${this.getProgramData().getStepCount()}`);
+            this.getProgramData().setFinish(true);
             this.getPC().setValue(this.getPMEM().getFlashEnd());
             return true;
         }
@@ -2402,31 +2223,34 @@ class Interpreter {
     }
 
     branch(s, clear_set, branch_arg = 0) {
-        this.branches_seen += 1;
+        this.getProgramData().offsetBranchesSeen(1);
         if (this.getDMEM().getSREGBit(s) !== clear_set) return;
 
         let k = this.getArgValue(branch_arg); // branch_arg is 0 unless inst is BRBC/BRBS
         this.getPC().offsetValue(k);
-        this.cycles += 1;
-        this.branches_taken += 1;
+        this.getProgramData().offsetCycles(1);
+        this.getProgramData().offsetBranchesTaken(1);
     }
 
     skipBitReg(clear_set) {
         let Rd = this.getArgValue(0);
         let b = this.getArgValue(1);
 
-        this.branches_seen += 1;
+        this.getProgramData().offsetBranchesSeen(1);
 
         if ((clear_set === 0) && ((Rd >> b) & 1)) return;    // return if it's set but should be cleared
         if ((clear_set === 1) && !((Rd >> b) & 1)) return;   // return if it's cleared but should be set
 
-        this.branches_taken += 1;
+        this.getProgramData().offsetBranchesTaken(1);
+        this.skip();
+    }
 
+    skip() {
         let incs = (this.getLine(2) === null) ? 2 : 1;  // increment twice if the next instruction is double size
 
         for (let i = 0; i < incs; i++) {
             this.getPC().offsetValue(1);
-            this.cycles += 1;
+            this.getProgramData().offsetCycles(1);
         }
     }
 
@@ -2527,7 +2351,23 @@ class Interpreter {
         const C_shift = 15 + is_frac;
         this.getDMEM().updateSREG(null, null, null, null, null, null, !Result, (Result >> C_shift) & 1);
 
-        if (num_signed === 1) this.cycles += 1;  // for MULSU and FMULSU
+        if (num_signed === 1) this.getProgramData().offsetCycles(1);  // for MULSU and FMULSU
+    }
+
+    shiftRight(shift_type) {        
+        // LSR = 0, ASR = 1, ROR = 2
+        const Rd = this.getArgValue(0);
+
+        const bit7 = [0, this.getBit(Rd, 7), this.getDMEM().getSREGBit(0)][shift_type];
+
+        const Result = this.mod256(Rd >> 1) + (bit7 << 7);
+
+        this.writeResultToRd(Result);
+
+        const N_bit = (!shift_type) ? 0 : this.getBit(Result, 7);
+        const C_bit = Rd & 1;
+        const V_bit = N_bit ^ C_bit;
+        this.getDMEM().updateSREG(null, null, null, N_bit ^ V_bit, V_bit, N_bit, !Result, C_bit);
     }
 
     call(call_type = 0) {
@@ -2545,14 +2385,109 @@ class Interpreter {
         if (call_type === 2) this.getPC().offsetValue(k - 1);
         else this.getPC().setValue(k - 1);
 
-        this.cycles += 3;
-        if (!call_type) this.cycles += 1;   // CALL takes 1 more cycle than the others
+        this.getProgramData().offsetCycles(3);
+        if (call_type) return;
+        this.getProgramData().offsetCycles(1);   // CALL takes 1 more cycle than the others
+    }
+
+    ret() {
+        const sp = this.getDMEM().getWord(0x5d);
+
+        // Finish program
+        if (sp === this.getDMEM().getRAMEnd()) {
+            this.getProgramData().setFinish(true);
+            this.getProgramData().offsetStepCount(1);
+            this.getProgramData().offsetCycles(5);
+            console.log(`Number of steps taken: ${this.getProgramData().getStepCount()}`);
+            return true;
+        }
+
+        if ((sp < 0x100) || (sp > (this.getDMEM().getRAMEnd() - 2))) {
+            return this.newError(`Bad stack pointer for RET on line ${this.line_in_file}.`);
+        }
+
+        // Get the return line from the stack
+        this.getDMEM().incSP();
+        let ret_line = (this.getDMEM().getValue(this.getDMEM().getWord(0x5d)) << 8); // get the ret high value
+
+        this.getDMEM().incSP();
+        ret_line += this.getDMEM().getValue(this.getDMEM().getWord(0x5d)); // add the ret low value to the ret high value
+
+        this.getPC().setValue(ret_line - 1);
+        this.getProgramData().offsetCycles(4);
+        return false;
+    }
+
+    loadStoreDataSpace(is_sts = 0) {
+        // LDS = 0, STS = 1
+        const k = this.getArgValue(1 - is_sts);
+        const Rd = this.getArgValue(1);
+        
+        if (is_sts) this.getDMEM().setValue(k, Rd);                     // (k) <-- Rd
+        else        this.writeResultToRd(this.getDMEM().getValue(k));   // Rd <-- (k)
+        
+        this.getPC().offsetValue(1); // increment once now cause total needs to be + 2
+        this.getProgramData().offsetCycles(1);
+    }
+
+    loadStore(is_st = 0) {
+        let w = this.getArgValue(1 - is_st);
+        const plusminus = -1 * w.includes('-') + w.includes('+'); // get if it's got a + or -
+        
+        w = w.replace('-', '').replace('+', '');                  // make it X, Y, or Z only
+        const low_byte = (['X', 'Y', 'Z'].indexOf(w) * 2) + 26;   // convert it to a number
+
+        // Decrement X/Y/Z
+        if (plusminus === -1) this.getDMEM().offsetWord(low_byte, -1);
+        
+        const k = this.getDMEM().getWord(low_byte);
+
+        const illegal_k = (k < 0x100 || k > this.getDMEM().getRAMEnd());
+        if (illegal_k) this.newError(`Illegal value \'${k}\' for ${w} on line ${this.line_in_file}.`);
+
+        if (is_st) this.getDMEM().setValue(k, this.getArgValue(1));  // (k) <-- Rr
+        
+        if (plusminus === 1) this.getDMEM().offsetWord(low_byte, 1);
+
+        const offset = [2, 0, 1][plusminus + 1];    // +2 for -1, +0 for 0, +1 for 1 
+        this.getProgramData().offsetCycles(offset);
+        
+        if (!is_st) this.writeResultToRd(this.getDMEM().getValue(k));  // Rd <-- (k)
+    }
+
+    loadStoreDisplacement(is_st = 0) {
+        //STD
+        const w = this.getRegNum(1 - is_st)[0]; // TODO check this
+        const q = parseInt(this.getRegNum(1 - is_st).slice(2)); // TODO check this
+
+        let k;
+        if (w === 'Y') k = this.getDMEM().getWord(28) + q;
+        else if (w === 'Z') k = this.getDMEM().getWord(30) + q;
+        
+        if (k < 0x100 || k > this.getDMEM().getRAMEnd()) this.newError(`Illegal value \'${k}\' for ${w}+${q} on line ${this.line_in_file}.`);
+        
+        this.getProgramData().offsetCycles(1);
+        
+        if (!is_st) return this.writeResultToRd(this.getDMEM().getValue(k));  // Rd <-- (k)
+
+        const Rd = this.getArgValue(1);
+        this.getDMEM().setValue(k, Rd);   // (k) <-- Rd
+    }
+
+    mov(is_word = 0) {
+        let Rr = this.getArgValue(1);
+        this.writeResultToRd(Rr); // Rd <-- Rr
+
+        if (!is_word) return;
+
+        Rr = this.getDMEM().getValue(this.getRegNum(1) + 1);
+        this.writeResultToRd(Rr, 1);    // Rd <-- Rr
     }
 
     pushPCToStack() {
-        this.getDMEM().setValue(this.getDMEM().getWord(0x5d), this.getPC().getPCL().getValue());               // push pcl in STACK
+        this.getDMEM().setValue(this.getDMEM().getWord(0x5d), this.getPC().getPCL().getValue());    // push pcl in STACK
         this.getDMEM().decSP();
-        this.getDMEM().setValue(this.getDMEM().getWord(0x5d), this.getPC().getPCH().getValue());     // push pch in STACK
+        this.getDMEM().setValue(this.getDMEM().getWord(0x5d), this.getPC().getPCH().getValue());    // push pch in STACK
         this.getDMEM().decSP();
     }
 
@@ -2570,7 +2505,6 @@ class Interpreter {
         - The string is printed
         - Goes to next instruction
         */
-
         const sp = this.getDMEM().getWord(0x5d);
 
         const can_pop_twice = (sp <= this.getDMEM().getRAMEnd() - 2);
@@ -2594,7 +2528,7 @@ class Interpreter {
         const console_box = document.getElementById('console');
         console_box.scrollTop = console_box.scrollHeight;
 
-        this.cycles += 4;
+        this.getProgramData().offsetCycles(4);
     }
 
     printToConsole(start_address) {
@@ -2607,9 +2541,9 @@ class Interpreter {
             address += 1;
             W_val += 1;
 
-            if (this.print) document.getElementById('console').innerHTML += char;   // add it to the console
+            if (this.getProgramData().getPrint()) document.getElementById('console').innerHTML += char;   // add it to the console
 
-            if (address > 0x8ff) break;                             // don't go beyond the end of memory
+            if (address > this.getDMEM().getRAMEnd()) break;    // don't go beyond the end of memory
 
             K_val = this.getDMEM().getValue(address);
             char = String.fromCharCode(K_val);
@@ -2618,23 +2552,32 @@ class Interpreter {
         return W_val;
     }
 
-    bitInIO(clear_set) {
+    bitInIO(clear_set, skip) {
         // 0 = clear, 1 = set
         const A_val = this.getArgValue(0);
         const b = this.getArgValue(1);
         const dmem_val = this.getDMEM().getValue(A_val + 0x20);
+        this.getProgramData().offsetCycles(1);
+
+        if (skip) {
+            if (!(clear_set) && ((dmem_val >> b) & 1)) return;  // return if it's set but should be cleared
+            if ((clear_set) && !((dmem_val >> b) & 1)) return;  // return if it's cleared but should be set
+            return this.skip();
+        }
+
         const bit_val = (1 << b);
         const Result = (clear_set) ? dmem_val | bit_val : dmem_val & (0xff - bit_val);
         this.getDMEM().setValue(A_val + 0x20, Result);
-        this.cycles += 1;
+        return;
+
     }
 
     incrementStepCount() {
-        this.step_count += 1 // count the number of steps to prevent infinite loops
-        this.cycles += 1 // count the number of clock cycles used
+        this.getProgramData().offsetStepCount(1);   // count the number of steps to prevent infinite loops
+        this.getProgramData().offsetCycles(1); // count the number of clock cycles used
 
         // If the number of steps is too large, terminate running the code
-        if (this.step_count > 1000000) {
+        if (this.getProgramData().getStepCount() > (1 << 20)) {
             return this.newError('Number of steps in code too large. Execution terminated.');
         } 
     }
@@ -2677,6 +2620,10 @@ class Interpreter {
         return this.dmem;
     }
 
+    getProgramData() {
+        return this.prog_data;
+    }
+
     getBit(value, bit) {
         // returns the value of a bit in a number
         return ((value >> bit) & 1);
@@ -2687,12 +2634,12 @@ class Interpreter {
         return 1 - this.getBit(value, bit);
     }
 
-    setPrint(val) {
-        this.print = val;
-    }
-
     getLine(offset = 0) {
-        return this.getPMEM().getValue(this.getPC().getValue() + offset);
+        const line_num = this.getPC().getValue() + offset;
+        if (line_num >= this.getPMEM().getFlashEnd()) {
+            return this.newError(`Cannot access PMEM line ${line_num} on line ${this.line_in_file}.`);
+        }
+        return this.getPMEM().getValue(line_num);
     }
 
     getRegNum(arg_num) {
@@ -2747,7 +2694,7 @@ class DMEM {
     getValue(loc = null) {
         // to get the registers as objects, use this.getValue()[i]
         if (loc === null) return this.memory;
-        if (loc > 0x8ff) return this.newError('Illegal DMEM location. Execution terminated.');
+        if (loc > 0x8ff) return this.newError(`Illegal DMEM location: ${loc}. Execution terminated.`);
         if (loc >= 0x100) return this.memory[loc];
         return this.memory[loc].getValue();
     }
@@ -2842,12 +2789,19 @@ class PMEM {
         this.memory.push(val);
     }
 
-    getValue(loc) {
+    getValue(loc, line) {
+        if (loc >= this.getLength()) return this.newError(`Illegal PMEM location: ${loc}. Execution terminated.`);
         return this.memory[loc];
     }
 
-    setValue(loc, val) {
+    setValue(loc, val, line) {
+        if (loc >= this.getLength()) return this.newError(`Illegal PMEM location: ${loc}. Execution terminated.`);
         this.memory[loc] = val;
+    }
+
+    newError() {
+        const s = new StatusHandler();
+        s.newError(text);
     }
 
 }
@@ -2881,6 +2835,200 @@ class PC {
 
     mod256(val) {
         return val & 0xff;
+    }
+}
+
+class ProgramData {
+    constructor(break_point = null, print = true) {
+        this.step_count = 0;
+        this.cycles = 0;
+        this.branches_taken = 0;
+        this.branches_seen = 0;
+        this.finished = false;
+        this.break_point = break_point;
+        this.print = print;
+    }
+
+    getStepCount() {
+        return this.step_count;
+    }
+
+    offsetStepCount(offset) {
+        this.step_count += offset;
+    }
+
+    getCycles() {
+        return this.cycles;
+    }
+
+    offsetCycles(offset) {
+        this.cycles += offset;
+    }
+
+    getBranchesTaken() {
+        return this.branches_taken;
+    }
+
+    offsetBranchesTaken(offset) {
+        this.branches_taken += offset;
+    }
+
+    getBranchesSeen() {
+        return this.branches_seen;
+    }
+
+    offsetBranchesSeen(offset) {
+        this.branches_seen += offset;
+    }
+
+    isFinished() {
+        return this.finished;
+    }
+
+    setFinish(val) {
+        this.finished = val;
+    }
+
+    getPrint() {
+        return this.print;
+    }
+
+    setPrint(val) {
+        this.print = val;
+    }
+
+    getBreakPoint() {
+        return this.break_point;
+    }
+}
+
+class ProgramDefinitions {
+    constructor() {
+        this.labels = Object.create(null);
+        this.defs = Object.create(null);
+        this.equs = Object.create(null);
+        this.inst_set = new InstructionSet();
+    }
+
+    getLabels() {
+        return this.labels;
+    }
+
+    getDefs() {
+        return this.defs;
+    }
+
+    getEqus() {
+        return this.equs;
+    }
+
+    getInstSet() {
+        return this.inst_set;
+    }
+
+    newLabel(label, value, line_in_file) {
+        if ( this.getLabels()[label] !== undefined ) {
+            this.newError(`Previous definition of \'${label}\'. Duplicate label \'${label}\' on line ${line_in_file}.`);
+        }
+
+        if ( this.getEqus()[label] !== undefined ) {
+            this.newError(`Previous definition of \'${label}\'. Illegal attempt to re-use \'${label}\' as label on line ${line_in_file}.`);
+        }
+
+        if ( this.getDefs()[label] !== undefined ) {
+            this.newError(`Previous definition of \'${label}\'. Illegal use of register \'${label}\' as label on line ${line_in_file}.`);
+        }
+        
+        if (this.getInstSet().isInstruction(this.getLabels()[label])) {
+            this.newError(`Illegal re-use of instruction \'${label}\' as label on line ${line_in_file}.`);
+        }
+
+        this.getLabels()[label] = value;
+    }
+
+    newEqu(label, value, line_in_file) {
+        if ( this.getLabels()[label] !== undefined ) {
+            this.newError(`Previous definition of \'${label}\'. Invalid redefinition of label \'${label}\' as variable on line ${line_in_file}.`);
+        }
+
+        // Allow redefinition of variables already in this.equs
+
+        if ( this.getDefs()[label] !== undefined ) {
+            this.newError(`Previous definition of \'${label}\'. Illegal use of register \'${label}\' as variable on line ${line_in_file}.`);
+        }
+        
+        if (this.getInstSet().isInstruction(this.getLabels()[label])) {
+            this.newError(`Attempt to redefine keyword \'${label}\' on line ${line_in_file}.`);
+        }
+
+        this.getEqus()[label] = value;
+    }
+
+    newDef(label, value, line_in_file) {
+        // If its already a label or .equ
+        if ( this.getLabels()[label] !== undefined || this.getEqus()[label] !== undefined ) {
+            this.newError(`Previous definition of \'${label}\'. Cannot use .def: ${label} redefinition on line ${line_in_file}.`);
+        }
+
+        // Allow redefinition of defs already in this.defs
+
+        // Dont allow definitions that are already instructions
+        
+        if (this.getInstSet().isInstruction(this.getLabels()[label])) {
+            this.newError(`Illegal re-use of instruction \'${label}\' as definition on line ${line_in_file}.`);
+        }
+
+        this.getDefs()[label] = value;
+    }
+
+    newError(text) {
+        const s = new StatusHandler();
+        s.newError(text);
+    }
+}
+
+class BreakPoint {
+    constructor() {
+        this.value = null;    // for stopping the interpreter run() method at
+        this.line_in_file = parseInt(document.getElementById('break_point').value);
+    }
+
+    getValue() {
+        return this.value;
+    }
+
+    getLineInFile() {
+        return this.line_in_file;
+    }
+
+    setValue(val) {
+        this.value = val;
+    }
+
+    defineBreakPoint(val, line_in_file) {
+        // If the break point should be here set the break point to be the line about to be put in
+        if (Number.isNaN(this.getLineInFile())) return
+        if (line_in_file < this.getLineInFile()) return;
+        if (this.getValue() !== null) return;
+        this.setValue(val);
+    }
+}
+
+class LineManager {
+    constructor() {
+        this.line = null;
+        this.line_in_file = null;
+        this.line_length = null;
+        this.line_num = 0;
+
+        this.tok_manager = new TokenManager();
+    }
+}
+
+class TokenManager {
+    constructor() {
+        this.current_tok = null;
+        this.tok_num = 0;
     }
 }
 
@@ -2989,6 +3137,8 @@ class Operands {
             'SBC': [reg_0_31, reg_0_31],
             'SBCI': [reg_16_31, int_0_255],
             'SBI': [int_0_31, int_0_7],
+            'SBIC': [int_0_31, int_0_7],
+            'SBIS': [int_0_31, int_0_7],
             'SBIW': [word_wxyz, int_0_63],
             'SBR': [reg_16_31, int_0_255],
             'SBRC': [reg_0_31, int_0_7],
@@ -3154,6 +3304,8 @@ class InstructionSet {
             'SBC',
             'SBCI',
             'SBI',
+            'SBIC',
+            'SBIS',
             'SBIW',
             'SBR',
             'SBRC',
@@ -3512,33 +3664,6 @@ class ThemeHandler {
     }
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// # AN EASTER EGG - POEM                                                                                            /
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/*
-O that you would know my heart,
-Your ways, greater than my own,
-To you I give my every hour,
-Just to you and you alone.
-
-O that you would see my eyes,
-Looking only at your shape,
-Spending time in your presence,
-Looking at you for escape.
-
-O that you would know my mind,
-Long I strive to let you see,
-Night and day I work for you,
-Just for you, not you for me.
-
-O that you would see my hands,
-Patiently they labour strong,
-Intro to Computer Systems,
-Man, you're tough and very long.
-*/
-
-
 class App {
 
     constructor() {
@@ -3592,7 +3717,7 @@ class App {
         this.parser.newData(this.lexer.getTokens(), txt);
 
         // Interpreter Initialisation
-        this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), txt, this.parser.break_point);
+        this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), this.parser.getBreakPoint().getValue());
 
         // Success!
         this.success('Success! Your code can be run.', print);
@@ -3625,11 +3750,9 @@ class App {
         const current_pc = this.interpreter.getPC().getValue();
         this.pmem_top = current_pc - (current_pc % 8); // move pmem display to the line
 
-        //if (this.interpreter.error) return this.newError(this.interpreter.error_text);
-
-        if (this.interpreter.finished) {
-            if (this.interpreter.break_point !== current_pc) this.success('The code has run and exited successfully!');
-            else this.success(`The code has run and exited successfully at the breakpoint on line ${this.parser.break_point_line}!`);
+        if (this.interpreter.getProgramData().isFinished()) {
+            if (this.interpreter.getProgramData().getBreakPoint() !== current_pc) this.success('The code has run and exited successfully!');
+            else this.success(`The code has run and exited successfully at the breakpoint on line ${this.parser.getBreakPoint().getLineInFile()}!`);
         }
 
         else this.emptyStatus();
@@ -3654,7 +3777,7 @@ class App {
 
         let sleep_time;
         let t0 = Date.now();
-        while (!this.interpreter.finished && !this.interpreter.error && !this.pause) {
+        while (!this.interpreter.getProgramData().isFinished() && !this.pause) {
             sleep_time = this.getRunTime() - (Date.now() - t0);
             if (sleep_time > 0) await sleep(sleep_time);
             if (this.pause) break;
@@ -3672,7 +3795,7 @@ class App {
         this.hideOpenPopup(); // hide any open popup
         
         const steps_back = this.getStepSize();
-        const steps = this.interpreter.step_count - steps_back;       // the total number of steps to get to the point you want to go for
+        const steps = this.interpreter.getProgramData().getStepCount() - steps_back;       // the total number of steps to get to the point you want to go for
         
         this.assemble(false);
 
@@ -3681,7 +3804,7 @@ class App {
         this.emptyStatus();
         this.hideOpenPopup(); // hide any open popup
 
-        this.interpreter.setPrint(false);   // stop from printing
+        this.interpreter.getProgramData().setPrint(false);   // stop from printing
 
         for (let i = 0; i < (steps - 1); i++) {
             this.interpreter.step();    // do enough steps to get to the point you expect to be at
@@ -3693,7 +3816,7 @@ class App {
 
         this.pmem_top = this.interpreter.getPC().getValue() - (this.interpreter.getPC().getValue() % 8); // move pmem display to the line
         
-        this.interpreter.setPrint(true);    // allow printing again
+        this.interpreter.getProgramData().setPrint(true);    // allow printing again
 
         this.populateAll();
     }
@@ -3945,10 +4068,10 @@ class App {
     populateStats() {
         if (!this.assembled) return;
 
-        this.setinnerHTML('stats-instructions-executed', this.interpreter.step_count);
-        this.setinnerHTML('stats-clock-cycles', this.interpreter.cycles);
-        this.setinnerHTML('stats-branches-seen', this.interpreter.branches_seen);
-        this.setinnerHTML('stats-branches-taken', this.interpreter.branches_taken);
+        this.setinnerHTML('stats-instructions-executed', this.interpreter.getProgramData().getStepCount());
+        this.setinnerHTML('stats-clock-cycles', this.interpreter.getProgramData().getCycles());
+        this.setinnerHTML('stats-branches-seen', this.interpreter.getProgramData().getBranchesSeen());
+        this.setinnerHTML('stats-branches-taken', this.interpreter.getProgramData().getBranchesTaken());
     }
 
     success(text, print = true) {
@@ -5069,6 +5192,30 @@ class App {
 
                     Operation:
                     I/O(A, b) = 1`,
+            'SBIC': `Syntax:   SBIC A, b
+                    Family:   Branch Instructions
+                    Function: Tests a single bit in an I/O register and skips the next instruction if the bit is cleared
+
+                    Boundaries:
+                    A → [0 - 31]
+                    b → [0 - 7]
+
+                    Operation Options:
+                    PC = PC + 1 { if I/O(A, b) = 1 }
+                    PC = PC + 2 { if I/O(A, b) = 0 and the next instruction is 16 bits }
+                    PC = PC + 3 { if I/O(A, b) = 0 and the next instruction is 32 bits }`,
+            'SBIS': `Syntax:   SBIS A, b
+                    Family:   Branch Instructions
+                    Function: Tests a single bit in an I/O register and skips the next instruction if the bit is set
+
+                    Boundaries:
+                    A → [0 - 31]
+                    b → [0 - 7]
+
+                    Operation Options:
+                    PC = PC + 1 { if I/O(A, b) = 0 }
+                    PC = PC + 2 { if I/O(A, b) = 1 and the next instruction is 16 bits }
+                    PC = PC + 3 { if I/O(A, b) = 1 and the next instruction is 32 bits }`,
             'SBIW': `Syntax:   SBIW Rd, K
                     Family:   Arithmetic Instructions
                     Function: Subtracts K from the word register Rd+1:Rd
