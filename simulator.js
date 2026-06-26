@@ -533,17 +533,8 @@ class Lexer {
     }
 
     newData(text) {
-        this.text = text;
         this.code_arr = text.split('\n');
-        this.tokens = [];
-        this.line_tokens = [];
-        this.line_number = 0;
-        this.line = '';
-        this.pos = 0;
-        this.match = null;
-        this.current_tok = null;
-        this.current_type = null;
-        this.current_value = null;
+        this.tok_manager = new TokenManager();
 
         this.tokenise();
     }
@@ -558,65 +549,63 @@ class Lexer {
         // TODO: can use variables as int or reg
 
         // Go over every line of code and move through the line making tokens
-        for (this.line_number = 0; this.line_number < this.code_arr.length; this.line_number++) {
+        for (let line_number = 0; line_number < this.getCodeArray().length; line_number++) {
+            this.getLineManager().setLineNumber(line_number);
             this.tokeniseLine();
             this.fixBadTokens();
 
-            if (this.line_tokens.length === 0) continue;          
+            if (this.getLineManager().getLineLength() === 0) continue;          
             
-            this.tokens.push(this.line_tokens);  // add to the tokens list if the line isnt empty
+            this.getLineManager().endLine(); // add to the tokens list if the line isnt empty
             
         }
     }
 
     tokeniseLine() {
         // Creates tokens from a line
-
-        this.pos = 0;
-        this.line = this.code_arr[this.line_number] + ' ';
-        this.line_tokens = [];
-
+        const line = this.getCodeArray()[this.getLineManager().getLineNumber()] + ' ';
+        this.getLineManager().clearLine();
+        
         // Iterate over the input code, finding matches for each token type
-        while (this.pos < this.line.length) {
-            this.getMatch();
-            this.pos += this.match[0].length;
+        let start_pos = 0;   // location in the line
+        while (start_pos < line.length) {
+            start_pos += this.getMatch(line, start_pos);
         }
     }
 
-    getMatch() {
+    getMatch(line, start_pos) {
         // Check all the valid regex token patterns to see if a token can be made
 
-        this.match = null;
+        let match = null;
 
         for (let i = 0; i < this.patterns.length; i++) {
             const [regex, tag] = this.patterns[i];
-            this.match = regex.exec(this.line.slice(this.pos));
+            match = regex.exec(line.slice(start_pos));
 
-            if (!this.match) continue;
+            if (!match) continue;
 
-            this.createNewToken(tag);
-            return;
+            this.createNewToken(tag, match, start_pos);
+            break;
         }
 
-        if (this.match) return;
+        if (match) return match[0].length;
         
-        this.newError(`Invalid syntax on line ${this.line_number + 1} starting at position ${this.pos}.`);
-        
+        this.newError(`Invalid syntax on line ${this.getLineManager().getLineNumber() + 1} starting at position ${position}.`);
     }
 
-    createNewToken(tag) {
+    createNewToken(tag, match, start_pos) {
         if (!tag) return;
 
-        const token = new Token(tag, this.match[0], `${this.line_number + 1}:${this.pos + 1}`);
-        this.line_tokens.push(token);
+        const token = new Token(tag, match[0], `${this.getLineManager().getLineNumber() + 1}:${start_pos + 1}`);
+        this.getLineManager().pushToLine(token);
     }
 
     fixBadTokens() {
         // Fixes any bad tokens (like REFs being INST tokens)
 
         let i = 0;
-        while (i < this.line_tokens.length) {
-            this.getCurrentToken(i);
+        while (i < this.getLineManager().getLineLength()) {
+            this.getTokenManager().setToken(i);
 
             this.makeInstructionTokens(i);
             this.makeRegTokens();
@@ -625,27 +614,26 @@ class Lexer {
             this.tokeniseInt();
 
             i = this.combineRefs(i);
-
             i += 1;
         }
     }
 
     tokeniseInt() {
         // Convert integers to base 10
-        if (!this.current_type.includes('INT')) return;
+        if (!this.getTokenManager().getType().includes('INT')) return;
 
         const base = this.getIntBase();
-        const slice_loc = (this.current_type === 'INT') ? 0 : (this.current_type === 'INTHEX1') ? 1 : 2;
-        const is_neg = (this.current_value.includes('-'));
+        const slice_loc = (this.getTokenManager().getType() === 'INT') ? 0 : (this.getTokenManager().getType() === 'INTHEX1') ? 1 : 2;
+        const is_neg = (this.getTokenManager().getValue().includes('-'));
         
         // Remove negative and store as multiplier for down the bottom of the function
-        if (is_neg) this.setCurrentTokenValue(this.current_value.slice(1));
+        if (is_neg) this.getTokenManager().setValue(this.getTokenManager().getValue().slice(1));
         
         const neg = is_neg ? -1 : 1;
-        const int_value = parseInt(this.current_value.slice(slice_loc), base);
+        const int_value = parseInt(this.getTokenManager().getValue().slice(slice_loc), base);
 
-        this.setCurrentTokenValue(neg * int_value);
-        this.setCurrentTokenType('INT');
+        this.getTokenManager().setType('INT');
+        this.getTokenManager().setValue(neg * int_value);
     }
 
     getIntBase() {
@@ -657,98 +645,85 @@ class Lexer {
             'INTBIN':    2
         };
 
-        return bases[this.current_type];
+        return bases[this.getTokenManager().getType()];
         
     }
 
     trimLabels() {
-        if (this.current_type !== 'LABEL') return;
+        if (this.getTokenManager().getType() !== 'LABEL') return;
         
-        const label_end = this.current_value.length - 1;
-        const new_value = this.current_value.slice(0, label_end).trim(); // remove the colon at the end (and any whitespace)
-        this.setCurrentTokenValue(new_value); 
+        const label_end = this.getTokenManager().getValue().length - 1;
+        const new_value = this.getTokenManager().getValue().slice(0, label_end).trim(); // remove the colon at the end (and any whitespace)
+        this.getTokenManager().setValue(new_value); 
     }
 
     capitaliseDirectives() {
-        if (this.current_type !== 'DIR') return;
+        if (this.getTokenManager().getType() !== 'DIR') return;
 
-        const directive = this.current_value.toUpperCase();
+        const directive = this.getTokenManager().getValue().toUpperCase();
         const is_valid_directive = this.directives.isDirective(directive);
 
-        if (!is_valid_directive) this.newError(`Invalid directive \'${this.current_value}\'.`);
+        if (!is_valid_directive) this.newError(`Invalid directive \'${this.getTokenManager().getValue()}\'.`);
 
-        this.setCurrentTokenValue(this.current_value.toUpperCase());
+        this.getTokenManager().setValue(directive);
     }
 
     makeInstructionTokens(i) {
-        if (this.current_type !== 'REF') return;
+        if (this.getTokenManager().getType() !== 'REF') return;
         
         const insts = new InstructionSet();
-        const upper_string = this.current_value.toUpperCase();
+        const upper_string = this.getTokenManager().getValue().toUpperCase();
         const is_inst = insts.inst_set.includes(upper_string);
         if (!is_inst) return;
 
-        const is_after_label = (i === 1 && this.line_tokens[0].getType() === 'LABEL');
+        const is_after_label = (i === 1 && this.getLineManager().getLine(0).getType() === 'LABEL');
         if (i !== 0 && !is_after_label) return;
         
-        this.setCurrentTokenType('INST');
-        this.setCurrentTokenValue(upper_string);
+        this.getTokenManager().setType('INST');
+        this.getTokenManager().setValue(upper_string);
     }
 
     makeRegTokens() {
-        if (this.current_type !== 'REG') return;
+        if (this.getTokenManager().getType() !== 'REG') return;
         
-        this.setCurrentTokenValue(parseInt(this.current_value.substring(1)));   // turn REG:Rn into REG:n
-        if (this.current_value <= 31) return;
+        this.getTokenManager().setValue(parseInt(this.getTokenManager().getValue().substring(1)));   // turn REG:Rn into REG:n
+        if (this.getTokenManager().getValue() <= 31) return;
 
-        this.newError(`Illegal register \'R${this.current_value}\' on line ${this.current_tok.getLine()}.`);
+        this.newError(`Illegal register \'R${this.getTokenManager().getValue()}\' on line ${this.getTokenManager().getToken().getLine()}.`);
     }
 
     combineRefs(i) {
         if (i === 0) return i;
-        if (this.line_tokens[i - 1].getType() !== 'REF') return i;
-        if (['COMMA', 'SYMBOL'].includes(this.current_type)) return i;
-        if (this.math.isValidSymbol(this.current_type)) return i;
+        if (this.getLineManager().getLine(i - 1).getType() !== 'REF') return i;
+        if (['COMMA', 'SYMBOL'].includes(this.getTokenManager().getType())) return i;
+        if (this.math.isValidSymbol(this.getTokenManager().getType())) return i;
 
-        const combined_value = this.line_tokens[i - 1].getValue() + this.current_value;
+        const combined_value = this.getLineManager().getLine(i - 1).getValue() + this.getTokenManager().getValue();
 
-        this.line_tokens[i - 1].setValue(combined_value); // put them together
-        this.line_tokens.splice(i, 1); // remove the current one
+        this.getLineManager().getLine(i - 1).setValue(combined_value); // put them together
+        this.getLineManager().getLine().splice(i, 1); // remove the current one
         return i - 1;   // counter the later shift forward
     }
 
-    getCurrentToken(n) {
-        this.current_tok = this.line_tokens[n];
-        this.current_type = this.current_tok.getType();
-        this.current_value = this.current_tok.getValue();
+    getTokenManager() {
+        return this.tok_manager;
     }
 
-    setCurrentTokenValue(v) {
-        this.current_tok.setValue(v);
-        this.current_value = v;
+    getCodeArray() {
+        return this.code_arr;
     }
 
-    setCurrentTokenType(t) {
-        this.current_tok.setType(t);
-        this.current_type = t;
-    }
-
-    getText() {
-        return this.text;
-    }
-
-    getTokens() {
-        return this.tokens;
+    getLineManager() {
+        return this.getTokenManager().getLineManager();
     }
     
     toString() {
         let s = '';
         let line;
-        for (let l = 0; l < this.tokens.length; l++) {
-            line = this.tokens[l];
-            for (let tok = 0; tok < line.length; tok++) {
-                s += line[tok].toString() + '\n';
-            }
+        for (let l = 0; l < this.getLineManager().getNumLines(); l++) {
+            line = this.getLineManager().getAllLines(l);
+            line = Array.from({ length: line.length }, (_, tok) => line[tok].toString());
+            s += line.join('\n') + '\n';
         }
         return s;
     }
@@ -857,7 +832,6 @@ class ExpressionEvaluator {
 class Parser {
     
     constructor() {
-        this.token_lines = [];
         this.pmem = new PMEM();
         this.dmem = new DMEM();
 
@@ -868,22 +842,15 @@ class Parser {
         this.functions = new Functions();
     }
 
-    newData(token_lines, txt) {
-        this.token_lines = token_lines;
-        this.lines = txt.split('\n');
+    newData(tok_manager, txt) {
+        
+        this.tok_manager = tok_manager;
 
         this.defs = new ProgramDefinitions(); 
         this.break_point = new BreakPoint();
-
-        this.text_section_start = null;
         
-        this.line = null;
-        this.line_in_file = null;
-        this.line_length = null;
-        this.line_num = 0;
-
-        this.current_tok = null;
-        this.tok_num = 0;
+        // TODO deal with all this
+        this.lines = txt.split('\n');
 
         this.dmem = new DMEM();
         // Add registers to dmem
@@ -897,12 +864,12 @@ class Parser {
         this.parse();
 
         // FILLING IN DMEM WITH 0s
-        for (let i = this.getDMEM().getLength(); i < (this.getDMEM().getRAMEnd() + 1); i++) {
+        for (let i = this.getDMEM().getLength(); i <= this.getDMEM().getRAMEnd(); i++) {
             this.getDMEM().push(0);
         }
 
         // FILLING IN PMEM WITH NOP INSTRUCTIONS
-        for (let i = this.getPMEM().getLength(); i < (this.getPMEM().getFlashEnd() + 1); i++) {
+        for (let i = this.getPMEM().getLength(); i <= this.getPMEM().getFlashEnd(); i++) {
             this.getPMEM().push(new Instruction([new Token('INST', 'NOP')]));
         }
         
@@ -962,8 +929,8 @@ class Parser {
     }
 
     replaceDirectiveRefs() {
-        if (['.BYTE','.WORD', '.SPACE'].includes(this.line_directive)) this.replaceRefs(this.line);
-        else if (['.SET','.EQU'].includes(this.line_directive)) this.replaceRefs(this.line.slice(2));        
+        if (['.BYTE','.WORD', '.SPACE'].includes(this.line_directive)) this.replaceRefs(this.getLineManager().getLine());
+        else if (['.SET','.EQU'].includes(this.line_directive)) this.replaceRefs(this.getLineManager().getLine().slice(2));        
         else return;
 
         this.evaluateCurrentLine(); 
@@ -973,43 +940,15 @@ class Parser {
         // Replace it in the line
         if (this.getProgDefs().getLabels()[current_tok.getValue()] !== undefined) current_tok.setValue(this.getProgDefs().getLabels()[current_tok.getValue()]);
         else if (this.getProgDefs().getEqus()[current_tok.getValue()] !== undefined) current_tok.setValue(this.getProgDefs().getEqus()[current_tok.getValue()]);
-        else this.newError(`Invalid reference \'${current_tok.getValue()}\' on line ${this.line_in_file}.`);
+        else this.newError(`Invalid reference \'${current_tok.getValue()}\' on line ${this.lineInFile()}.`);
 
         current_tok.setType('INT');
     }
 
     evaluateCurrentLine() {
-        this.line = this.evaluator.evaluateNewLine(this.line);
-        this.line_length = this.line.length;
-    }
-
-    getTokenLines() {
-        return this.token_lines;
-    }
-
-    hi8(val) {
-        return (val >> 8) & 0xff;
-        // return parseInt((val - (val % 0x100)) / 0x100);
-    }
-
-    lo8(val) {
-        return val & 0xff;
-        // return (val % 0x100);
-    }
-
-    getTokValue() {
-        return this.current_tok.getValue();
-    }
-
-    getTokType() {
-        return this.current_tok.getType();
-    }
-
-    getLine(line_num) {
-        // sets the relevant line parameters
-        this.line = this.token_lines[line_num];
-        this.line_length = this.line.length;
-        this.line_in_file = this.line[0].getLine();
+        let line = this.getLineManager().getLine();
+        line = this.evaluator.evaluateNewLine(line);
+        this.getLineManager().setLine(line);
     }
 
     checkSectionDirectives() {
@@ -1019,7 +958,7 @@ class Parser {
     }
 
     checkFirstLine() {
-        const first_line = this.token_lines[0];
+        const first_line = this.getLineManager().getAllLines(0); 
 
         // Check if first line is a .SECTION directive
         if (first_line[0].getType() !== 'DIR' || first_line[0].getValue() !== '.SECTION') {
@@ -1034,51 +973,56 @@ class Parser {
 
     checkLastLine() {
         // Check if last line is .end
-        const last_line = this.token_lines[this.token_lines.length - 1];
+        const last_line_loc = this.getLineManager().getNumLines() - 1;
+        const last_line = this.getLineManager().getAllLines(last_line_loc);
         if (last_line.length > 1 || last_line[0].getType() !== 'DIR' || last_line[0].getValue() !== '.END') {
             this.newError("Final line must be '.end'");
         }
     }
 
     findTextSectionStart() {
-        for (this.line_num = 0; this.line_num < this.token_lines.length; this.line_num++) {
-            this.getLine(this.line_num);
+        for (this.getLineManager().setLineNumber(0); this.getLineManager().getLineNumber() < this.getLineManager().getNumLines(); this.getLineManager().offsetLineNumber(1)) {
+            this.getLineManager().setLine();
 
             // If you find a .SECTION directive check it
-            if (this.line[0].getValue() !== '.SECTION' || this.line[0].getType() !== 'DIR') {
-                continue;
-            }
-                
-            if (this.line.length !== 2 || this.line[1].getType() !== 'DIR' || !['.DATA', '.TEXT'].includes(this.line[1].getValue())) {
-                this.newError(`Invalid '.section' directive on line ${this.line_in_file}.`);
-            }
+            if (this.getLineManager().getLine(0).getValue() !== '.SECTION') continue;
+            if (this.getLineManager().getLine(0).getType() !== 'DIR') continue;
+            
+            const bad_length = this.getLineManager().getLineLength() !== 2;
+
+            const no_2nd_directive  = bad_length || this.getLineManager().getLine(1).getType() !== 'DIR';
+
+            const bad_2nd_directive = no_2nd_directive || !['.DATA', '.TEXT'].includes(this.getLineManager().getLine(1).getValue());
+
+            if (bad_2nd_directive) this.newError(`Invalid '.section' directive on line ${this.lineInFile()}.`);
 
             // If you find the text section then stop looking
-            if (this.line[1].getValue() === '.TEXT') {
-                this.text_section_start = this.line_num;
+            if (this.getLineManager().getLine(1).getValue() === '.TEXT') {
+                this.getLineManager().setTextSecStart(this.getLineManager().getLineNumber());
                 break;
             }
+
         }
 
-        // If there's no text section, raise an error
-        if (this.text_section_start === null) {
-            this.newError("File must contain a '.section .text'");
-        }
+        if (this.getLineManager().getTextSecStart() !== null) return;
+        
+        this.newError("File must contain a '.section .text'");  // If there's no text section
     }
 
     validateInstructions() {
-        let current_tok;
-        for (this.line_num = 0; this.line_num < this.token_lines.length; this.line_num++) {
-            this.getLine(this.line_num);
+        for (this.getLineManager().setLineNumber(0); this.getLineManager().getLineNumber() < this.getLineManager().getNumLines(); this.getLineManager().offsetLineNumber(1)) {
+            this.getLineManager().setLine();
 
             // Go through each token
-            for (this.tok_num = 0; this.tok_num < this.line_length; this.tok_num++) {
-                current_tok = this.line[this.tok_num];
+            for (this.getTokenManager().setTokNum(0); this.getTokenManager().getTokNum() < this.getLineManager().getLineLength(); this.getTokenManager().offsetTokNum(1)) {
+                this.getTokenManager().setToken();
 
-                // Check INST tokens are real instructions 
-                if (current_tok.getType() === 'INST' && !this.inst_set.isInstruction(current_tok.getValue())) {
-                    this.newError(`Invalid instruction \'${current_tok.getValue()}\' on line ${this.line_in_file}.`);
-                }
+                // Check INST tokens are real instructions
+                if (this.getTokenManager().getType() !== 'INST') continue;
+                if (this.inst_set.isInstruction(this.getTokenManager().getValue())) continue;
+                
+                this.newError(`Invalid instruction \'${this.getTokenManager().getValue()}\' on line ${this.lineInFile()}.`);
+                
             }
         }
     }
@@ -1157,23 +1101,30 @@ class Parser {
     }
 
     checkGlobalAtStart() {
-        this.getLine(this.text_section_start + 1);
-        if (this.line_length !== 2 || this.line[0].getValue() !== '.GLOBAL') {
-            this.newError(`Must begin text section with a valid .global directive: line ${this.line_in_file}.`);
-        }
-        this.global_funct_names = [this.line[1].getValue()];        // the name of the global function for later
+        this.getLineManager().setLine(null, this.getLineManager().getTextSecStart() + 1);
+
+        const bad_line_length = this.getLineManager().getLineLength()       !== 2;
+        const bad_line_val    = this.getLineManager().getLine(0).getValue() !== '.GLOBAL';
+
+        if (bad_line_length || bad_line_val) this.newError(`Must begin text section with a valid .global directive: line ${this.lineInFile()}.`);
+
+        this.global_funct_names = [this.getLineManager().getLine(1).getValue()];        // the name of the global function for later
     }
 
     createPMEM() {
-        this.line_num = this.text_section_start + 2;
+        const start_line = this.getLineManager().getTextSecStart() + 2;
+        this.getLineManager().setLineNumber(start_line);
+        
         // CREATE PMEM AND GET THE LABEL LOCATIONS
-        while (this.line_num < (this.token_lines.length - 1)) {
+        let inst;
+        const num_lines = this.getLineManager().getNumLines();
+        while (this.getLineManager().getLineNumber() < (num_lines - 1)) {
 
-            this.getLine(this.line_num);
+            this.getLineManager().setLine();
             this.removeLabels('pmem'); // Check for labels and remove them
 
-            if (this.line_length === 0) {
-                this.line_num += 1;
+            if (this.getLineManager().getLineLength() === 0) {
+                this.getLineManager().offsetLineNumber(1);
                 continue;
             }
 
@@ -1181,76 +1132,72 @@ class Parser {
             if (skip) continue;
 
             // If theyre not instructions, it's illegal
-            if (this.line[0].getType() !== 'INST') this.newError(`Illegal token \'${this.line[0].getValue()}\' on line ${this.line_in_file}.`);
+            if (this.getLineManager().getLine(0).getType() !== 'INST') {
+                this.newError(`Illegal token \'${this.getLineManager().getLine(0).getValue()}\' on line ${this.lineInFile()}.`);
+            }
 
             // Set the break point to be the line equal about to be put in
-            this.getBreakPoint().defineBreakPoint( this.getPMEM().getLength(), this.line_in_file );
+            this.getBreakPoint().defineBreakPoint( this.getPMEM().getLength(), this.lineInFile() );
 
-            this.getPMEM().push(this.line); // push the line without any label
-            const inst = this.line[0].getValue();
-
+            this.getPMEM().push(this.getLineManager().getLine()); // push the line without any label
+            
             // Add null as next line if it's a 32 bit opcode
+            inst = this.getLineManager().getLine(0).getValue();
             if (['CALL', 'JMP', 'LDS', 'STS'].includes(inst)) this.getPMEM().push(null);
             
-            this.line_num += 1;
+            this.getLineManager().offsetLineNumber(1);
         }
 
         if (this.getPMEM().getLength() > this.getPMEM().getFlashEnd()) this.newError(`Too many lines of code to put into the program memory in the .text section.`);
     }
 
-    removeLabels(mem) {
-        const len = (mem === 'pmem') ? this.getPMEM().getLength() : this.getDMEM().getLength();
-        this.tok_num = 0;
+    removeLabels(mem_type) {
+        const loc = (mem_type === 'pmem') ? this.getPMEM().getLength() : this.getDMEM().getLength();
+        
         // Check for labels and remove them
-        while (this.tok_num < this.line_length) {
+        this.getTokenManager().setTokNum(0);
+        while (this.getTokenManager().getTokNum() < this.getLineManager().getLineLength()) {
 
-            this.current_tok = this.line[this.tok_num]; // current token
+            this.getTokenManager().setToken();  // set current token
 
-            if (this.getTokType() !== 'LABEL') {
-                this.tok_num += 1;
-                continue;
-            }
-            
-            this.popLabel(len);
-            
+            if (this.getTokenManager().getType() === 'LABEL') this.popLabel(loc);
+            else this.getTokenManager().offsetTokNum(1);
         }
 
-        this.tok_num = 0;
+        this.getTokenManager().setTokNum(0);
     }
 
-    popLabel(len) {
+    popLabel(value) {
         // Label can only be at the start
-        if (this.tok_num !== 0) this.newError(`Illegal label location on line ${this.line_in_file}.`);
+        if (this.getTokenManager().getTokNum() !== 0) this.newError(`Illegal label location on line ${this.lineInFile()}.`);
 
-        const label = this.getTokValue(); // remove the colon from the end
-        this.getProgDefs().newLabel(label, len, this.line_in_file);
+        const label = this.getTokenManager().getValue(); // remove the colon from the end
+        this.getProgDefs().newLabel(label, value, this.lineInFile());
 
         // Remove the label
-        this.line.shift();
-        this.line_length -= 1;                
-
-        // Check the global function label when you get to it
-        // if (label === this.global_funct_names[0]) this.pc = this.getPMEM().getLength();
+        this.getLineManager().getLine().shift();
     }
 
     defineGlobalFunctions() {
         // Add global functions to the global function list
-        if (this.line[0].getType() !== 'DIR' || this.line[0].getValue() !== '.GLOBAL') return false;
+        if (this.getLineManager().getLine(0).getType() !== 'DIR' || this.getLineManager().getLine(0).getValue() !== '.GLOBAL') {
+            return false;
+        }
 
         if (this.getPMEM().getLength() > 0) {
-            this.newError(`Illegal .global directive on line ${this.line_in_file}.`);
+            this.newError(`Illegal .global directive on line ${this.lineInFile()}.`);
         }
 
-        if (this.line.length !== 2) {
-            this.newError(`Incorrect number of arguments for .global directive on line ${this.line_in_file}.`);
+        if (this.getLineManager().getLineLength() !== 2) {
+            this.newError(`Incorrect number of arguments for .global directive on line ${this.lineInFile()}.`);
         }
 
-        if (this.line[1].getType() !== 'REF') {
-            this.newError(`Illegal token type ${this.line[1].getType()} for the argument ${this.line[1].getValue()} on line ${this.line_in_file}.`);
+        if (this.getLineManager().getLine(1).getType() !== 'REF') {
+            this.newError(`Illegal token type ${this.getLineManager().getLine(1).getType()} for the argument ${this.getLineManager().getLine(1).getValue()} on line ${this.lineInFile()}.`);
         }
 
-        this.global_funct_names.push(this.line[1].getValue());
-        this.line_num += 1;
+        this.global_funct_names.push(this.getLineManager().getLine(1).getValue());
+        this.getLineManager().offsetLineNumber(1);
         return true;
         
     }
@@ -1271,115 +1218,109 @@ class Parser {
         // Check for real instruction
         // Check number of args given is correct
         // Check if the types for each token are correct and their values are acceptable
-        for (this.line_num = 0; this.line_num < this.getPMEM().getLength(); this.line_num++) {
+        let current_line;
+        for (this.getLineManager().setLineNumber(0); this.getLineManager().getLineNumber() < this.getPMEM().getLength(); this.getLineManager().offsetLineNumber(1)) {
+            
+            current_line = this.getPMEM().getValue(this.getLineManager().getLineNumber());
+            if (current_line === null) continue;
 
-            this.line = this.getPMEM().getValue(this.line_num);                     // the line up to
-
-            if (this.line === null) continue;
-
-            this.line_length = this.line.length;                                          // calculate number of tokens in the line
-            this.line_in_file = this.line[0].getLine();    // the current line if there's an error
+            this.getLineManager().setLine(current_line);   // the line up to
             
             this.evaluateLineExpressions(); // Evaluate all refs, hi8()/lo8(), and expressions
 
             // CHECK FOR COMMA AND REMOVE THEM IF THEYRE CORRECTLY PLACED
-            if (this.line_length > 2) {
-
+            if (this.getLineManager().getLineLength() > 2) {
+                
                 // If the 3rd token is not a comma then its bad syntax
-                if (this.line[2].getType() !== 'COMMA') {
-                    this.newError(`Illegal token ${this.line[2].getValue()} on line ${this.line_in_file}: expecting comma.`);
+                if (this.getLineManager().getLine(2).getType() !== 'COMMA') {
+                    this.newError(`Illegal token ${this.getLineManager().getLine(2).getValue()} on line ${this.lineInFile()}: expecting comma.`);
                 }
 
-                this.line.splice(2, 1);                       // remove the comma
-                this.line_length -= 1;                       // line is shorter by 1
+                this.getLineManager().getLine().splice(2, 1);    // remove the comma
             }
 
-            const inst = this.line[0].getValue();            // instruction for that line
+            const inst = this.getLineManager().getLine(0).getValue();            // instruction for that line
 
             // CHECK IT'S A REAL INSTRUCTION
             this.checkInstructionExists(inst);
 
             // GET GIVEN AND EXPECTED ARGUMENTS
             const expected_args = this.operands.getOperands(inst);   // the arguments we expect
-            const given_args = this.line.slice(1);                   // the arguments we have
-
-            if (inst === 'LPM' && given_args.length === 0) {
-                // SET THE LINE TO AN INSTRUCTION
-                this.getPMEM().setValue(this.line_num, new Instruction(this.line));
-                continue;
-            }
+            const given_args = this.getLineManager().getLine().slice(1);                   // the arguments we have
 
             this.checkArguments(inst, given_args);
 
             // CHECK THE ARGUMENTS
-            for (this.tok_num = 1; this.tok_num < this.line_length; this.tok_num++) {
+            for (this.getTokenManager().setTokNum(1); this.getTokenManager().getTokNum() < this.getLineManager().getLineLength(); this.getTokenManager().offsetTokNum(1)) {
 
-                const given_arg = this.line[this.tok_num];          // given arg
-                const exp_arg = expected_args[this.tok_num - 1];    // expected arg
+                const given_arg = this.getLineManager().getLine(this.getTokenManager().getTokNum());   // given arg
+                const exp_arg = expected_args[this.getTokenManager().getTokNum() - 1];    // expected arg
                 // CHECK THE TOKEN IS LEGAL
-                exp_arg.isLegalToken(given_arg, this.line_in_file);
+                exp_arg.isLegalToken(given_arg, this.lineInFile());
             }
 
             // SET THE LINE TO AN INSTRUCTION
-            this.getPMEM().setValue(this.line_num, new Instruction(this.line));
+            this.getPMEM().setValue(this.getLineManager().getLineNumber(), new Instruction(this.getLineManager().getLine()));
         }
     }
 
-    checkArguments(inst, given_arguments) {
+    checkArguments(inst, given_args) {
         // CHECK IF IT'S GOT THE WRONG NUMBER OF ARGUMENTS
-        if (this.operands.numArgs(inst) === given_arguments.length) return;
-        this.newError(`Wrong number of arguments given on line ${this.line_in_file} for the ${inst} instruction. Please refer to the instruction manual.`);
+        if (this.operands.numArgs(inst) === given_args.length) return;
+        if (inst === 'LPM' && given_args.length === 0) return;
+        this.newError(`Wrong number of arguments given on line ${this.lineInFile()} for the ${inst} instruction. Please refer to the instruction manual.`);
     }
 
     checkInstructionExists(inst) {
         if (this.operands.isDefined(inst)) return;
-        this.newError(`Illegal instruction \'${inst}\' on line ${this.line_in_file}.`);
+        this.newError(`Illegal instruction \'${inst}\' on line ${this.lineInFile()}.`);
     }
 
     checkDataSection() {
-        this.line_num = 0;
-        const data_section_exists = (this.text_section_start !== 0);
+        this.getLineManager().setLineNumber(0);
+        const data_section_exists = (this.getLineManager().getTextSecStart() !== 0);
         // GO THROUGH LINES IN DATA SECTION
-        while (data_section_exists && (this.line_num < this.text_section_start)) {
+        while (data_section_exists && (this.getLineManager().getLineNumber() < this.getLineManager().getTextSecStart())) {
 
-            if (this.line_num === 0) {                               // skip if it's the .SECTION .data line
-                this.line_num += 1;
+            if (this.getLineManager().getLineNumber() === 0) {                               // skip if it's the .SECTION .data line
+                this.getLineManager().offsetLineNumber(1);
                 continue;
             }
 
-            this.getLine(this.line_num);
+            this.getLineManager().setLine();
 
             // DEAL WITH LABELS AT THE START OF THE LINE
             this.removeLabels('dmem');
             
 
-            if (this.line_length === 0) {
-                this.line_num += 1;
+            if (this.getLineManager().getLineLength() === 0) {
+                this.getLineManager().offsetLineNumber(1);
                 continue;
             }
             
             // CHECK THE DIRECTIVE
-            if (this.line[this.tok_num].getType() !== 'DIR') this.newError(`Illegal syntax \'${this.lines[this.line_in_file - 1]}\' for the data section. Expecting a directive on line ${this.line_in_file}.`);
+            if (this.getLineManager().getLine(this.getTokenManager().getTokNum()).getType() !== 'DIR') this.newError(`Illegal syntax \'${this.lines[this.lineInFile() - 1]}\' for the data section. Expecting a directive on line ${this.lineInFile()}.`);
 
-            this.line_directive = this.line[this.tok_num].getValue();    // get the directive for this line to use below
+            this.line_directive = this.getLineManager().getLine(this.getTokenManager().getTokNum()).getValue();    // get the directive for this line to use below
             this.replaceDirectiveRefs();
             
-            this.line_length = this.line.length; 
-            this.tok_num += 1;                                       // Move to the next token in the line
+            this.getTokenManager().offsetTokNum(1); // Move to the next token in the line
 
             // EXECUTE THE DIRECTIVE
             this.executeDirectives();
 
-            this.line_num += 1;
+            this.getLineManager().offsetLineNumber(1);
         }
 
+        if (this.getDMEM().getLength() <= this.getDMEM().getRAMEnd() + 1) return;
+        
         // Cannot hold more data than RamEnd
-        if (this.getDMEM().getLength() > this.getDMEM().getRAMEnd()) this.newError(`Too much data to put into the data memory in the .data section.`);
+        this.newError(`Too much data to put into the data memory in the .data section.`);
     }
 
     executeDirectives() {
-        while (this.tok_num < this.line_length) {
-            this.current_tok = this.line[this.tok_num];
+        while (this.getTokenManager().getTokNum() < this.getLineManager().getLineLength()) {
+            this.getTokenManager().setToken();  // set current token
 
             ///// EXECUTE THE DIRECTIVES /////
             this.executeByteDirective();
@@ -1388,46 +1329,49 @@ class Parser {
             this.executeSetDirectives();    // Set, Equ directives
             this.checkDirectiveCommas();
 
-            this.tok_num += 1;
+            this.getTokenManager().offsetTokNum(1);
         }
     }
 
     executeByteDirective() {
-        const parity_of_current_tok = this.tok_num & 1;
+        const parity_of_current_tok = this.getTokenManager().getTokNum() & 1;
 
         if (parity_of_current_tok !== 1 || !['.BYTE','.WORD'].includes(this.line_directive)) {
             return;
         }
 
-        if (this.getTokType() !== 'INT') {
-            this.newError(`Bad token \'${this.getTokValue()}\' on line ${this.line_in_file} at position ${this.current_tok.getStart()}.`);
-        }
+        const tok_val = this.getTokenManager().getValue();
 
-        this.getDMEM().push(this.lo8(this.getTokValue()));
+        if (this.getTokenManager().getType() !== 'INT') {
+            const start = this.getTokenManager().getToken().getStart();
+            this.newError(`Bad token \'${tok_val}\' on line ${this.lineInFile()} at position ${start}.`);
+        }
+        
+        this.getDMEM().push(this.lo8(tok_val));
 
         if (this.line_directive === '.WORD') {
-            this.getDMEM().push(this.hi8(this.getTokValue()));
+            this.getDMEM().push(this.hi8(tok_val));
         }    
     }
 
     executeAsciiDirectives() {
         // String, Ascii, Asciz directives
-        const parity_of_current_tok = this.tok_num & 1;
-        const is_ascii = ['.STRING', '.ASCII', '.ASCIZ'].includes(this.line_directive)
+        const parity_of_current_tok = this.getTokenManager().getTokNum() & 1;
+        const is_ascii = ['.STRING', '.ASCII', '.ASCIZ'].includes(this.line_directive);
         
         if (parity_of_current_tok !== 1 || !is_ascii) return;
 
-        if (this.getTokType() !== 'STR') {
-            this.newError(`Bad token \'${this.getTokValue()}\' on line ${this.line_in_file}.`);
+        let string_text = this.getTokenManager().getValue();
+        
+        if (this.getTokenManager().getType() !== 'STR') {
+            this.newError(`Bad token \'${string_text}\' on line ${this.lineInFile()}.`);
         }
 
-        let string_text = this.getTokValue();
         string_text = string_text.slice(1, (string_text.length - 1));   // remove quotation marks from either side
 
-        let char_ascii_value;
-        let char;
+        let char_ascii_value, char;
+        let escape = false; // if the last char was an escape character
 
-        let escape = false; // if the last char was an escape character 
         const escape_chars = {
             '\\': 0x5c,
             'n': 0x0a,
@@ -1452,7 +1396,7 @@ class Parser {
                 if (char === '\\') {
                     escape = true;
                     if (i + 1 === string_text.length) {
-                        this.newError(`Invalid escape character \'${char}\' on line ${this.line_in_file}.`);
+                        this.newError(`Invalid escape character \'${char}\' on line ${this.lineInFile()}.`);
                     }
                     continue;
                 }
@@ -1462,7 +1406,7 @@ class Parser {
             else {
                 // Check if it's a valid escape character
                 if (!Object.keys(escape_chars).includes(char)) {
-                    this.newError(`Invalid escape character \'\\${char}\' on line ${this.line_in_file}.`);
+                    this.newError(`Invalid escape character \'\\${char}\' on line ${this.lineInFile()}.`);
                 }
 
                 char_ascii_value = escape_chars[char]; // get ascii code
@@ -1477,190 +1421,177 @@ class Parser {
 
     executeSpaceDirective() {
         // Space directive
-        const parity_of_current_tok = this.tok_num & 1;
+        const parity_of_current_tok = this.getTokenManager().getTokNum() & 1;
 
         if (parity_of_current_tok !== 1 || this.line_directive !== '.SPACE') {
             return;
         }
 
-        if (this.getTokType() !== 'INT') { // expecting integer
-            this.newError(`Bad token \'${this.getTokValue()}\' on line ${this.line_in_file}.`);
+        const tok_val = this.getTokenManager().getValue();
+        
+        if (this.getTokenManager().getType() !== 'INT') { // expecting integer
+            this.newError(`Bad token \'${tok_val}\' on line ${this.lineInFile()}.`);
+        }
+        
+        const tok_num          = this.getTokenManager().getTokNum();
+        const is_last_tok      = this.getLineManager().getLineLength() === (tok_num + 1);
+        const is_num_spaces    = this.getLineManager().getLine(tok_num - 1).getType() === 'DIR';
+        
+        // Assume only 1 arg given (number of spaces)
+        let   space_value      = 0;
+        let   number_of_spaces = tok_val;
+
+        // Check it's the final token. If it's the second argument given it must be the last
+        if (!is_last_tok) {
+            if (is_num_spaces) return;   // Only execute once the whole line has been read
+            this.newError(`Too many arguments given for .string on line ${this.lineInFile()}.`);
         }
 
-        // Check if it's the number of spaces or the content of the spaces
-        // Check if the previous token is the directive
-        // If so, it's the number of spaces
-
-        if (this.line[this.tok_num - 1].getType() === 'DIR') {              // if this integer is the number of values
-
-            const number_of_spaces = this.getTokValue();        // the number of spaces we're making
-
-            if ((this.tok_num + 1) === this.line_length) {                // if there is no space value given, make them 0
-                for (let i = 0; i < number_of_spaces; i++) {
-                    this.getDMEM().push(0);                            // add 0's for as many spaces as needed
-                }
-            }
+        // If it's the value of the spaces
+        if (!is_num_spaces) {
+            space_value = tok_val;
+            number_of_spaces = this.getLineManager().getLine(tok_num - 2).getValue();
         }
 
-        // Otherwise check it's the final token
-        else if ((this.tok_num + 1) !== this.line_length) { // if it's the second argument given it must be the last
-            this.newError(`Too many arguments given for .string on line ${this.line_in_file}.`);
-        }
-
-        // If it is the final token
-        else {
-            const space_value = this.getTokValue();             // value of the spaces
-            const number_of_spaces = this.line[this.tok_num - 2].getValue();  // the number of spaces we're making
-            for (let i = 0; i < number_of_spaces; i++) {
-                this.getDMEM().push(this.lo8(space_value));                // add the value for as many spaces as needed
-            }
+        for (let i = 0; i < number_of_spaces; i++) {
+            this.getDMEM().push(this.lo8(space_value));
         }
     }
 
     executeSetDirectives() {
-        const parity_of_current_tok = this.tok_num & 1;
+        const parity_of_current_tok = this.getTokenManager().getTokNum() & 1;
 
         if (!['.EQU','.SET'].includes(this.line_directive)) return;
 
         // Check the number of arguments
-        if ((this.line_length - this.tok_num) !== 3) { // if there's too many arguments
-            this.newError(`Wrong number of arguments given for .equ on line ${this.line_in_file}.`);
+        if ((this.getLineManager().getLineLength() - this.getTokenManager().getTokNum()) !== 3) { // if there's too many arguments
+            this.newError(`Wrong number of arguments given for .equ on line ${this.lineInFile()}.`);
         }
 
         // if it's the 3rd last argument (expecting REF)
-        if (this.getTokType() !== 'REF') {
-            this.newError(`Bad argument \'${this.getTokValue()}\' on line ${this.line_in_file}.`);
+        if (this.getTokenManager().getType() !== 'REF') {
+            this.newError(`Bad argument \'${this.getTokenManager().getValue()}\' on line ${this.lineInFile()}.`);
         }
 
         // Move to next token
-        this.tok_num += 1;
-        this.current_tok = this.line[this.tok_num];
+        this.getTokenManager().offsetTokNum(1);
+        this.getTokenManager().setToken();  // set current token
 
         // Raise error if 2nd last token is not a comma
-        if (this.getTokType() !== 'COMMA') {
-            this.newError(`Bad argument \'${this.getTokValue()}\' on line ${this.line_in_file}.`);
+        if (this.getTokenManager().getType() !== 'COMMA') {
+            this.newError(`Bad argument \'${this.getTokenManager().getValue()}\' on line ${this.lineInFile()}.`);
         }
 
         // Move to next token
-        this.tok_num += 1;
-        this.current_tok = this.line[this.tok_num];
+        this.getTokenManager().offsetTokNum(1);
+        this.getTokenManager().setToken();  // set current token
 
         this.asciiCharacterLiteral();
 
-        if (this.getTokType() !== 'INT') {
-            this.newError(`Bad argument \'${this.getTokValue()}\' on line ${this.line_in_file}.`);
+        if (this.getTokenManager().getType() !== 'INT') {
+            this.newError(`Bad argument \'${this.getTokenManager().getValue()}\' on line ${this.lineInFile()}.`);
         }
 
-        const equ_word = this.line[this.tok_num - 2].getValue();  // get the equ name for the labels list
-        this.getProgDefs().newEqu(equ_word, this.getTokValue(), this.line_in_file);
+        const equ_word = this.getLineManager().getLine(this.getTokenManager().getTokNum() - 2).getValue();  // get the equ name for the labels list
+        const tok_val = this.getTokenManager().getValue();
+        
+        this.getProgDefs().newEqu(equ_word, tok_val, this.lineInFile());
     }
 
     asciiCharacterLiteral() {
         // Support ASCII character literals
-        if (this.getTokType() !== 'STR') return;
+        if (this.getTogetTokenManager().getTypekType() !== 'STR') return;
 
-        const val = this.getTokValue();
+        const val = this.getTokenManager().getValue();
 
         if (val.length !== 3 || val[0] !== val[2]) return;
 
         const str_matcher = /^[\"\'“‘].*?[\"\'”’]/;
         const match = str_matcher.exec(val);
 
-        if (!match) this.newError(`Bad argument \'${this.getTokValue()}\' on line ${this.line_in_file}.`);;
+        if (!match) this.newError(`Bad argument \'${this.getTokenManager().getValue()}\' on line ${this.lineInFile()}.`);;
 
         const charCode = val.charCodeAt(1);
-        this.current_tok.setType('INT');
-        this.current_tok.setValue(charCode); 
+        this.getTokenManager().setType('INT');
+        this.getTokenManager().setValue(charCode); 
     }
 
     checkDirectiveCommas() {
         // Should be comma if there are even number of tokens left. Raise error.
-        const parity_of_current_tok = this.tok_num & 1;
+        const parity_of_current_tok = this.getTokenManager().getTokNum() & 1;
 
-        if (parity_of_current_tok === 0 && this.getTokType() !== 'COMMA') {
-            this.newError(`Missing comma on line ${this.line_in_file} at position ${this.current_tok.getStart()}.`);
+        const start = this.getTokenManager().getToken().getStart();
+
+        if (parity_of_current_tok === 0 && this.getTokenManager().getType() !== 'COMMA') {
+            this.newError(`Missing comma on line ${this.lineInFile()} at position ${start}.`);
         }
 
-        else if ((this.tok_num + 1 === this.line.length) && this.getTokType() === 'COMMA') {
-            this.newError(`Illegal comma on line ${this.line_in_file}  at position ${this.current_tok.getStart()}.`);
-        }
-    }
-
-    evaluateallLines() {
-        for (this.line_num = 0; this.line_num < this.getPMEM().getLength(); this.line_num++) {
-
-            this.line = this.getPMEM().getValue(this.line_num);           // current line
-
-            if (this.line === null) continue;
-
-            this.line_length = this.line.length;            // calculate number of tokens in the line
-            this.line_in_file = this.line[0].getLine();     // the current line if there's an error
-            
-            this.evaluateLineExpressions();
+        else if ((this.getTokenManager().getTokNum() + 1 === this.getLineManager().getLineLength()) && this.getTokenManager().getType() === 'COMMA') {
+            this.newError(`Illegal comma on line ${this.lineInFile()}  at position ${start}.`);
         }
     }
 
     evaluateLineExpressions() {
         // Replace refs according to the instruction
-        for (this.tok_num = 0; this.tok_num < this.line_length; this.tok_num++) {
-            this.current_tok = this.line[this.tok_num];
 
-            let isRef = (this.getTokType() === 'REF');
-            let isHiLo = (['HI8', 'LO8'].includes(this.getTokType()));
+        let isRef, isHiLo, tok_type;
 
-            // Replace hi8/lo8 with its value
-            if (isHiLo) this.evaluateHiLo();
+        for (this.getTokenManager().setTokNum(0); this.getTokenManager().getTokNum() < this.getLineManager().getLineLength(); this.getTokenManager().offsetTokNum(1)) {
+            this.getTokenManager().setToken();  // set current token
+
+            tok_type = this.getTokenManager().getType();
+            isRef = tok_type === 'REF';
+            isHiLo = ['HI8', 'LO8'].includes(tok_type);
             
-            // Replace REF with its value
-            else if (isRef) this.evaluateRef();
+            if (isHiLo) this.evaluateHiLo();    // Replace hi8/lo8 with its value
+            else if (isRef) this.evaluateRef(); // Replace REF with its value
         }
 
         this.evaluateCurrentLine();
     }
 
     evaluateHiLo() {
-        const fnct = this.getTokType(); // store the function name while you're pointed at it so you can use it later
+        const fnct = this.getTokenManager().getType(); // store the function name while you're pointed at it so you can use it later
 
         // Check there's enough room
-        if (this.line.length <= this.tok_num + 3) {
-            this.newError(`Bad syntax on line ${this.line_in_file}. Not enough tokens given for a valid ${this.getTokType()} function.`); 
+        if (this.getLineManager().getLineLength() <= this.getTokenManager().getTokNum() + 3) {
+            this.newError(`Bad syntax on line ${this.lineInFile()}. Not enough tokens given for a valid ${this.getTokenManager().getType()} function.`); 
         }
 
-        this.tok_num += 1;
+        this.getTokenManager().offsetTokNum(1);
 
         // Check the token we expect to be the left bracket
-        if (this.line[this.tok_num].getType() !== 'LPAR') {
-            this.newError(`Illegal ${this.getTokValue()} left bracket on line ${this.line_in_file}.`);
+        if (this.getLineManager().getLine(this.getTokenManager().getTokNum()).getType() !== 'LPAR') {
+            this.newError(`Illegal ${this.getTokenManager().getValue()} left bracket on line ${this.lineInFile()}.`);
         }
 
-        this.tok_num += 1;
+        this.getTokenManager().offsetTokNum(1);
 
-        const expr_start = this.tok_num;
+        const expr_start = this.getTokenManager().getTokNum();
 
         this.checkBracketsClose();
 
-        this.replaceRefs(this.line.slice(expr_start, this.tok_num - 1));
+        this.replaceRefs(this.getLineManager().getLine().slice(expr_start, this.getTokenManager().getTokNum() - 1));
         
         this.evaluateCurrentLine();
 
-        this.tok_num = expr_start - 1;
-        const val = this.line[this.tok_num].getValue();
+        this.getTokenManager().setTokNum(expr_start - 1);
+        const val = this.getLineManager().getLine(this.getTokenManager().getTokNum()).getValue();
 
-        if (val > 0x7fffffff || val < -0x80000000) this.newError(`Error: bignum invalid on line ${this.line_in_file}. Cannot have a number outside of [-2^31, 2^31 - 1].`);
+        if (val > 0x7fffffff || val < -0x80000000) this.newError(`Error: bignum invalid on line ${this.lineInFile()}. Cannot have a number outside of [-2^31, 2^31 - 1].`);
 
         // Convert the value to the hi8/lo8 value
         let int_value = (fnct === 'HI8') ? this.hi8(val) : this.lo8(val);
 
-        this.line.splice(expr_start - 2, 2, new Token('INT', int_value, this.current_tok.getLocation()));
-        this.tok_num = expr_start - 2;
-        this.line_length = this.line.length;
+        this.getLineManager().getLine().splice(expr_start - 2, 2, new Token('INT', int_value, this.getTokenManager().getToken().getLocation()));
+        this.getTokenManager().setTokNum(expr_start - 2);
     }
 
     evaluateRef() {
         let tok_type = 'INT';
-        let tok_val = this.getTokValue();
+        let tok_val = this.getTokenManager().getValue();
 
-        const first_tok_val = this.line[0].getValue();  // first token in the line
+        const first_tok_val = this.getLineManager().getLine(0).getValue();  // first token in the line
 
         // If it's a non relative control flow instruction and it's not a function
         if (this.inst_set.isNonrelativeControlFlowInstruction(first_tok_val) && !this.functions.isFunction(tok_val)) {
@@ -1669,7 +1600,7 @@ class Parser {
 
         // If it's a relative control flow instruction
         else if (this.inst_set.isRelativeControlFlowInstruction(first_tok_val)) {
-            tok_val = this.getProgDefs().getLabels()[tok_val] - 1 - this.line_num;
+            tok_val = this.getProgDefs().getLabels()[tok_val] - 1 - this.getLineManager().getLineNumber();
         }
 
         // If it's in data labels
@@ -1695,35 +1626,27 @@ class Parser {
         
         // If it's none of these and not a function, raise an error
         else if (!this.functions.isFunction(tok_val)) {
-            this.newError(`Bad reference ${tok_val} on line ${this.line_in_file}.`);
+            this.newError(`Bad reference ${tok_val} on line ${this.lineInFile()}.`);
         }
 
-        this.current_tok.setType(tok_type);
-        this.current_tok.setValue(tok_val);
+        this.getTokenManager().setValue(tok_val);
+        this.getTokenManager().setType(tok_type);
     }
 
     checkBracketsClose() {
         let bracket_level = 1;
         
         // Find closing right bracket
-        while (this.tok_num < this.line.length) {
+        while (this.getTokenManager().getTokNum() < this.getLineManager().getLineLength()) {
             if (bracket_level === 0) break;
             
-            this.current_tok = this.line[this.tok_num];
-            bracket_level += (this.getTokType() === 'LPAR') ? 1 : (this.getTokType() === 'RPAR') ? -1 : 0;
-            this.tok_num += 1;
+            this.getTokenManager().setToken();  // set current token
+
+            bracket_level += (this.getTokenManager().getType() === 'LPAR') ? 1 : (this.getTokenManager().getType() === 'RPAR') ? -1 : 0;
+            this.getTokenManager().offsetTokNum(1);
         }
 
-        if (bracket_level !== 0) this.newError(`Missing ')' on line ${this.line_in_file}.`);
-    }
-
-    getLineNumber() {
-        return this.line_num;
-    }
-
-    setLineNumber(n) {
-        this.line_num = n;
-        this.getLine(this.line_num);
+        if (bracket_level !== 0) this.newError(`Missing ')' on line ${this.lineInFile()}.`);
     }
 
     getPMEM() {
@@ -1742,11 +1665,32 @@ class Parser {
         return this.break_point;
     }
 
+    getTokenManager() {
+        return this.tok_manager;
+    }
+
+    getLineManager() {
+        return this.getTokenManager().getLineManager();
+    }
+
+    hi8(val) {
+        return (val >> 8) & 0xff;
+        // return parseInt((val - (val % 0x100)) / 0x100);
+    }
+
+    lo8(val) {
+        return val & 0xff;
+        // return (val % 0x100);
+    }
+
+    lineInFile() {
+        return this.getLineManager().getLineInFile();
+    }
+
     newError(text) {
         const s = new StatusHandler();
         s.newError(text);
     }
-
 }
 
 // Also called simulator
@@ -2927,19 +2871,19 @@ class ProgramDefinitions {
     }
 
     newLabel(label, value, line_in_file) {
-        if ( this.getLabels()[label] !== undefined ) {
+        if (this.labelExists(label)) {
             this.newError(`Previous definition of \'${label}\'. Duplicate label \'${label}\' on line ${line_in_file}.`);
         }
 
-        if ( this.getEqus()[label] !== undefined ) {
+        if (this.equExists(label)) {
             this.newError(`Previous definition of \'${label}\'. Illegal attempt to re-use \'${label}\' as label on line ${line_in_file}.`);
         }
 
-        if ( this.getDefs()[label] !== undefined ) {
+        if (this.defExists(label)) {
             this.newError(`Previous definition of \'${label}\'. Illegal use of register \'${label}\' as label on line ${line_in_file}.`);
         }
         
-        if (this.getInstSet().isInstruction(this.getLabels()[label])) {
+        if (this.instExists(label)) {
             this.newError(`Illegal re-use of instruction \'${label}\' as label on line ${line_in_file}.`);
         }
 
@@ -2947,17 +2891,17 @@ class ProgramDefinitions {
     }
 
     newEqu(label, value, line_in_file) {
-        if ( this.getLabels()[label] !== undefined ) {
+        if (this.labelExists(label)) {
             this.newError(`Previous definition of \'${label}\'. Invalid redefinition of label \'${label}\' as variable on line ${line_in_file}.`);
         }
 
         // Allow redefinition of variables already in this.equs
 
-        if ( this.getDefs()[label] !== undefined ) {
+        if (this.defExists(label)) {
             this.newError(`Previous definition of \'${label}\'. Illegal use of register \'${label}\' as variable on line ${line_in_file}.`);
         }
         
-        if (this.getInstSet().isInstruction(this.getLabels()[label])) {
+        if (this.instExists(label)) {
             this.newError(`Attempt to redefine keyword \'${label}\' on line ${line_in_file}.`);
         }
 
@@ -2966,19 +2910,33 @@ class ProgramDefinitions {
 
     newDef(label, value, line_in_file) {
         // If its already a label or .equ
-        if ( this.getLabels()[label] !== undefined || this.getEqus()[label] !== undefined ) {
+        if ( this.labelExists(label) || this.equExists(label) ) {
             this.newError(`Previous definition of \'${label}\'. Cannot use .def: ${label} redefinition on line ${line_in_file}.`);
         }
 
         // Allow redefinition of defs already in this.defs
-
-        // Dont allow definitions that are already instructions
         
-        if (this.getInstSet().isInstruction(this.getLabels()[label])) {
+        if (this.instExists(label)) {
             this.newError(`Illegal re-use of instruction \'${label}\' as definition on line ${line_in_file}.`);
         }
 
         this.getDefs()[label] = value;
+    }
+
+    labelExists(label) {
+        return this.getLabels()[label] !== undefined;
+    }
+
+    equExists(label) {
+        return this.getEqus()[label] !== undefined;
+    }
+
+    defExists(label) {
+        return this.getDefs()[label] !== undefined;
+    }
+
+    instExists(label) {
+        return this.getInstSet().isInstruction(label);
     }
 
     newError(text) {
@@ -3016,19 +2974,130 @@ class BreakPoint {
 
 class LineManager {
     constructor() {
-        this.line = null;
+        this.all_lines = [];   // Tokens in each line
+
+        this.line = [];
         this.line_in_file = null;
-        this.line_length = null;
         this.line_num = 0;
 
-        this.tok_manager = new TokenManager();
+        this.text_section_start = null;
     }
+
+    getAllLines(line_num = null) {
+        if (line_num === null) return this.all_lines;
+        return this.all_lines[line_num];
+    }
+
+    getNumLines() {
+        return this.all_lines.length;
+    }
+
+    getLine(loc = null) {
+        if (loc === null) return this.line;
+        return this.line[loc];
+    }
+
+    overwriteLine(line) {
+        this.line = line;
+    }
+
+    setLine(line = null, line_num = null) {
+        if (line !== null) this.line = line;
+        else if (line_num !== null) this.line = this.getAllLines(line_num);
+        else this.line = this.getAllLines(this.getLineNumber());
+    }
+
+    getLineLength() {
+        return this.line.length;
+    }
+
+    clearLine() {
+        this.setLine([]);
+    }
+
+    pushToLine(tok) {
+        this.line.push(tok);
+    }
+
+    endLine() {
+        this.all_lines.push(this.line);
+        this.clearLine();
+    }
+
+    getLineNumber() {
+        return this.line_num;
+    }
+
+    setLineNumber(val) {
+        this.line_num = val;
+    }
+
+    offsetLineNumber(val) {
+        this.line_num += val;
+    }
+
+    getTextSecStart() {
+        return this.text_section_start;
+    }
+
+    setTextSecStart(val) {
+        this.text_section_start = val;
+    }
+
+    getLineInFile() {
+        return this.getLine(0).getLine();
+    }
+
+    
 }
 
 class TokenManager {
     constructor() {
         this.current_tok = null;
         this.tok_num = 0;
+        this.line_manager = new LineManager();
+    }
+
+    getLineManager() {
+        return this.line_manager;
+    }
+
+    getTokNum() {
+        return this.tok_num;
+    }
+    
+    setTokNum(val) {
+        this.tok_num = val;
+    }
+    
+    offsetTokNum(val) {
+        this.tok_num += val;
+    }
+
+    getToken() {
+        return this.current_tok;
+    }
+
+    getValue() {
+        return this.getToken().getValue();
+    }
+
+    getType() {
+        return this.getToken().getType();
+    }
+
+    setToken(loc = null) {
+        const place = (loc !== null) ? loc : this.getTokNum();
+        const tok = this.getLineManager().getLine(place);
+        this.current_tok = tok;
+    }
+
+    setValue(val) {
+        this.getToken().setValue(val);
+    }
+
+    setType(typ) {
+        this.getToken().setType(typ);
     }
 }
 
@@ -3489,7 +3558,6 @@ class EventListeners {
         const code_box = document.getElementById('code_box');
         const keys_down = [];
 
-
         // Let tab be '\t' instead of move to next element
         code_box.addEventListener('keydown', event => {
             // Add key to list of key's down
@@ -3501,27 +3569,23 @@ class EventListeners {
             document.getElementById('break_point').max = `${code_box.value.split('\n').length + 1}`;
 
             if (event.key === 'Enter') this.codeBoxEnter(event, code_box);
-            if (event.key === 'Tab') this.codeBoxTab(event, code_box);
+            if (event.key === 'Tab')   this.codeBoxTab(event, code_box);
         });
 
         document.addEventListener('keyup', event => {
             // Remove key from list of key's down
             const k = keys_down.indexOf(event.key);
-            if (k !== -1) {
-                keys_down.splice(k,1);
-            }
+            if (k !== -1) keys_down.splice(k, 1);
         });
 
         // Make the line numbers on keyup
         code_box.addEventListener('keyup', event => {
             // count lines and make the line counter display that many lines
             const line_count = code_box.value.split('\n').length;
+            const lines_array = Array.from({ length: line_count }, (_, i) => String(i + 1));
+
             const lines_box = document.getElementById('lines_box');
-            lines_box.innerHTML = '';
-            
-            for (let i = 1; i < line_count + 1; i++) {
-                lines_box.innerHTML += `${i}\n`;
-            }
+            lines_box.innerHTML = lines_array.join('\n');
         });
 
 
@@ -3714,7 +3778,7 @@ class App {
         if (print) console.log(this.lexer.toString());
 
         // Parsing
-        this.parser.newData(this.lexer.getTokens(), txt);
+        this.parser.newData(this.lexer.getTokenManager(), txt);
 
         // Interpreter Initialisation
         this.interpreter.newData(this.parser.getPMEM(), this.parser.getDMEM(), this.parser.getBreakPoint().getValue());
