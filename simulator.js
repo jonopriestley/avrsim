@@ -906,13 +906,13 @@ class Parser {
         this.createPMEM(); // create PMEM and get the label locations
         
         this.checkGlobalFunctions();
-
+        
         //////////////////////////////
-
+        
         this.checkDataSection();
-
+        
         // Should be at .SECTION .text line now
-
+        
 
         //////////////// TEXT SECTION ////////////////
 
@@ -1116,7 +1116,6 @@ class Parser {
         this.getLineManager().setLineNumber(start_line);
         
         // CREATE PMEM AND GET THE LABEL LOCATIONS
-        let inst;
         const num_lines = this.getLineManager().getNumLines();
         while (this.getLineManager().getLineNumber() < (num_lines - 1)) {
 
@@ -1128,8 +1127,7 @@ class Parser {
                 continue;
             }
 
-            let skip = this.defineGlobalFunctions();
-            if (skip) continue;
+            if (this.defineGlobalFunctions()) continue; // for other global functions
 
             // If theyre not instructions, it's illegal
             if (this.getLineManager().getLine(0).getType() !== 'INST') {
@@ -1141,14 +1139,18 @@ class Parser {
 
             this.getPMEM().push(this.getLineManager().getLine()); // push the line without any label
             
-            // Add null as next line if it's a 32 bit opcode
-            inst = this.getLineManager().getLine(0).getValue();
-            if (['CALL', 'JMP', 'LDS', 'STS'].includes(inst)) this.getPMEM().push(null);
+            this.addNullLine(); // Add null as next line if it's a 32 bit opcode
             
             this.getLineManager().offsetLineNumber(1);
         }
 
         if (this.getPMEM().getLength() > this.getPMEM().getFlashEnd()) this.newError(`Too many lines of code to put into the program memory in the .text section.`);
+    }
+
+    addNullLine() {
+        const inst = this.getLineManager().getLine(0).getValue();
+        if (!['CALL', 'JMP', 'LDS', 'STS'].includes(inst)) return;
+        this.getPMEM().push(null);
     }
 
     removeLabels(mem_type) {
@@ -1160,22 +1162,20 @@ class Parser {
 
             this.getTokenManager().setToken();  // set current token
 
-            if (this.getTokenManager().getType() === 'LABEL') this.popLabel(loc);
+            if (this.getTokenManager().getType() === 'LABEL') this.createLabel(loc);
             else this.getTokenManager().offsetTokNum(1);
         }
 
         this.getTokenManager().setTokNum(0);
     }
 
-    popLabel(value) {
+    createLabel(loc) {
         // Label can only be at the start
         if (this.getTokenManager().getTokNum() !== 0) this.newError(`Illegal label location on line ${this.lineInFile()}.`);
 
-        const label = this.getTokenManager().getValue(); // remove the colon from the end
-        this.getProgDefs().newLabel(label, value, this.lineInFile());
-
-        // Remove the label
-        this.getLineManager().getLine().shift();
+        const label = this.getTokenManager().getValue(); // Remove the colon from the end
+        this.getProgDefs().newLabel(label, loc, this.lineInFile());
+        this.getLineManager().getLine().shift();         // Remove the label
     }
 
     defineGlobalFunctions() {
@@ -1199,15 +1199,15 @@ class Parser {
         this.global_funct_names.push(this.getLineManager().getLine(1).getValue());
         this.getLineManager().offsetLineNumber(1);
         return true;
-        
     }
 
     checkGlobalFunctions() {
-        let global_funct_name;
+        let global_funct_name, label;
         // Check you've found the global function name
         for (let i = 0; i < this.global_funct_names.length; i++) {
             global_funct_name = this.global_funct_names[i];
-            if (this.getProgDefs().getLabels()[global_funct_name] === undefined) this.newError(`Cannot find the global label \'${global_funct_name}\' in the program. Check spelling if unsure.`);    
+            label = this.getProgDefs().getLabels()[global_funct_name];
+            if (label === undefined) this.newError(`Cannot find the global label \'${global_funct_name}\' in the program. Check spelling if unsure.`);    
         }
     }
 
@@ -1228,47 +1228,61 @@ class Parser {
             
             this.evaluateLineExpressions(); // Evaluate all refs, hi8()/lo8(), and expressions
 
-            // CHECK FOR COMMA AND REMOVE THEM IF THEYRE CORRECTLY PLACED
-            if (this.getLineManager().getLineLength() > 2) {
-                
-                // If the 3rd token is not a comma then its bad syntax
-                if (this.getLineManager().getLine(2).getType() !== 'COMMA') {
-                    this.newError(`Illegal token ${this.getLineManager().getLine(2).getValue()} on line ${this.lineInFile()}: expecting comma.`);
-                }
+            this.removeCommas();
 
-                this.getLineManager().getLine().splice(2, 1);    // remove the comma
-            }
-
-            const inst = this.getLineManager().getLine(0).getValue();            // instruction for that line
-
-            // CHECK IT'S A REAL INSTRUCTION
-            this.checkInstructionExists(inst);
-
-            // GET GIVEN AND EXPECTED ARGUMENTS
-            const expected_args = this.operands.getOperands(inst);   // the arguments we expect
-            const given_args = this.getLineManager().getLine().slice(1);                   // the arguments we have
-
-            this.checkArguments(inst, given_args);
-
-            // CHECK THE ARGUMENTS
-            for (this.getTokenManager().setTokNum(1); this.getTokenManager().getTokNum() < this.getLineManager().getLineLength(); this.getTokenManager().offsetTokNum(1)) {
-
-                const given_arg = this.getLineManager().getLine(this.getTokenManager().getTokNum());   // given arg
-                const exp_arg = expected_args[this.getTokenManager().getTokNum() - 1];    // expected arg
-                // CHECK THE TOKEN IS LEGAL
-                exp_arg.isLegalToken(given_arg, this.lineInFile());
-            }
+            this.checkArgs();
 
             // SET THE LINE TO AN INSTRUCTION
             this.getPMEM().setValue(this.getLineManager().getLineNumber(), new Instruction(this.getLineManager().getLine()));
         }
     }
 
-    checkArguments(inst, given_args) {
+    removeCommas() {
+        // CHECK FOR COMMA AND REMOVE THEM IF THEYRE CORRECTLY PLACED
+        if (this.getLineManager().getLineLength() <= 2) return;
+            
+        // If the 3rd token is not a comma then its bad syntax
+        if (this.getLineManager().getLine(2).getType() !== 'COMMA') {
+            this.newError(`Illegal token ${this.getLineManager().getLine(2).getValue()} on line ${this.lineInFile()}: expecting comma.`);
+        }
+
+        this.getLineManager().getLine().splice(2, 1);    // remove the comma
+        
+    }
+
+    checkInstruction() {
+        // GET GIVEN AND EXPECTED ARGUMENTS
+        const inst = this.getLineManager().getLine(0).getValue();            // instruction for that line
+
+        // CHECK IT'S A REAL INSTRUCTION
+        this.checkInstructionExists(inst);
+
+        // GET GIVEN AND EXPECTED ARGUMENTS
+        const expected_args = this.operands.getOperands(inst);   // the arguments we expect
+        const given_args = this.getLineManager().getLine().slice(1);                   // the arguments we have
+
+        this.checkArgsLength(inst, given_args);
+
+        return expected_args;
+    }
+
+    checkArgsLength(inst, given_args) {
         // CHECK IF IT'S GOT THE WRONG NUMBER OF ARGUMENTS
         if (this.operands.numArgs(inst) === given_args.length) return;
         if (inst === 'LPM' && given_args.length === 0) return;
         this.newError(`Wrong number of arguments given on line ${this.lineInFile()} for the ${inst} instruction. Please refer to the instruction manual.`);
+    }
+
+    checkArgs() {
+        let given_arg, exp_arg;
+        const expected_args = this.checkInstruction();
+
+        // CHECK THE ARGUMENTS
+        for (this.getTokenManager().setTokNum(1); this.getTokenManager().getTokNum() < this.getLineManager().getLineLength(); this.getTokenManager().offsetTokNum(1)) {
+            given_arg = this.getLineManager().getLine(this.getTokenManager().getTokNum());  // Given arg
+            exp_arg   = expected_args[this.getTokenManager().getTokNum() - 1];              // Expected arg
+            exp_arg.isLegalToken(given_arg, this.lineInFile());                             // Check the token is legal
+        }
     }
 
     checkInstructionExists(inst) {
@@ -1282,33 +1296,30 @@ class Parser {
         // GO THROUGH LINES IN DATA SECTION
         while (data_section_exists && (this.getLineManager().getLineNumber() < this.getLineManager().getTextSecStart())) {
 
-            if (this.getLineManager().getLineNumber() === 0) {                               // skip if it's the .SECTION .data line
+            if (this.getLineManager().getLineNumber() === 0) {  // skip if it's the .SECTION .data line
                 this.getLineManager().offsetLineNumber(1);
                 continue;
             }
 
             this.getLineManager().setLine();
-
-            // DEAL WITH LABELS AT THE START OF THE LINE
-            this.removeLabels('dmem');
+            this.removeLabels('dmem');  // DEAL WITH LABELS AT THE START OF THE LINE
             
-
             if (this.getLineManager().getLineLength() === 0) {
                 this.getLineManager().offsetLineNumber(1);
                 continue;
             }
             
             // CHECK THE DIRECTIVE
-            if (this.getLineManager().getLine(this.getTokenManager().getTokNum()).getType() !== 'DIR') this.newError(`Illegal syntax \'${this.lines[this.lineInFile() - 1]}\' for the data section. Expecting a directive on line ${this.lineInFile()}.`);
+            if (this.getLineManager().getLine(this.getTokenManager().getTokNum()).getType() !== 'DIR') {
+                const data_line = this.lines[this.lineInFile() - 1];
+                this.newError(`Illegal syntax \'${data_line}\' for the data section. Expecting a directive on line ${this.lineInFile()}.`);
+            }
 
             this.line_directive = this.getLineManager().getLine(this.getTokenManager().getTokNum()).getValue();    // get the directive for this line to use below
             this.replaceDirectiveRefs();
             
             this.getTokenManager().offsetTokNum(1); // Move to the next token in the line
-
-            // EXECUTE THE DIRECTIVE
             this.executeDirectives();
-
             this.getLineManager().offsetLineNumber(1);
         }
 
