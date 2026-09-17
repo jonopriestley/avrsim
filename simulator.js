@@ -473,9 +473,6 @@ class Instruction {
 
 class Lexer {
     constructor() {
-        this.math = new MathTokens();
-        this.directives = new Directives();
-        this.patterns = this.getPatterns();
     }
 
     getPatterns() {
@@ -535,7 +532,6 @@ class Lexer {
     newData(text) {
         this.code_arr = text.split('\n');
         this.tok_manager = new TokenManager();
-
         this.tokenise();
     }
 
@@ -557,7 +553,6 @@ class Lexer {
             if (this.getLineManager().getLineLength() === 0) continue;          
             
             this.getLineManager().endLine(); // add to the tokens list if the line isnt empty
-            
         }
     }
 
@@ -578,8 +573,8 @@ class Lexer {
 
         let match = null;
 
-        for (let i = 0; i < this.patterns.length; i++) {
-            const [regex, tag] = this.patterns[i];
+        for (let i = 0; i < this.getPatterns().length; i++) {
+            const [regex, tag] = this.getPatterns()[i];
             match = regex.exec(line.slice(start_pos));
 
             if (!match) continue;
@@ -646,7 +641,6 @@ class Lexer {
         };
 
         return bases[this.getTokenManager().getType()];
-        
     }
 
     trimLabels() {
@@ -661,7 +655,8 @@ class Lexer {
         if (this.getTokenManager().getType() !== 'DIR') return;
 
         const directive = this.getTokenManager().getValue().toUpperCase();
-        const is_valid_directive = this.directives.isDirective(directive);
+        const directive_list = new Directives();
+        const is_valid_directive = directive_list.isDirective(directive);
 
         if (!is_valid_directive) this.newError(`Invalid directive \'${this.getTokenManager().getValue()}\'.`);
 
@@ -693,10 +688,11 @@ class Lexer {
     }
 
     combineRefs(i) {
+        const math = new MathTokens(); 
         if (i === 0) return i;
         if (this.getLineManager().getLine(i - 1).getType() !== 'REF') return i;
         if (['COMMA', 'SYMBOL'].includes(this.getTokenManager().getType())) return i;
-        if (this.math.isValidSymbol(this.getTokenManager().getType())) return i;
+        if (math.isValidSymbol(this.getTokenManager().getType())) return i;
 
         const combined_value = this.getLineManager().getLine(i - 1).getValue() + this.getTokenManager().getValue();
 
@@ -746,7 +742,6 @@ class ExpressionEvaluator {
         this.tok_type = null;
         this.tok_value = null;
         this.index = 0;
-        this.math = new MathTokens();
     }
 
     evaluateNewLine(line) {
@@ -758,13 +753,13 @@ class ExpressionEvaluator {
 
     evaluateLineExpressions() {
         // Evaluate all expressions in the line
-        
+        const math = new MathTokens();
         this.index = 0;
         while (this.index < this.line.length) {
             this.setCurrentToken();
 
             // Add the the expression
-            if (this.math.isValidType(this.tok_type)) {
+            if (math.isValidType(this.tok_type)) {
                 this.addTokenToExpression();
             }
 
@@ -1293,6 +1288,7 @@ class Parser {
     checkDataSection() {
         this.getLineManager().setLineNumber(0);
         const data_section_exists = (this.getLineManager().getTextSecStart() !== 0);
+        let directive_type;
         // GO THROUGH LINES IN DATA SECTION
         while (data_section_exists && (this.getLineManager().getLineNumber() < this.getLineManager().getTextSecStart())) {
 
@@ -1309,14 +1305,18 @@ class Parser {
                 continue;
             }
             
-            // CHECK THE DIRECTIVE
-            if (this.getLineManager().getLine(this.getTokenManager().getTokNum()).getType() !== 'DIR') {
+            // CHECK IT'S A DIRECTIVE
+            directive_type = this.getLineManager().getLine(this.getTokenManager().getTokNum()).getType();
+            if (directive_type !== 'DIR') {
                 const data_line = this.lines[this.lineInFile() - 1];
                 this.newError(`Illegal syntax \'${data_line}\' for the data section. Expecting a directive on line ${this.lineInFile()}.`);
             }
 
             this.line_directive = this.getLineManager().getLine(this.getTokenManager().getTokNum()).getValue();    // get the directive for this line to use below
             this.replaceDirectiveRefs();
+
+            // TODO: CHECK IT HAS THE RIGHT NUMBER OF ARGS
+            this.checkNumDirectiveArgs();
             
             this.getTokenManager().offsetTokNum(1); // Move to the next token in the line
             this.executeDirectives();
@@ -1327,6 +1327,26 @@ class Parser {
         
         // Cannot hold more data than RamEnd
         this.newError(`Too much data to put into the data memory in the .data section.`);
+    }
+
+    checkNumDirectiveArgs() {
+        const num_args = this.getLineManager().getLine().length - 1;
+
+        if (num_args === 0) {
+            this.newError(`Illegal number of arguments on line ${this.lineInFile()}.`);
+        }
+
+        if (['.BYTE','.WORD'].includes(this.line_directive) && num_args & 1 === 0) {
+            this.newError(`Illegal number of arguments on line ${this.lineInFile()}.`);
+        };
+
+        if (['.STRING', '.ASCII','.ASCIZ'].includes(this.line_directive) && num_args & 1 === 0) {
+            this.newError(`Illegal number of arguments on line ${this.lineInFile()}.`);
+        };
+
+        if (['.SPACE'].includes(this.line_directive) && ![1, 3].includes(num_args)) {
+            this.newError(`Illegal number of arguments on line ${this.lineInFile()}.`);
+        };
     }
 
     executeDirectives() {
@@ -1347,9 +1367,8 @@ class Parser {
     executeByteDirective() {
         const parity_of_current_tok = this.getTokenManager().getTokNum() & 1;
 
-        if (parity_of_current_tok !== 1 || !['.BYTE','.WORD'].includes(this.line_directive)) {
-            return;
-        }
+        if (parity_of_current_tok !== 1) return;
+        if (!['.BYTE','.WORD'].includes(this.line_directive)) return;
 
         const tok_val = this.getTokenManager().getValue();
 
@@ -3465,7 +3484,7 @@ class Directives {
     }
 
     isDirective(d) {
-        return this.directives.includes(d);
+        return this.getDirectives().includes(d);
     }
 }
 
