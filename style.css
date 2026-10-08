@@ -476,6 +476,12 @@ small {
     margin: auto;
 }
 
+.table-other-values-heading-PC-small{
+    padding-left: 9%;
+    padding-right: 9%;
+    border-radius: 5px;
+}
+
 .pmem {
     float:left;
     width: 40%;

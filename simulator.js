@@ -1757,7 +1757,6 @@ class Interpreter {
         const pcl = new Register('PCL', 0); // PC lo8
         const pch = new Register('PCH', 0); // PC hi8
         this.pc = new PC(pcl, pch);
-
     }
 
     newData(pmem, dmem, break_point) {
@@ -1765,7 +1764,6 @@ class Interpreter {
         this.pmem = pmem;
         this.dmem = dmem;
         this.prog_data = new ProgramData(break_point);
-
 
         // DEFINING PC
         const pcl = new Register('PCL', this.getDMEM().getValue(0x5b));
@@ -1788,6 +1786,8 @@ class Interpreter {
 
         let Rd, Rr, Result, K_val, k, b, s, A_val, q, w, low_byte, plusminus;    // declaring all the variable names
         let [T_bit, H_bit, V_bit, N_bit, Z_bit, C_bit] = [null, null, null, null, null, null];
+
+        this.getPC().clearJump();
 
         // Big switch statement
         switch (inst) {
@@ -2076,7 +2076,7 @@ class Interpreter {
                 if (this.ret()) return;
                 break;
             case 'RJMP':
-                this.getPC().offsetValue(this.getArgValue(0));
+                this.getPC().offsetValue(this.getArgValue(0), true);
                 this.getProgramData().offsetCycles(1);
                 break;
             case 'ROL':
@@ -2219,7 +2219,7 @@ class Interpreter {
         if (this.getDMEM().getSREGBit(s) !== clear_set) return;
 
         let k = this.getArgValue(branch_arg); // branch_arg is 0 unless inst is BRBC/BRBS
-        this.getPC().offsetValue(k);
+        this.getPC().offsetValue(k, true);
         this.getProgramData().offsetCycles(1);
         this.getProgramData().offsetBranchesTaken(1);
     }
@@ -2241,7 +2241,7 @@ class Interpreter {
         let incs = (this.getLine(2) === null) ? 2 : 1;  // increment twice if the next instruction is double size
 
         for (let i = 0; i < incs; i++) {
-            this.getPC().offsetValue(1);
+            this.getPC().offsetValue(1, true);
             this.getProgramData().offsetCycles(1);
         }
     }
@@ -2364,8 +2364,8 @@ class Interpreter {
 
     call(call_type = 0) {
         // 0 = CALL, 1 = ICALL, 2 = RCALL
-        this.getPC().offsetValue(1);
-        if (!call_type) this.getPC().offsetValue(1);   // CALL is a 32 bit instruction
+        this.getPC().offsetValue(1, true);
+        if (!call_type) this.getPC().offsetValue(1, true);   // CALL is a 32 bit instruction
 
         // If SP <= 0x101
         if (this.getDMEM().getWord(0x5d) <= 0x101) return this.newError(`Bad stack pointer for CALL on line ${this.line_in_file}.`);
@@ -2374,7 +2374,7 @@ class Interpreter {
 
         const k = (call_type === 1) ? this.getDMEM().getWord(30) : this.getArgValue(0);
 
-        if (call_type === 2) this.getPC().offsetValue(k - 1);
+        if (call_type === 2) this.getPC().offsetValue(k - 1, true);
         else this.getPC().setValue(k - 1);
 
         this.getProgramData().offsetCycles(3);
@@ -2514,7 +2514,7 @@ class Interpreter {
         this.getDMEM().setValue(25, this.mod256(W_val >> 8));
         //document.getElementById('console').innerHTML += '\n';               // add a new line after a print
 
-        this.getPC().offsetValue(1);   // increment because CALL is double length 
+        this.getPC().offsetValue(1, true);   // increment because CALL is double length 
         
         // Move the scroll to the bottom
         const console_box = document.getElementById('console');
@@ -2800,6 +2800,7 @@ class PC {
     constructor(pcl, pch) {
         this.pcl = pcl;
         this.pch = pch;
+        this.jump = false;
     }
 
     getValue() {
@@ -2814,13 +2815,22 @@ class PC {
         return this.pch;
     }
 
-    setValue(new_value) {
+    setValue(new_value, jump = true) {
         this.pch.setValue(this.mod256(new_value >> 8));
         this.pcl.setValue(this.mod256(new_value));
+        this.jump |= jump;
     }
 
-    offsetValue(offset) {
-        this.setValue(this.getValue() + offset);
+    offsetValue(offset, jump = false) {
+        this.setValue(this.getValue() + offset, jump);
+    }
+
+    getJump() {
+        return this.jump;
+    }
+
+    clearJump() {
+        this.jump = false;
     }
 
     mod256(val) {
@@ -4067,6 +4077,17 @@ class App {
         this.setinnerHTML('reg-X', x);
         this.setinnerHTML('reg-Y', y);
         this.setinnerHTML('reg-Z', z);
+
+        const is_light = (this.theme_handler.getTheme() === 'light');
+        const normal_bg_col = (is_light) ? '#ddd' : '#7e7e7e';
+        const normal_txt_col = (is_light) ? '#444' : '#fff';
+        
+        const change_bg_col = '#fd0002';
+        const change_txt_col = '#fff';
+        const pc_jump = this.interpreter.getPC().getJump();
+
+        if (pc_jump) this.setFgBG("reg-PC", change_txt_col, change_bg_col);
+        else         this.setFgBG("reg-PC", normal_txt_col, normal_bg_col);
 
     }
 
