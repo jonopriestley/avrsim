@@ -77,11 +77,29 @@ class Register {
         // Returns the value of a bit in a number
         return ((this.getValue() >> bit) & 1);
     }
-    inc() {
-        this.setValue(this.getValue() + 1);
+}
+
+class DMEMCell {
+    constructor(value = 0, changed = 0) {
+        this.value = value;
+        this.changed = changed;
     }
-    dec() {
-        this.setValue(this.getValue() - 1);
+    clearChange() {
+        // To be done at the start of every new instruction.
+        this.changed = 0;
+    }
+    setChange() {
+        this.changed = 1;
+    }
+    getChange() {
+        return this.changed;
+    }
+    setValue(new_value) {
+        this.value = new_value & 0xff;
+        this.setChange();
+    }
+    getValue() {
+        return this.value;
     }
 }
 
@@ -860,7 +878,7 @@ class Parser {
 
         // FILLING IN DMEM WITH 0s
         for (let i = this.getDMEM().getLength(); i <= this.getDMEM().getRAMEnd(); i++) {
-            this.getDMEM().push(0);
+            this.getDMEM().push(new DMEMCell());
         }
 
         // FILLING IN PMEM WITH NOP INSTRUCTIONS
@@ -1377,10 +1395,10 @@ class Parser {
             this.newError(`Bad token \'${tok_val}\' on line ${this.lineInFile()} at position ${start}.`);
         }
         
-        this.getDMEM().push(this.lo8(tok_val));
+        this.getDMEM().push(new DMEMCell(this.lo8(tok_val)));
 
         if (this.line_directive === '.WORD') {
-            this.getDMEM().push(this.hi8(tok_val));
+            this.getDMEM().push(new DMEMCell(this.hi8(tok_val)));
         }    
     }
 
@@ -1443,10 +1461,10 @@ class Parser {
                 escape = false;
             }
             
-            this.getDMEM().push(this.lo8(char_ascii_value));           // add to data
+            this.getDMEM().push(new DMEMCell(this.lo8(char_ascii_value)));           // add to data
         }
 
-        if (['.STRING', '.ASCIZ'].includes(this.line_directive)) this.getDMEM().push(0);                                  // add NULL to data        
+        if (['.STRING', '.ASCIZ'].includes(this.line_directive)) this.getDMEM().push(new DMEMCell(0));  // add NULL to data        
     }
 
     executeSpaceDirective() {
@@ -1484,7 +1502,7 @@ class Parser {
         }
 
         for (let i = 0; i < number_of_spaces; i++) {
-            this.getDMEM().push(this.lo8(space_value));
+            this.getDMEM().push(new DMEMCell(this.lo8(space_value)));
         }
     }
 
@@ -2668,14 +2686,12 @@ class DMEM {
     getValue(loc = null) {
         // to get the registers as objects, use this.getValue()[i]
         if (loc === null) return this.memory;
-        if (loc > 0x8ff) return this.newError(`Illegal DMEM location: ${loc}. Execution terminated.`);
-        if (loc >= 0x100) return this.memory[loc];
+        if (loc > 0x8ff)  return this.newError(`Illegal DMEM location: ${loc}. Execution terminated.`);
         return this.memory[loc].getValue();
     }
 
     setValue(loc, val) {
-        if (loc >= 0x100) this.memory[loc] = val;
-        else              this.memory[loc].setValue(val);
+        this.memory[loc].setValue(val);
     }
 
     setMultipleValues(loc_arr, val_arr) {
@@ -3917,7 +3933,7 @@ class App {
 
     clearRegChange() {
         // Clear the change for all registers
-        for (let i = 0; i < 0xff; i++) {
+        for (let i = 0; i <= 0x8ff; i++) {
             this.interpreter.getDMEM().getValue()[i].clearChange();
         }
     }
@@ -3988,12 +4004,14 @@ class App {
         const change_text_colour = '#fff';
 
         // Go through each reg in the line
+        let change;
         for (let reg_num = 0; reg_num < 32; reg_num++) {
             const reg_value = this.convertValueToBase(registers[reg_num].getValue(), 2);
             this.setinnerHTML(`reg-${reg_num}`, reg_value);
 
             // If it's changed, make the display different
-            if (registers[reg_num].getChange()) {
+            change = registers[reg_num].getChange();
+            if (change) {
                 this.setFgBG(`reg-${reg_num}`, change_text_colour, change_background_colour);
             } else {
                 this.setFgBG(`reg-${reg_num}`, no_change_text_colour, no_change_background_colour);
@@ -4115,11 +4133,12 @@ class App {
         const normal_background_colour = (is_light) ? '#ddd' : '#7e7e7e';
         const normal_text_colour = (is_light) ? '#444' : '#fff';
 
-        const sp_background_colour = '#da920d';
-        const x_background_colour = '#32bd32';
-        const y_background_colour = '#20a3a3';
-        const z_background_colour = '#bd0c47';
-        const pointer_text_colour = '#fff';
+        const sp_bg_col = '#da920d';
+        const x_bg_col = '#32bd32';
+        const y_bg_col = '#20a3a3';
+        const z_bg_col = '#bd0c91'; // was #bd0c47
+        const change_bg_col = '#fd0002';
+        const pointer_txt_col = '#fff';
 
         for (let line = 0; line < num_lines; line++) {
 
@@ -4140,20 +4159,24 @@ class App {
                 let cell_value = this.interpreter.getDMEM().getValue(cell_number);
                 cell_value = (this.display_ascii) ? this.getAscii(cell_value) : this.convertValueToBase(cell_value, 2);
 
+                let change = this.interpreter.getDMEM().getValue()[cell_number].getChange();
+
                 // Assume it's not being pointed to by SP, X, Y, or Z
                 this.setinnerHTML(`dmem-line-${line}${row}`, cell_value);
                 this.setFgBG(`dmem-line-${line}${row}`, normal_text_colour, normal_background_colour);
 
                 
-                // Check if it's SP, X, Y, Z
+                // Check if it's SP, X, Y, Z, or Change
                 if (cell_number === sp) {
-                    this.setFgBG(`dmem-line-${line}${row}`, pointer_text_colour, sp_background_colour);
+                    this.setFgBG(`dmem-line-${line}${row}`, pointer_txt_col, sp_bg_col);
                 } else if (cell_number === z) {
-                    this.setFgBG(`dmem-line-${line}${row}`, pointer_text_colour, z_background_colour);
+                    this.setFgBG(`dmem-line-${line}${row}`, pointer_txt_col, z_bg_col);
                 } else if (cell_number === y) {
-                    this.setFgBG(`dmem-line-${line}${row}`, pointer_text_colour, y_background_colour);
+                    this.setFgBG(`dmem-line-${line}${row}`, pointer_txt_col, y_bg_col);
                 } else if (cell_number === x) {
-                    this.setFgBG(`dmem-line-${line}${row}`, pointer_text_colour, x_background_colour);
+                    this.setFgBG(`dmem-line-${line}${row}`, pointer_txt_col, x_bg_col);
+                } else if (change) {
+                    this.setFgBG(`dmem-line-${line}${row}`, pointer_txt_col, change_bg_col);
                 }
             }
         }
