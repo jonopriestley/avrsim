@@ -18,15 +18,18 @@
 </head>
 
 <body>
-
     <h1 class="h1 page-header">
         <div class="page-title">AVR Simulator</div>
         <button class="button button-theme" id="button_theme" type="button" onmousedown="app.toggleTheme()">Theme: Light</button>
-        <form style="float: left;">
+        <form style="float: right;">
             <input class="button button-guide" type="button"
             onclick=" window.open('AVR Simulator Guide.pdf','_blank', 'noopener noreferrer')" value="AVR Simulator Guide"
             download="AVR Simulator Guide" target="_blank" rel="noopener noreferrer"/>
         </form>
+        <a class="button button-feedback" id="button_feedback" href="https://forms.gle/45BmsgQvjkZu9hEo7"
+        target="_blank" rel="noopener noreferrer">Feedback Form</a>
+        <a class="button button-support" id="button_support" href="https://buymeacoffee.com/jonopriestley"
+        target="_blank" rel="noopener noreferrer">Support</a>
     </h1>
 
     <div class="body">
@@ -83,7 +86,6 @@ ret
                         <option value="100">100</option>
                     </select>
                     <button class="button button-step" type="button" onclick="app.stepBack()">Step Back</button>
-                    <button class="button button-base" type="button" id="button_base" onclick="app.changeBase()">Display Base: 16</button>
                     <br>
                     <button class="button button-run-slowly" type="button" onclick="app.runSlowly()">Run Slowly</button>
                     <select class="button select select-speed" name="run_speed" id="run_speed">
@@ -132,13 +134,14 @@ ret
                         <p class="text-muted">Break Point</p>
                         <input class="break-point" id="break_point" type="number" placeholder="Break line..." min="0" max="9">
                     </div>
-                    <br>
                 </div>
             </div>
 
             <div class="panel panel-cpu-and-memory">
                 <div class="panel-heading">
-                    <h4 class="panel-title">CPU & Memory</h4>
+                    <h4 class="panel-title">CPU & Memory
+                        <button class="button button-base" type="button" id="button_base" onclick="app.changeBase()">Display Base: 16</button>
+                    </h4>
                 </div>
                 <div class="panel-body" id="panel_cpu_body">
                     <p class="text-muted">Registers</p>
@@ -906,22 +909,13 @@ ret
                     </div>
                     <br>
                     <p class="text-muted">Console</p>
-                    <textarea class="console" id="console" name="console" rows="7" cols="75" readonly></textarea>
+                    <textarea class="console" id="console" name="console" rows="5" cols="75" readonly></textarea>
                     <br>
                     <button class="button button-clear-console" type="button" onclick="app.clearConsole()">Clear
                         Console</button>
                 </div>
             </div>
         </div>
-
-
-
-    </div>
-
-    <div class="feedback">
-        Give
-        <a href="https://forms.gle/45BmsgQvjkZu9hEo7" target="_blank" rel="noopener noreferrer">feedback</a>
-        on anything you want improved.
     </div>
 
     <script src="simulator.js"></script>

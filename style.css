@@ -55,7 +55,6 @@ h1 {
 
 .page-title {
     display: inline-block;
-    margin-right: 10%;
 }
 
 .body {
@@ -246,10 +245,29 @@ textarea {
     margin-right: 5px;
 }
 
+a {
+    text-decoration: none;
+    font-weight: normal;
+}
+
+.button-feedback {
+    padding: 8px 15px;
+    float: left;
+    font-size: 14pt;
+}
+
+.button-support {
+    padding: 8px 15px;
+    float: left;
+    font-size: 14pt;
+    margin-left: 10px;
+}
+
 .button-guide {
     padding: 8px 15px;
     float: right;
     font-size: 14pt;
+    margin-right: 10px;
 }
 
 .button-manual {
@@ -279,7 +297,9 @@ textarea {
 }
 
 .button-base {
-    padding: 15px 15px;
+    padding: 6px 10px;
+    margin-right: 8px;
+    float: right;
 }
 
 .button-pmem-up {
@@ -586,6 +606,7 @@ input {
     font-size: 17px;
     padding: 5px 5px;
     margin-top: 5px;
+    margin-bottom: 8px;
     width: 20%;
 }
 
@@ -674,6 +695,13 @@ input {
     animation: fadeIn 0.5s;
 }
 
+.donate {
+    font-size: 15px;
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 1%;
+    float: left;
+}
+
 
 /* Add animation (fade in the popup) */
 @-webkit-keyframes fadeIn {
@@ -687,16 +715,4 @@ input {
 }
 
 
-.donate {
-    font-size: 15px;
-    font-family: Arial, Helvetica, sans-serif;
-    margin: 1%;
-    float: left;
-}
 
-.feedback {
-    font-size: 15px;
-    font-family: Arial, Helvetica, sans-serif;
-    margin: 1%;
-    float: left;
-}
