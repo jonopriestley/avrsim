@@ -173,6 +173,7 @@ textarea {
     padding: 10px;
     align-self: center;
     resize: none;
+    width: 100%;
 }
 
 .line-numbers {
