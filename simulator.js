@@ -1548,7 +1548,7 @@ class Parser {
 
     asciiCharacterLiteral() {
         // Support ASCII character literals
-        if (this.getTogetTokenManager().getTypekType() !== 'STR') return;
+        if (this.getTokenManager().getType() !== 'STR') return;
 
         const val = this.getTokenManager().getValue();
 
