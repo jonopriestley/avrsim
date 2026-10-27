@@ -4087,8 +4087,7 @@ class App {
         const pc_jump = this.interpreter.getPC().getJump();
 
         if (pc_jump) this.setFgBG("reg-PC", change_txt_col, change_bg_col);
-        else         this.setFgBG("reg-PC", normal_txt_col, normal_bg_col);
-
+        else         this.setFgBG("reg-PC", normal_txt_col, normal_bg_col)
     }
 
     populatePMEM(start_cell) {
@@ -4151,7 +4150,7 @@ class App {
 
         const is_light = (this.theme_handler.getTheme() === 'light');
 
-        const normal_background_colour = (is_light) ? '#ddd' : '#7e7e7e';
+        const normal_background_colour = 'transparent';
         const normal_text_colour = (is_light) ? '#444' : '#fff';
 
         const sp_bg_col = '#da920d';
@@ -4159,7 +4158,7 @@ class App {
         const y_bg_col = '#20a3a3';
         const z_bg_col = '#bd0c91'; // was #bd0c47
         const change_bg_col = '#fd0002';
-        const pointer_txt_col = '#fff';
+        
 
         for (let line = 0; line < num_lines; line++) {
 
@@ -4179,27 +4178,79 @@ class App {
 
                 let cell_value = this.interpreter.getDMEM().getValue(cell_number);
                 cell_value = (this.display_ascii) ? this.getAscii(cell_value) : this.convertValueToBase(cell_value, 2);
-
-                let change = this.interpreter.getDMEM().getValue()[cell_number].getChange();
-
+                
                 // Assume it's not being pointed to by SP, X, Y, or Z
                 this.setinnerHTML(`dmem-line-${line}${row}`, cell_value);
                 this.setFgBG(`dmem-line-${line}${row}`, normal_text_colour, normal_background_colour);
+                this.setFgBG(`div-dmem-line-${line}${row}`, normal_text_colour, normal_background_colour);
 
+                this.removeAllButSmall(line, row);
                 
+                let change = this.interpreter.getDMEM().getValue()[cell_number].getChange();
+                let colours = [];
                 // Check if it's SP, X, Y, Z, or Change
-                if (cell_number === sp) {
-                    this.setFgBG(`dmem-line-${line}${row}`, pointer_txt_col, sp_bg_col);
-                } else if (cell_number === z) {
-                    this.setFgBG(`dmem-line-${line}${row}`, pointer_txt_col, z_bg_col);
-                } else if (cell_number === y) {
-                    this.setFgBG(`dmem-line-${line}${row}`, pointer_txt_col, y_bg_col);
-                } else if (cell_number === x) {
-                    this.setFgBG(`dmem-line-${line}${row}`, pointer_txt_col, x_bg_col);
-                } else if (change) {
-                    this.setFgBG(`dmem-line-${line}${row}`, pointer_txt_col, change_bg_col);
-                }
+                if (cell_number === sp) colours.push(sp_bg_col);
+                if (cell_number === z)  colours.push(z_bg_col);
+                if (cell_number === y)  colours.push(y_bg_col);
+                if (cell_number === x)  colours.push(x_bg_col);
+                if (change)             colours.push(change_bg_col);
+
+                this.highlightDMEMCell(line, row, colours);
             }
+        }
+    }
+
+    removeAllButSmall(line, row) {
+        // remove background divs but keep the small
+        const parent = document.getElementById(`div-dmem-line-${line}${row}`);
+        for (let i = 0; parent.childElementCount > 1; i++) {
+            parent.removeChild(parent.firstChild);
+        }
+    }
+
+    highlightDMEMCell(line, row, colours) {
+        if (colours.length === 0) return;
+
+        const pointer_txt_col = '#fff';
+        this.setFgBG(`dmem-line-${line}${row}`, pointer_txt_col, 'transparent');    // set text colour
+        
+        const parent = document.getElementById(`div-dmem-line-${line}${row}`);
+        for (let idx_col = 0; idx_col < colours.length; idx_col++) {
+            if (idx_col === 4) break;   // max 4 colours
+            
+            let current_div = `<div class="table-dmem-body-bg" id="div-dmem-line-${line}${row}${idx_col}"></div>`;
+            parent.insertAdjacentHTML("afterbegin", current_div); // insert div
+
+            this.highlightDMEMCellOneColour(line, row, colours, idx_col);
+        }
+    }
+
+    highlightDMEMCellOneColour(line, row, colours, idx_col) {
+        const num_len = document.getElementById(`dmem-line-${line}${row}`).innerHTML.length;
+        const max_width = [40, 60, 80][num_len - 1];
+        const max_height = 85;
+        const margin_left = Math.round(50 - max_width / 2);
+
+        const widths  = [[1], [0.5, 1], [0.33, 0.67, 1], [0.5, 1, 0.5, 1]];
+        const heights  = [[1], [1, 1], [1, 1, 1], [0.57, 0.57, 1, 1]];
+
+        const width = widths[colours.length - 1][idx_col] * max_width;
+        const height = heights[colours.length - 1][idx_col] * max_height;
+
+        // Set style
+        const current_div = document.getElementById(`div-dmem-line-${line}${row}${idx_col}`);
+        current_div.style.width = `${width}%`;
+        current_div.style.marginLeft = `${margin_left}%`;
+        current_div.style.backgroundColor = `${colours[idx_col]}`;
+        current_div.style.height = `${height}%`;
+        
+        // Set border radii
+        if (width < max_width) {
+            current_div.style.borderTopRightRadius = '0px';
+            current_div.style.borderBottomRightRadius = '0px';
+        } if (height < max_height) {
+            current_div.style.borderBottomRightRadius = '0px';
+            current_div.style.borderBottomLeftRadius = '0px';
         }
     }
 
