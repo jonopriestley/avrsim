@@ -4190,9 +4190,9 @@ class App {
                 let colours = [];
                 // Check if it's SP, X, Y, Z, or Change
                 if (cell_number === sp) colours.push(sp_bg_col);
-                if (cell_number === z)  colours.push(z_bg_col);
-                if (cell_number === y)  colours.push(y_bg_col);
                 if (cell_number === x)  colours.push(x_bg_col);
+                if (cell_number === y)  colours.push(y_bg_col);
+                if (cell_number === z)  colours.push(z_bg_col);
                 if (change)             colours.push(change_bg_col);
 
                 this.highlightDMEMCell(line, row, colours);
@@ -4213,11 +4213,11 @@ class App {
 
         const pointer_txt_col = '#fff';
         this.setFgBG(`dmem-line-${line}${row}`, pointer_txt_col, 'transparent');    // set text colour
+
+        if (colours.length === 5) colours.splice(2, 0, colours.pop())   // move the change colour the the middle
         
         const parent = document.getElementById(`div-dmem-line-${line}${row}`);
         for (let idx_col = 0; idx_col < colours.length; idx_col++) {
-            if (idx_col === 4) break;   // max 4 colours
-            
             let current_div = `<div class="table-dmem-body-bg" id="div-dmem-line-${line}${row}${idx_col}"></div>`;
             parent.insertAdjacentHTML("afterbegin", current_div); // insert div
 
@@ -4226,13 +4226,13 @@ class App {
     }
 
     highlightDMEMCellOneColour(line, row, colours, idx_col) {
-        const num_len = document.getElementById(`dmem-line-${line}${row}`).innerHTML.length;
-        const max_width = [40, 60, 80][num_len - 1];
+        const num_len = document.getElementById(`dmem-line-${line}${row}`).innerHTML.length;    
+        const max_width = [45, 60, 80][num_len - 1];    // widths for 1, 2, or 3 digit numbers
         const max_height = 85;
         const margin_left = Math.round(50 - max_width / 2);
 
-        const widths  = [[1], [0.5, 1], [0.33, 0.67, 1], [0.5, 1, 0.5, 1]];
-        const heights  = [[1], [1, 1], [1, 1, 1], [0.57, 0.57, 1, 1]];
+        const widths  = [[1], [0.5, 1], [0.32, 0.68, 1], [0.5, 0.5, 1, 1], [0.35, 0.35, 0.65, 1, 1]];
+        const heights  = [[1], [1, 1], [1, 1, 1], [0.55, 1, 0.55, 1], [0.55, 1, 1, 0.55, 1]];
 
         const width = widths[colours.length - 1][idx_col] * max_width;
         const height = heights[colours.length - 1][idx_col] * max_height;
