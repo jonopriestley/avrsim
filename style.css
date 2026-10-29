@@ -255,13 +255,13 @@ a {
     padding: 8px 15px;
     float: left;
     font-size: 14pt;
+    margin-left: 10px;
 }
 
 .button-support {
     padding: 8px 15px;
     float: left;
     font-size: 14pt;
-    margin-left: 10px;
 }
 
 .button-guide {
