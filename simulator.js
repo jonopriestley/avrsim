@@ -311,7 +311,8 @@ class Instruction {
 
         this.operands = new Operands();
         this.inst_set = new InstructionSet();
-        this.opcode = this.makeOpcode();
+        this.opcode2 = this.makeOpcode(2);
+        this.opcode16 = this.makeOpcode(16);
     }
 
     twosComp(number, digits) {
@@ -323,35 +324,34 @@ class Instruction {
 
         // Remove digits from the front if it's too long
         if (b.length >= digits) return b.slice(b.length - digits);
-
-        // Add digits to the front if it's too short
-        const ones = digits - b.length;
-        return '1'.repeat(ones) + b;
+        return b.padStart(digits, '1'); // Add digits to the front if it's too short
     }
 
     binLenDigits(number, digits) {
         let b = number.toString(2);
         // Remove digits from the front if it's too long
         if (b.length >= digits) return b.slice(b.length - digits);
-        const zeros = digits - b.length; // Add digits to the front if it's too short
-        return '0'.repeat(zeros) + b;
+        return b.padStart(digits, '0');  // Add digits to the front if it's too short
     }
 
     countElements(string, symbol) {
         return string.split(symbol).length - 1;
     }
 
-    makeOpcode() {
+    makeOpcode(base) {
         const inst = this.inst.getValue();
         const opcode_requirements = this.all_opcodes[inst];
+        let opcode;
 
         // More tricky opcodes
-        if (opcode_requirements === null) return this.makeComplexOpcode(inst);
+        if (opcode_requirements === null) opcode = this.makeComplexOpcode(inst);
         
         // Simple opcodes
-        return this.makeDefinedOpcode(opcode_requirements);
+        else opcode = this.makeDefinedOpcode(opcode_requirements);
 
-        
+        if (base === 2) return opcode;
+
+        if (base === 16) return parseInt(opcode, 2).toString(16).padStart(4, '0');
     }
 
     makeDefinedOpcode(opcode_requirements) {
@@ -383,17 +383,17 @@ class Instruction {
     }
 
     makeComplexOpcode(inst) {
-        let d, r, K, w;
+        let d, k, w;
 
         switch (inst) {
             case 'ADIW':
                 d = this.binLenDigits(((this.args[0].getValue() / 2) - 12), 2);
-                K = this.binLenDigits(this.args[1].getValue(), 6);
-                return `10010110${K.slice(0, 2)}${d}${K.slice(2)}`;
+                k = this.binLenDigits(this.args[1].getValue(), 6);
+                return `10010110${k.slice(0, 2)}${d}${k.slice(2)}`;
             case 'CBR':
                 d = this.binLenDigits(this.args[0].getValue(), 4);
-                K = this.binLenDigits((0xff - this.args[1].getValue()), 8);
-                return `0111${K.slice(0, 4)}${d}${K.slice(4)}`;
+                k = this.binLenDigits((0xff - this.args[1].getValue()), 8);
+                return `0111${k.slice(0, 4)}${d}${k.slice(4)}`;
             case 'CLR':
                 d = this.binLenDigits(this.args[0].getValue(), 5);
                 return `001001${d.slice(0, 1)}${d}${d.slice(1)}`;
@@ -418,8 +418,8 @@ class Instruction {
                 return `000111${d.slice(0, 1)}${d}${d.slice(1)}`;
             case 'SBIW':
                 d = this.binLenDigits(((this.args[0].getValue() / 2) - 12), 2);
-                K = this.binLenDigits(this.args[1].getValue(), 6);
-                return `10010111${K.slice(0, 2)}${d}${K.slice(2)}`;
+                k = this.binLenDigits(this.args[1].getValue(), 6);
+                return `10010111${k.slice(0, 2)}${d}${k.slice(2)}`;
             case 'ST':
                 this.makeDataTransferOpcode(1, 0);
             case 'STD':
@@ -471,8 +471,9 @@ class Instruction {
         return `${inst} ${arg1}, ${arg2}`;
     }
 
-    getOpcode() {
-        return this.opcode;
+    getOpcode(base) {
+        if (base ===  2) return this.opcode2;
+        if (base === 16) return this.opcode16;
     }
 
     getInst() {
@@ -2004,7 +2005,7 @@ class Interpreter {
                 if (this.line.getArgs().length !== 0 && this.getArgValue(1).includes('+')) this.getDMEM().offsetWord(30, 1);
 
                 const inst_location = (k >> 1) & 0xffff;
-                const inst_opcode = this.getPMEM().getValue(inst_location).getOpcode();
+                const inst_opcode = this.getPMEM().getValue(inst_location).getOpcode(2);
                 const start = 8 * !(k & 1); // slicing at 0 gives the most significant 8 bits, so k = 1 returns 0
                 const opcode_slice = inst_opcode.slice(start, start + 8);
 
@@ -3806,7 +3807,7 @@ class App {
 
         // Displays
         this.base = 16; // value base for display
-        this.display_opcode = false;
+        this.display_opcode = 0;
         this.display_ascii = false;
 
         this.assembled = false;
@@ -3850,6 +3851,8 @@ class App {
     progress(prog_type = 0) {
         // 0 = step, 1 = run slowly, 2 = run        
         this.hideOpenPopup(); // hide any open popup
+
+        if (!this.assembled) this.assemble();
         
         this.clearRegChange();  // clear the change for all registers
 
@@ -4112,9 +4115,9 @@ class App {
             let line_value = this.interpreter.getPMEM().getValue(start_cell + line);  // get the line to print
 
             // If the opcode display = true 
-            if (this.display_opcode) {
-                if (line_value !== null) line_value = line_value.getOpcode().slice(0, 16);              // replace null lines with (two line inst.)
-                else                     line_value = this.interpreter.getPMEM().getValue(start_cell + line - 1).getOpcode().slice(16);  
+            if (this.display_opcode !== 0) {
+                if (line_value !== null) line_value = line_value.getOpcode(this.display_opcode).slice(0, 16);              // replace null lines with (two line inst.)
+                else                     line_value = this.interpreter.getPMEM().getValue(start_cell + line - 1).getOpcode(this.display_opcode).slice(16);  
             }
 
             // If the instruction is to be display, not the opcode
@@ -4159,15 +4162,11 @@ class App {
         const z_bg_col = '#bd0c91'; // was #bd0c47
         const change_bg_col = '#fd0002';
         
-
         for (let line = 0; line < num_lines; line++) {
 
             let line_value = (start_cell + (num_rows * line)).toString(this.base);     // Calculate line start cell number as base 16 string
 
-            // Add 0's to the front until it's 4 digits long
-            for (let i = line_value.length; i < 4; i++) {
-                line_value = '0' + line_value;
-            }
+            line_value = line_value.padStart(4, '0');   // Add 0's to the front until it's 4 digits long
 
             // Put the line value in the html
             this.setinnerHTML(`dmem-linenum-${line}`, line_value);
@@ -4342,7 +4341,12 @@ class App {
     }
 
     getStepSize() {
-        return parseInt(document.getElementById('step_size').value);
+        const val = document.getElementById('step_size').value;
+        try {
+            return parseInt(val);
+        } catch (e) {
+            this.newError(`Illegal value \'${val}\' for step size.`);
+        }
     }
 
     getRunSpeed() {
@@ -4363,11 +4367,7 @@ class App {
 
         if (this.base !== 16) return n;
 
-        for (let i = n.length; i < num_digits; i++) {
-            n = '0' + n;
-        }
-
-        return n;
+        return n.padStart(num_digits, '0');
     }
 
     changeBase() {
@@ -4389,10 +4389,13 @@ class App {
 
     toggleOpcodeDisplay() {
         this.hideOpenPopup(); // hide any open popup
-        this.display_opcode = !(this.display_opcode);
+        
+        const options = [0, 2, 16];
+        const idx_op = options.indexOf(this.display_opcode);
+        this.display_opcode = options[(idx_op + 1) % 3];
 
-        if (this.display_opcode) this.setinnerHTML('button-opcode', 'Opcode Off');
-        else                     this.setinnerHTML('button-opcode', 'Opcode On');
+        if (this.display_opcode !== 0) this.setinnerHTML('button-opcode', `Opcode: ${this.display_opcode}`);
+        else                           this.setinnerHTML('button-opcode', 'Opcode: Off');
 
         this.populatePMEM(this.pmem_top);
     }
@@ -5668,9 +5671,3 @@ class App {
 }
 
 app = new App();
-
-
-
-
-
-

@@ -86,7 +86,7 @@ ret
                     <option value="100">100</option>
                     </select-->
                     <button class="button button-step" type="button" onclick="app.stepBack()">Step Back</button>
-                    <input class="button select select-step" name="step_size" id="step_size" type="number" placeholder="Step size..." min="0" max="9999" value="1">
+                    <input class="button select input-step" name="step_size" id="step_size" type="number" placeholder="Step size..." min="0" max="1000" value="1">
                     <br>
                     <button class="button button-run-slowly" type="button" onclick="app.runSlowly()">Run Slowly</button>
                     <select class="button select select-speed" name="run_speed" id="run_speed">
@@ -551,7 +551,7 @@ ret
                         <button class="button button-pmem-up" type="button" onclick="app.displayPMEMUp()">ʌ</button>
                         <button class="button button-pmem-down" type="button" onclick="app.displayPMEMDown()">v</button>
                         <button class="button button-toggle-opcode" type="button" id="button-opcode"
-                            onclick="app.toggleOpcodeDisplay()">Opcode On</button>
+                            onclick="app.toggleOpcodeDisplay()">Opcode: Off</button>
                     </div>
                     <div class="dmem">
                         <table class="table table-dmem">
