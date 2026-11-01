@@ -383,7 +383,7 @@ class Instruction {
     }
 
     makeComplexOpcode(inst) {
-        let d, k, w;
+        let d, k, w, r;
 
         switch (inst) {
             case 'ADIW':
@@ -413,6 +413,7 @@ class Instruction {
             case 'MOVW':
                 d = this.binLenDigits((this.args[0].getValue() / 2), 4);
                 r = this.binLenDigits((this.args[1].getValue() / 2), 4);
+                return `00000001${d}${r}`;
             case 'ROL':
                 d = this.binLenDigits(this.args[0].getValue(), 5);
                 return `000111${d.slice(0, 1)}${d}${d.slice(1)}`;
