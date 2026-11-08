@@ -3626,8 +3626,9 @@ class EventListeners {
             // Update max value for break point
             document.getElementById('break_point').max = `${code_box.value.split('\n').length + 1}`;
 
-            if (event.key === 'Enter') this.codeBoxEnter(event, code_box);
+            if (event.key === 'Enter') this.codeBoxEnter(code_box);
             if (event.key === 'Tab')   this.codeBoxTab(event, code_box);
+
         });
 
         document.addEventListener('keyup', event => {
@@ -3654,7 +3655,7 @@ class EventListeners {
         });
     }
 
-    codeBoxEnter(event, code_box) {
+    codeBoxEnter(code_box) {
         // When enter key is pressed update the line number of the breakpoint if it has changed
         if (document.getElementById('break_point').value === '') return;
 
@@ -5669,6 +5670,28 @@ class App {
         this.populateAll();
     }
 
+    saveCodeBox() {
+        const code_box = document.getElementById('code_box');
+        localStorage.setItem("savedValue", code_box.value); // set the value if in localStorage
+    }
+
+    loadCodeBox() {
+        // checks if value is saved or not
+        let text = ".section .data\n\n.section .text\n.global asm_function\n\nasm_function:\nret\n\n.end";
+        if(localStorage.getItem("savedValue")) text = localStorage.getItem("savedValue");
+        document.getElementById('code_box').value = text;
+        this.loadLineNumbers();
+    }
+
+    loadLineNumbers() {
+        // count lines and make the line counter display that many lines
+        const code_box = document.getElementById('code_box');
+        const line_count = code_box.value.split('\n').length;
+        const lines_array = Array.from({ length: line_count }, (_, i) => String(i + 1));
+
+        const lines_box = document.getElementById('lines_box');
+        lines_box.innerHTML = lines_array.join('\n');
+    }
 }
 
 app = new App();
