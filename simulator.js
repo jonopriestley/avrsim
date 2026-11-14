@@ -398,9 +398,9 @@ class Instruction {
                 d = this.binLenDigits(this.args[0].getValue(), 5);
                 return `001001${d.slice(0, 1)}${d}${d.slice(1)}`;
             case 'LD':
-                this.makeDataTransferOpcode(0, 0);
+                return this.makeDataTransferOpcode(0, 0);
             case 'LDD':
-                this.makeDataTransferOpcode(0, 1);
+                return this.makeDataTransferOpcode(0, 1);
             case 'LPM':
                 if (this.getArgs().length === 0) return '1001010111001000';
                 w = this.args[1].getValue();
@@ -422,9 +422,9 @@ class Instruction {
                 k = this.binLenDigits(this.args[1].getValue(), 6);
                 return `10010111${k.slice(0, 2)}${d}${k.slice(2)}`;
             case 'ST':
-                this.makeDataTransferOpcode(1, 0);
+                return this.makeDataTransferOpcode(1, 0);
             case 'STD':
-                this.makeDataTransferOpcode(1, 1);
+                return this.makeDataTransferOpcode(1, 1);
             case 'TST':
                 d = this.binLenDigits(this.args[0].getValue(), 5);
                 return `001000${d.slice(0, 1)}${d}${d.slice(1)}`;
